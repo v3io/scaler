@@ -12,11 +12,11 @@ type AutoScalerOptions struct {
 	KubeClientSet  kubernetes.Interface
 	ResourceScaler ResourceScaler
 
-	Namespace      string
-	ScaleInterval  time.Duration
-	ScaleWindow    time.Duration
-	MetricName     string
-	Threshold      int64
+	Namespace     string
+	ScaleInterval time.Duration
+	ScaleWindow   time.Duration
+	MetricName    string
+	Threshold     int64
 }
 
 type PollerOptions struct {
@@ -24,9 +24,9 @@ type PollerOptions struct {
 	CustomMetricsClientSet custommetricsv1.CustomMetricsClient
 	ResourceScaler         ResourceScaler
 
-	MetricInterval         time.Duration
-	MetricName             string
-	Namespace              string
+	MetricInterval time.Duration
+	MetricName     string
+	Namespace      string
 }
 
 type ResourceScalerConfig struct {
@@ -38,7 +38,7 @@ type ResourceScalerConfig struct {
 
 type DLXOptions struct {
 	// not needed to be provided by ResourceScalerConfig
-	ResourceScaler   ResourceScaler
+	ResourceScaler ResourceScaler
 
 	Namespace        string
 	TargetNameHeader string

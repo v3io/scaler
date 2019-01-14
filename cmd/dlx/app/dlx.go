@@ -9,7 +9,6 @@ import (
 
 	"github.com/nuclio/errors"
 	"github.com/nuclio/zap"
-
 )
 
 func Run(namespace string, targetNameHeader string, targetPathHeader string, targetPort int, listenAddress string) error {
@@ -18,10 +17,10 @@ func Run(namespace string, targetNameHeader string, targetPathHeader string, tar
 	dlxOptions := scaler.DLXOptions{
 		TargetNameHeader: targetNameHeader,
 		TargetPathHeader: targetPathHeader,
-		TargetPort: targetPort,
-		ListenAddress: listenAddress,
-		Namespace: namespace,
-		ResourceScaler: resourceScaler,
+		TargetPort:       targetPort,
+		ListenAddress:    listenAddress,
+		Namespace:        namespace,
+		ResourceScaler:   resourceScaler,
 	}
 
 	// see if resource scaler wants to override the arguments

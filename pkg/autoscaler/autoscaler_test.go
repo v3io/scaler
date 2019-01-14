@@ -1,9 +1,10 @@
 package autoscaler
 
 import (
-	"github.com/v3io/scaler/pkg"
 	"testing"
 	"time"
+
+	"github.com/v3io/scaler/pkg"
 
 	"github.com/nuclio/logger"
 	"github.com/nuclio/zap"

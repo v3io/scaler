@@ -1,0 +1,24 @@
+sudo: required
+
+services:
+  - docker
+
+addons:
+  apt:
+    packages:
+      - docker-ce
+
+language: go
+go_import_path: github.com/v3io/scaler
+go: "1.10"
+
+script:
+  - make lint test
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
+  - echo $TRAVIS_PULL_REQUEST
+  - echo $TRAVIS_BRANCH
+  - echo "$DOCKER_PASSWORD" | docker login -u="$DOCKER_USERNAME" --password-stdin &&
+    make docker-images push-docker-images
+  - echo "Done."

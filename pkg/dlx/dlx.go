@@ -1,16 +1,18 @@
 package dlx
 
 import (
+	"net/http"
+
+	"github.com/v3io/scaler/pkg"
+
 	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"
-	"github.com/v3io/scaler/pkg"
-	"net/http"
 )
 
 type DLX struct {
-	logger logger.Logger
-	listenAddress   string
-	handler         Handler
+	logger        logger.Logger
+	listenAddress string
+	handler       Handler
 }
 
 func NewDLX(logger logger.Logger,
@@ -30,9 +32,9 @@ func NewDLX(logger logger.Logger,
 	}
 
 	return &DLX{
-		logger: logger,
+		logger:        logger,
 		listenAddress: options.ListenAddress,
-		handler: handler,
+		handler:       handler,
 	}, nil
 }
 

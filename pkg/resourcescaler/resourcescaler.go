@@ -2,21 +2,20 @@ package resourcescaler
 
 import "github.com/v3io/scaler/pkg"
 
-type resourceScaler struct {}
+type ResourceScaler struct{}
 
-
-func New() *resourceScaler {
-	return &resourceScaler{}
+func New() *ResourceScaler {
+	return &ResourceScaler{}
 }
 
-func (r *resourceScaler) SetScale(string, scaler.Resource, int) error {
+func (r *ResourceScaler) SetScale(string, scaler.Resource, int) error {
 	return nil
 }
 
-func (r *resourceScaler) GetResources() ([]scaler.Resource, error) {
+func (r *ResourceScaler) GetResources() ([]scaler.Resource, error) {
 	return []scaler.Resource{}, nil
 }
 
-func (r *resourceScaler) GetConfig() (*scaler.ResourceScalerConfig, error) {
+func (r *ResourceScaler) GetConfig() (*scaler.ResourceScalerConfig, error) {
 	return nil, nil
 }

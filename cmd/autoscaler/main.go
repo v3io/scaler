@@ -5,8 +5,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/nuclio/errors"
 	"github.com/v3io/scaler/cmd/autoscaler/app"
+
+	"github.com/nuclio/errors"
 )
 
 func main() {

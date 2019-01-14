@@ -1,15 +1,15 @@
 package app
 
 import (
-	"github.com/v3io/scaler/pkg"
 	"os"
 	"time"
 
-	"github.com/nuclio/errors"
-	"github.com/nuclio/zap"
+	"github.com/v3io/scaler/pkg"
 	"github.com/v3io/scaler/pkg/autoscaler"
 	"github.com/v3io/scaler/pkg/resourcescaler"
 
+	"github.com/nuclio/errors"
+	"github.com/nuclio/zap"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -24,16 +24,16 @@ func Run(kubeconfigPath string,
 	scaleThreshold int64,
 	metricsInterval time.Duration) error {
 	autoScalerOptions := scaler.AutoScalerOptions{
-		Namespace: namespace,
+		Namespace:     namespace,
 		ScaleInterval: scaleInterval,
-		ScaleWindow: scaleWindow,
-		Threshold: scaleThreshold,
-		MetricName: metricName,
+		ScaleWindow:   scaleWindow,
+		Threshold:     scaleThreshold,
+		MetricName:    metricName,
 	}
 
 	pollerOptions := scaler.PollerOptions{
-		Namespace: namespace,
-		MetricName: metricName,
+		Namespace:      namespace,
+		MetricName:     metricName,
 		MetricInterval: metricsInterval,
 	}
 
@@ -50,8 +50,8 @@ func Run(kubeconfigPath string,
 		pollerOptions = resourceScalerConfig.PollerOptions
 	}
 
-	autoScalerOptions.resourceScaler = resourceScaler
-	pollerOptions.resourceScaler = resourceScaler
+	autoScalerOptions.ResourceScaler = resourceScaler
+	pollerOptions.ResourceScaler = resourceScaler
 
 	restConfig, err := getClientConfig(kubeconfigPath)
 	if err != nil {
@@ -63,7 +63,7 @@ func Run(kubeconfigPath string,
 		return errors.Wrap(err, "Failed to create scaler")
 	}
 
-	if err := newScaler.Start(); err != nil {
+	if err = newScaler.Start(); err != nil {
 		return errors.Wrap(err, "Failed to start scaler")
 	}
 
@@ -72,7 +72,7 @@ func Run(kubeconfigPath string,
 		return errors.Wrap(err, "Failed to create poller")
 	}
 
-	if err := newScaler.Start(); err != nil {
+	if err = newScaler.Start(); err != nil {
 		return errors.Wrap(err, "Failed to start scaler")
 	}
 
@@ -94,7 +94,7 @@ func createAutoScaler(restConfig *rest.Config, options scaler.AutoScalerOptions)
 		return nil, errors.Wrap(err, "Failed to create k8s client set")
 	}
 
-	options.kubeClientSet = kubeClientSet
+	options.KubeClientSet = kubeClientSet
 
 	newScaler, err := autoscaler.NewAutoScaler(rootLogger, options)
 
@@ -116,7 +116,7 @@ func createPoller(restConfig *rest.Config, reporter autoscaler.MetricReporter, o
 		return nil, errors.Wrap(err, "Failed create custom metrics client set")
 	}
 
-	options.customMetricsClientSet = customMetricsClient
+	options.CustomMetricsClientSet = customMetricsClient
 
 	newPoller, err := autoscaler.NewMetricsPoller(rootLogger, reporter, options)
 	if err != nil {

@@ -1,10 +1,11 @@
 package dlx
 
 import (
-	"github.com/v3io/scaler/pkg"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/v3io/scaler/pkg"
 
 	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"
@@ -36,7 +37,7 @@ func NewResourceStarter(parentLogger logger.Logger,
 		resourceSinksMap:         make(resourceSinksMap),
 		namespace:                namespace,
 		resourceReadinnesTimeout: time.Minute,
-		scaler:                   scaler,
+		scaler: scaler,
 	}
 	return fs, nil
 }

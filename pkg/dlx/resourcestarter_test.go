@@ -2,11 +2,12 @@ package dlx
 
 import (
 	"fmt"
-	"github.com/v3io/scaler/pkg"
 	"net/http"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/v3io/scaler/pkg"
 
 	"github.com/nuclio/logger"
 	"github.com/nuclio/zap"
