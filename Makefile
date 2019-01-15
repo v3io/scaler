@@ -35,12 +35,12 @@ DLX_DOCKER_REPO = levrado1/dlx-onbuild
 .PHONY: autoscaler-onbuild
 autoscaler-onbuild:
 	@echo Building autoscaler-onbuild
-	docker build -f cmd/autoscaler/Dockerfile -t $(AUTOSCALER_DOCKER_REPO) .
+	docker build -f cmd/autoscaler/Dockerfile -t $(AUTOSCALER_DOCKER_REPO):$(SCALER_LABEL) .
 
 .PHONY: dlx-onbuild
 dlx-onbuild:
 	@echo Building dlx-onbuild
-	docker build -f cmd/dlx/Dockerfile -t $(DLX_DOCKER_REPO) .
+	docker build -f cmd/dlx/Dockerfile -t $(DLX_DOCKER_REPO):$(SCALER_LABEL) .
 
 .PHONY: docker-images
 docker-images: autoscaler-onbuild dlx-onbuild
@@ -48,8 +48,8 @@ docker-images: autoscaler-onbuild dlx-onbuild
 .PHONY: push-docker-images
 push-docker-images:
 	@echo Pushing images
-	docker push $(DLX_DOCKER_REPO)
-	docker push $(AUTOSCALER_DOCKER_REPO)
+	docker push $(DLX_DOCKER_REPO):$(SCALER_LABEL)
+	docker push $(AUTOSCALER_DOCKER_REPO):$(SCALER_LABEL)
 
 #
 # Build helpers
