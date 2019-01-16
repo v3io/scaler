@@ -19,7 +19,7 @@ type ResourceStarter struct {
 	namespace                string
 	resourceSinksMap         resourceSinksMap
 	resourceSinkMutex        sync.Mutex
-	resourceReadinnesTimeout time.Duration
+	resourceReadinessTimeout time.Duration
 	scaler                   scaler.ResourceScaler
 }
 
@@ -36,8 +36,8 @@ func NewResourceStarter(parentLogger logger.Logger,
 		logger:                   parentLogger.GetChild("resource-starter"),
 		resourceSinksMap:         make(resourceSinksMap),
 		namespace:                namespace,
-		resourceReadinnesTimeout: time.Minute,
-		scaler: scaler,
+		resourceReadinessTimeout: time.Minute,
+		scaler:                   scaler,
 	}
 	return fs, nil
 }
@@ -82,7 +82,7 @@ func (r *ResourceStarter) startResource(resourceSinkChannel chan responseChannel
 	go r.waitResourceReadiness(scaler.Resource(resourceName), resourceReadyChannel)
 
 	select {
-	case <-time.After(r.resourceReadinnesTimeout):
+	case <-time.After(r.resourceReadinessTimeout):
 		r.logger.WarnWith("Timed out waiting for resource to be ready", "resource", resourceName)
 		defer r.deleteResourceSink(resourceName)
 		resultStatus = ResourceStatusResult{
@@ -123,7 +123,7 @@ func (r *ResourceStarter) startResource(resourceSinkChannel chan responseChannel
 }
 
 func (r *ResourceStarter) waitResourceReadiness(resourceName scaler.Resource, resourceReadyChannel chan error) {
-	err := r.scaler.SetScale(r.namespace, resourceName, 1)
+	err := r.scaler.SetScale(r.logger, r.namespace, resourceName, 1)
 	resourceReadyChannel <- err
 }
 
