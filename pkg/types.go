@@ -3,6 +3,7 @@ package scaler
 import (
 	"time"
 
+	"github.com/nuclio/logger"
 	"k8s.io/client-go/kubernetes"
 	custommetricsv1 "k8s.io/metrics/pkg/client/custom_metrics"
 )
@@ -48,7 +49,7 @@ type DLXOptions struct {
 }
 
 type ResourceScaler interface {
-	SetScale(string, Resource, int) error
+	SetScale(logger.Logger, string, Resource, int) error
 	GetResources() ([]Resource, error)
 	GetConfig() (*ResourceScalerConfig, error)
 }

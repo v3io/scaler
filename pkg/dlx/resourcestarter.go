@@ -37,7 +37,7 @@ func NewResourceStarter(parentLogger logger.Logger,
 		resourceSinksMap:         make(resourceSinksMap),
 		namespace:                namespace,
 		resourceReadinnesTimeout: time.Minute,
-		scaler: scaler,
+		scaler:                   scaler,
 	}
 	return fs, nil
 }
@@ -123,7 +123,7 @@ func (r *ResourceStarter) startResource(resourceSinkChannel chan responseChannel
 }
 
 func (r *ResourceStarter) waitResourceReadiness(resourceName scaler.Resource, resourceReadyChannel chan error) {
-	err := r.scaler.SetScale(r.namespace, resourceName, 1)
+	err := r.scaler.SetScale(r.logger, r.namespace, resourceName, 1)
 	resourceReadyChannel <- err
 }
 
