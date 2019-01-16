@@ -10,7 +10,7 @@ addons:
 
 language: go
 go_import_path: github.com/v3io/scaler
-go: "1.10"
+go: "1.11"
 
 script:
   - make lint test
