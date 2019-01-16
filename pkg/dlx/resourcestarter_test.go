@@ -44,7 +44,7 @@ func (suite *resourceStarterTest) SetupTest() {
 		logger:                   suite.logger,
 		resourceSinksMap:         make(resourceSinksMap),
 		namespace:                "default",
-		resourceReadinnesTimeout: time.Duration(1 * time.Second),
+		resourceReadinessTimeout: time.Duration(1 * time.Second),
 		scaler:                   suite,
 	}
 	suite.mocker = new(mocker)
