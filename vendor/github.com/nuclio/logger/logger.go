@@ -16,85 +16,57 @@ limitations under the License.
 
 package logger
 
-import (
-    "context"
-)
-
 // Level defines a log level
 type Level uint8
 
 const (
-    LevelDebug Level = iota
-    LevelInfo
-    LevelWarn
-    LevelError
+	LevelDebug Level = iota
+	LevelInfo
+	LevelWarn
+	LevelError
 )
 
 // Logger allows outputting logs to various logger sinks
 type Logger interface {
 
-    // emit a log entry of a given verbosity. the first argument may be an object, a string
-    // or a format string. in case of the latter, the following varargs are passed
-    // to a formatter (e.g. fmt.Sprintf)
+	// emit a log entry of a given verbosity. the first argument may be an object, a string
+	// or a format string. in case of the latter, the following varargs are passed
+	// to a formatter (e.g. fmt.Sprintf)
 
-    // Error emits an unstructured error log
-    Error(format interface{}, vars ...interface{})
+	// Error emits an unstructured error log
+	Error(format interface{}, vars ...interface{})
 
-    // Warn emits an unstructured warning log
-    Warn(format interface{}, vars ...interface{})
+	// Warn emits an unstructured warning log
+	Warn(format interface{}, vars ...interface{})
 
-    // Info emits an unstructured informational log
-    Info(format interface{}, vars ...interface{})
+	// Info emits an unstructured informational log
+	Info(format interface{}, vars ...interface{})
 
-    // Debug emits an unstructured debug log
-    Debug(format interface{}, vars ...interface{})
+	// Debug emits an unstructured debug log
+	Debug(format interface{}, vars ...interface{})
 
-    // ErrorCtx emits an unstructured error log with context
-    ErrorCtx(ctx context.Context, format interface{}, vars ...interface{})
+	// emit a structured log entry. example:
+	//
+	// l.InfoWith("The message",
+	//  "first-key", "first-value",
+	//  "second-key", 2)
+	//
 
-    // WarnCtx emits an unstructured warning log with context
-    WarnCtx(ctx context.Context, format interface{}, vars ...interface{})
+	// ErrorWith emits a structured error log
+	ErrorWith(format interface{}, vars ...interface{})
 
-    // InfoCtx emits an unstructured informational log with context
-    InfoCtx(ctx context.Context, format interface{}, vars ...interface{})
+	// WarnWith emits a structured warning log
+	WarnWith(format interface{}, vars ...interface{})
 
-    // DebugCtx emits an unstructured debug log with context
-    DebugCtx(ctx context.Context, format interface{}, vars ...interface{})
+	// InfoWith emits a structured info loglog
+	InfoWith(format interface{}, vars ...interface{})
 
-    // emit a structured log entry. example:
-    //
-    // l.InfoWith("The message",
-    //  "first-key", "first-value",
-    //  "second-key", 2)
-    //
+	// DebugWith emits a structured debug log
+	DebugWith(format interface{}, vars ...interface{})
 
-    // ErrorWith emits a structured error log
-    ErrorWith(format interface{}, vars ...interface{})
+	// Flush flushes buffered logs, if applicable
+	Flush()
 
-    // WarnWith emits a structured warning log
-    WarnWith(format interface{}, vars ...interface{})
-
-    // InfoWith emits a structured info log
-    InfoWith(format interface{}, vars ...interface{})
-
-    // DebugWith emits a structured debug log
-    DebugWith(format interface{}, vars ...interface{})
-
-    // ErrorWithCtx emits a structured error log with context
-    ErrorWithCtx(ctx context.Context, format interface{}, vars ...interface{})
-
-    // WarnWithCtx emits a structured warning log with context
-    WarnWithCtx(ctx context.Context, format interface{}, vars ...interface{})
-
-    // InfoWithCtx emits a structured info log with context
-    InfoWithCtx(ctx context.Context, format interface{}, vars ...interface{})
-
-    // DebugWithCtx emits a structured debug log with context
-    DebugWithCtx(ctx context.Context, format interface{}, vars ...interface{})
-
-    // Flush flushes buffered logs, if applicable
-    Flush()
-
-    // GetChild returns a child logger, if underlying logger supports hierarchal logging
-    GetChild(name string) Logger
+	// GetChild returns a child logger, if underlying logger supports hierarchal logging
+	GetChild(name string) Logger
 }

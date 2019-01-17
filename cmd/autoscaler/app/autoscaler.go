@@ -84,7 +84,7 @@ func Run(kubeconfigPath string,
 }
 
 func createAutoScaler(restConfig *rest.Config, options scaler.AutoScalerOptions) (*autoscaler.Autoscaler, error) {
-	rootLogger, err := nucliozap.NewNuclioZap("autoscaler", "console", os.Stdout, os.Stderr, nucliozap.DebugLevel)
+	rootLogger, err := nucliozap.NewNuclioZap("autoscaler", "console",nil, os.Stdout, os.Stderr, nucliozap.DebugLevel)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to initialize root logger")
 	}
@@ -106,7 +106,7 @@ func createAutoScaler(restConfig *rest.Config, options scaler.AutoScalerOptions)
 }
 
 func createPoller(restConfig *rest.Config, reporter autoscaler.MetricReporter, options scaler.PollerOptions) (*autoscaler.MetricsPoller, error) {
-	rootLogger, err := nucliozap.NewNuclioZap("autoscaler", "json", os.Stdout, os.Stderr, nucliozap.DebugLevel)
+	rootLogger, err := nucliozap.NewNuclioZap("autoscaler", "console", nil,os.Stdout, os.Stderr, nucliozap.DebugLevel)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to initialize root logger")
 	}

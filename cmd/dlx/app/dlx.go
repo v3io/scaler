@@ -47,7 +47,7 @@ func Run(namespace string, targetNameHeader string, targetPathHeader string, tar
 }
 
 func createDLX(options scaler.DLXOptions) (*dlx.DLX, error) {
-	rootLogger, err := nucliozap.NewNuclioZap("dlx", "console", os.Stdout, os.Stderr, nucliozap.DebugLevel)
+	rootLogger, err := nucliozap.NewNuclioZap("dlx", "console", nil, os.Stdout, os.Stderr, nucliozap.DebugLevel)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to initialize root logger")
 	}
