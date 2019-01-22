@@ -16,8 +16,9 @@ type DLX struct {
 }
 
 func NewDLX(logger logger.Logger,
+	resourceScaler scaler.ResourceScaler,
 	options scaler.DLXOptions) (*DLX, error) {
-	resourceStarter, err := NewResourceStarter(logger, options.ResourceScaler, options.Namespace)
+	resourceStarter, err := NewResourceStarter(logger, resourceScaler, options.Namespace)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create function starter")
 	}

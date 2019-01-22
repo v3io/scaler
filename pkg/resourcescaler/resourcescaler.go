@@ -6,20 +6,20 @@ import (
 	"github.com/nuclio/logger"
 )
 
-type ResourceScaler struct{}
+type EmptyResourceScaler struct{}
 
-func New() *ResourceScaler {
-	return &ResourceScaler{}
+func New() scaler.ResourceScaler {
+	return &EmptyResourceScaler{}
 }
 
-func (r *ResourceScaler) SetScale(logger.Logger, string, scaler.Resource, int) error {
+func (r *EmptyResourceScaler) SetScale(logger logger.Logger, namespace string, resource scaler.Resource, scale int) error {
 	return nil
 }
 
-func (r *ResourceScaler) GetResources() ([]scaler.Resource, error) {
+func (r *EmptyResourceScaler) GetResources(namespace string) ([]scaler.Resource, error) {
 	return []scaler.Resource{}, nil
 }
 
-func (r *ResourceScaler) GetConfig() (*scaler.ResourceScalerConfig, error) {
+func (r *EmptyResourceScaler) GetConfig() (*scaler.ResourceScalerConfig, error) {
 	return nil, nil
 }

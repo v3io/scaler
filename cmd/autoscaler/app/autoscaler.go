@@ -10,7 +10,6 @@ import (
 
 	"github.com/nuclio/errors"
 	"github.com/nuclio/zap"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	custommetricsv1 "k8s.io/metrics/pkg/client/custom_metrics"
@@ -50,15 +49,12 @@ func Run(kubeconfigPath string,
 		pollerOptions = resourceScalerConfig.PollerOptions
 	}
 
-	autoScalerOptions.ResourceScaler = resourceScaler
-	pollerOptions.ResourceScaler = resourceScaler
-
 	restConfig, err := getClientConfig(kubeconfigPath)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get client configuration")
 	}
 
-	newScaler, err := createAutoScaler(restConfig, autoScalerOptions)
+	newScaler, err := createAutoScaler(restConfig, resourceScaler, autoScalerOptions)
 	if err != nil {
 		return errors.Wrap(err, "Failed to create scaler")
 	}
@@ -83,20 +79,15 @@ func Run(kubeconfigPath string,
 	select {}
 }
 
-func createAutoScaler(restConfig *rest.Config, options scaler.AutoScalerOptions) (*autoscaler.Autoscaler, error) {
+func createAutoScaler(restConfig *rest.Config,
+	resourceScaler scaler.ResourceScaler,
+	options scaler.AutoScalerOptions) (*autoscaler.Autoscaler, error) {
 	rootLogger, err := nucliozap.NewNuclioZap("autoscaler", "console", os.Stdout, os.Stderr, nucliozap.DebugLevel)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to initialize root logger")
 	}
 
-	kubeClientSet, err := kubernetes.NewForConfig(restConfig)
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to create k8s client set")
-	}
-
-	options.KubeClientSet = kubeClientSet
-
-	newScaler, err := autoscaler.NewAutoScaler(rootLogger, options)
+	newScaler, err := autoscaler.NewAutoScaler(rootLogger, resourceScaler, options)
 
 	if err != nil {
 		return nil, err
@@ -105,8 +96,10 @@ func createAutoScaler(restConfig *rest.Config, options scaler.AutoScalerOptions)
 	return newScaler, nil
 }
 
-func createPoller(restConfig *rest.Config, reporter autoscaler.MetricReporter, options scaler.PollerOptions) (*autoscaler.MetricsPoller, error) {
-	rootLogger, err := nucliozap.NewNuclioZap("autoscaler", "json", os.Stdout, os.Stderr, nucliozap.DebugLevel)
+func createPoller(restConfig *rest.Config,
+	reporter autoscaler.MetricReporter,
+	options scaler.PollerOptions) (*autoscaler.MetricsPoller, error) {
+	rootLogger, err := nucliozap.NewNuclioZap("autoscaler", "console", os.Stdout, os.Stderr, nucliozap.DebugLevel)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to initialize root logger")
 	}
@@ -116,9 +109,7 @@ func createPoller(restConfig *rest.Config, reporter autoscaler.MetricReporter, o
 		return nil, errors.Wrap(err, "Failed create custom metrics client set")
 	}
 
-	options.CustomMetricsClientSet = customMetricsClient
-
-	newPoller, err := autoscaler.NewMetricsPoller(rootLogger, reporter, options)
+	newPoller, err := autoscaler.NewMetricsPoller(rootLogger, reporter, customMetricsClient, options)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create metrics poller")
 	}
