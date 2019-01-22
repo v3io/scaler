@@ -25,7 +25,7 @@ func (suite *autoScalerTest) SetScale(logger logger.Logger, namespace string, re
 	return nil
 }
 
-func (suite *autoScalerTest) GetResources() ([]scaler.Resource, error) {
+func (suite *autoScalerTest) GetResources(namespace string) ([]scaler.Resource, error) {
 	return []scaler.Resource{}, nil
 }
 

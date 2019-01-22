@@ -20,7 +20,6 @@ func Run(namespace string, targetNameHeader string, targetPathHeader string, tar
 		TargetPort:       targetPort,
 		ListenAddress:    listenAddress,
 		Namespace:        namespace,
-		ResourceScaler:   resourceScaler,
 	}
 
 	// see if resource scaler wants to override the arguments
@@ -33,7 +32,7 @@ func Run(namespace string, targetNameHeader string, targetPathHeader string, tar
 		dlxOptions = resourceScalerConfig.DLXOptions
 	}
 
-	newDLX, err := createDLX(dlxOptions)
+	newDLX, err := createDLX(resourceScaler, dlxOptions)
 	if err != nil {
 		return errors.Wrap(err, "Failed to create dlx")
 	}
@@ -46,13 +45,13 @@ func Run(namespace string, targetNameHeader string, targetPathHeader string, tar
 	select {}
 }
 
-func createDLX(options scaler.DLXOptions) (*dlx.DLX, error) {
+func createDLX(resourceScaler scaler.ResourceScaler, options scaler.DLXOptions) (*dlx.DLX, error) {
 	rootLogger, err := nucliozap.NewNuclioZap("dlx", "console", os.Stdout, os.Stderr, nucliozap.DebugLevel)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to initialize root logger")
 	}
 
-	newScaler, err := dlx.NewDLX(rootLogger, options)
+	newScaler, err := dlx.NewDLX(rootLogger, resourceScaler, options)
 
 	if err != nil {
 		return nil, err

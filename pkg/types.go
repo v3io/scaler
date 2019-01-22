@@ -4,15 +4,9 @@ import (
 	"time"
 
 	"github.com/nuclio/logger"
-	"k8s.io/client-go/kubernetes"
-	custommetricsv1 "k8s.io/metrics/pkg/client/custom_metrics"
 )
 
 type AutoScalerOptions struct {
-	// not needed to be provided by ResourceScalerConfig
-	KubeClientSet  kubernetes.Interface
-	ResourceScaler ResourceScaler
-
 	Namespace     string
 	ScaleInterval time.Duration
 	ScaleWindow   time.Duration
@@ -21,10 +15,6 @@ type AutoScalerOptions struct {
 }
 
 type PollerOptions struct {
-	// not needed to be provided by ResourceScalerConfig
-	CustomMetricsClientSet custommetricsv1.CustomMetricsClient
-	ResourceScaler         ResourceScaler
-
 	MetricInterval time.Duration
 	MetricName     string
 	Namespace      string
@@ -38,9 +28,6 @@ type ResourceScalerConfig struct {
 }
 
 type DLXOptions struct {
-	// not needed to be provided by ResourceScalerConfig
-	ResourceScaler ResourceScaler
-
 	Namespace        string
 	TargetNameHeader string
 	TargetPathHeader string
@@ -50,7 +37,7 @@ type DLXOptions struct {
 
 type ResourceScaler interface {
 	SetScale(logger.Logger, string, Resource, int) error
-	GetResources() ([]Resource, error)
+	GetResources(string) ([]Resource, error)
 	GetConfig() (*ResourceScalerConfig, error)
 }
 

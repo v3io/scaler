@@ -33,7 +33,9 @@ type Autoscaler struct {
 	threshold      int64
 }
 
-func NewAutoScaler(parentLogger logger.Logger, options scaler.AutoScalerOptions) (*Autoscaler, error) {
+func NewAutoScaler(parentLogger logger.Logger,
+	resourceScaler scaler.ResourceScaler,
+	options scaler.AutoScalerOptions) (*Autoscaler, error) {
 	childLogger := parentLogger.GetChild("autoscale")
 	childLogger.DebugWith("Creating Autoscaler",
 		"Namespace", options.Namespace,
@@ -43,7 +45,7 @@ func NewAutoScaler(parentLogger logger.Logger, options scaler.AutoScalerOptions)
 		logger:         childLogger,
 		namespace:      options.Namespace,
 		metricsMap:     make(resourceMetricTypeMap),
-		resourceScaler: options.ResourceScaler,
+		resourceScaler: resourceScaler,
 		metricName:     options.MetricName,
 		windowSize:     options.ScaleWindow,
 		scaleInterval:  options.ScaleInterval,
@@ -132,7 +134,7 @@ func (as *Autoscaler) Start() error {
 		for {
 			select {
 			case <-ticker.C:
-				resourcesList, err := as.resourceScaler.GetResources()
+				resourcesList, err := as.resourceScaler.GetResources(as.namespace)
 				if err != nil {
 					as.logger.WarnWith("Failed to build resource map")
 				}

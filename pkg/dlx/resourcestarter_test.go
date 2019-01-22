@@ -31,7 +31,7 @@ func (suite *resourceStarterTest) SetScale(logger logger.Logger, namespace strin
 	return nil
 }
 
-func (suite *resourceStarterTest) GetResources() ([]scaler.Resource, error) {
+func (suite *resourceStarterTest) GetResources(namespace string) ([]scaler.Resource, error) {
 	return []scaler.Resource{}, nil
 }
 
