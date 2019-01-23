@@ -4,12 +4,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/v3io/scaler/pkg"
 	"github.com/v3io/scaler/pkg/autoscaler"
-	"github.com/v3io/scaler/pkg/resourcescaler"
+	"github.com/v3io/scaler/pkg/pluginloader"
 
 	"github.com/nuclio/errors"
 	"github.com/nuclio/zap"
+	"github.com/v3io/scaler-types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	custommetricsv1 "k8s.io/metrics/pkg/client/custom_metrics"
@@ -22,7 +22,7 @@ func Run(kubeconfigPath string,
 	metricName string,
 	scaleThreshold int64,
 	metricsInterval time.Duration) error {
-	autoScalerOptions := scaler.AutoScalerOptions{
+	autoScalerOptions := scaler_types.AutoScalerOptions{
 		Namespace:     namespace,
 		ScaleInterval: scaleInterval,
 		ScaleWindow:   scaleWindow,
@@ -30,13 +30,20 @@ func Run(kubeconfigPath string,
 		MetricName:    metricName,
 	}
 
-	pollerOptions := scaler.PollerOptions{
+	pollerOptions := scaler_types.PollerOptions{
 		Namespace:      namespace,
 		MetricName:     metricName,
 		MetricInterval: metricsInterval,
 	}
 
-	resourceScaler := resourcescaler.New()
+	pluginLoader, err := pluginloader.New()
+	if err != nil {
+		return errors.Wrap(err, "Failed to initialize plugin loader")
+	}
+	resourceScaler, err := pluginLoader.Load()
+	if err != nil {
+		return errors.Wrap(err, "Failed to load plugin")
+	}
 
 	resourceScalerConfig, err := resourceScaler.GetConfig()
 	if err != nil {
@@ -80,8 +87,8 @@ func Run(kubeconfigPath string,
 }
 
 func createAutoScaler(restConfig *rest.Config,
-	resourceScaler scaler.ResourceScaler,
-	options scaler.AutoScalerOptions) (*autoscaler.Autoscaler, error) {
+	resourceScaler scaler_types.ResourceScaler,
+	options scaler_types.AutoScalerOptions) (*autoscaler.Autoscaler, error) {
 	rootLogger, err := nucliozap.NewNuclioZap("autoscaler", "console", os.Stdout, os.Stderr, nucliozap.DebugLevel)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to initialize root logger")
@@ -98,7 +105,7 @@ func createAutoScaler(restConfig *rest.Config,
 
 func createPoller(restConfig *rest.Config,
 	reporter autoscaler.MetricReporter,
-	options scaler.PollerOptions) (*autoscaler.MetricsPoller, error) {
+	options scaler_types.PollerOptions) (*autoscaler.MetricsPoller, error) {
 	rootLogger, err := nucliozap.NewNuclioZap("autoscaler", "console", os.Stdout, os.Stderr, nucliozap.DebugLevel)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to initialize root logger")

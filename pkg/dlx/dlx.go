@@ -3,10 +3,9 @@ package dlx
 import (
 	"net/http"
 
-	"github.com/v3io/scaler/pkg"
-
 	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"
+	"github.com/v3io/scaler-types"
 )
 
 type DLX struct {
@@ -16,8 +15,8 @@ type DLX struct {
 }
 
 func NewDLX(logger logger.Logger,
-	resourceScaler scaler.ResourceScaler,
-	options scaler.DLXOptions) (*DLX, error) {
+	resourceScaler scaler_types.ResourceScaler,
+	options scaler_types.DLXOptions) (*DLX, error) {
 	resourceStarter, err := NewResourceStarter(logger, resourceScaler, options.Namespace)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create function starter")
