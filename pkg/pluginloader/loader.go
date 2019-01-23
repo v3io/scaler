@@ -8,6 +8,8 @@ import (
 	"github.com/v3io/scaler-types"
 )
 
+type resourceScalerNewFunc func() (scaler_types.ResourceScaler, error)
+
 type PluginLoader struct{}
 
 func New() (*PluginLoader, error) {
@@ -15,8 +17,11 @@ func New() (*PluginLoader, error) {
 }
 
 func (p *PluginLoader) Load() (scaler_types.ResourceScaler, error) {
+	var funcNew resourceScalerNewFunc
+	var ok bool
+
 	plugins, err := filepath.Glob("plugins/*.so")
-	if err != nil {
+	if err != nil || len(plugins) == 0 {
 		return nil, errors.New("No plugins found")
 	}
 
@@ -32,13 +37,11 @@ func (p *PluginLoader) Load() (scaler_types.ResourceScaler, error) {
 			return nil, errors.Wrap(err, "Failed to find New symbol")
 		}
 
-		funcNew, ok := symbol.(func() (scaler_types.ResourceScaler, error))
+		funcNew, ok = symbol.(func() (scaler_types.ResourceScaler, error))
 		if !ok {
 			return nil, errors.New("Failed to cast New function of plugin")
 		}
-
-		return funcNew()
 	}
 
-	return nil, errors.New("No plugins found")
+	return funcNew()
 }

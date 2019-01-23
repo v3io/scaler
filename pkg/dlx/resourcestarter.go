@@ -36,7 +36,7 @@ func NewResourceStarter(parentLogger logger.Logger,
 		resourceSinksMap:         make(resourceSinksMap),
 		namespace:                namespace,
 		resourceReadinessTimeout: time.Minute,
-		scaler: scaler,
+		scaler:                   scaler,
 	}
 	return fs, nil
 }

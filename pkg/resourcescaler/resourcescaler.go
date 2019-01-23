@@ -6,7 +6,7 @@ import (
 
 type NopResourceScaler struct{}
 
-func New() (scaler_types.ResourceScaler, error) {
+func New() (scaler_types.ResourceScaler, error) { // nolint: deadcode
 	return &NopResourceScaler{}, nil
 }
 
