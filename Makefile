@@ -25,8 +25,8 @@ SCALER_LABEL := $(if $(SCALER_LABEL),$(SCALER_LABEL),latest)
 SCALER_TEST_HOST := $(if $(SCALER_TEST_HOST),$(SCALER_TEST_HOST),$(SCALER_DEFAULT_TEST_HOST))
 SCALER_VERSION_GIT_COMMIT = $(shell git rev-parse HEAD)
 
-AUTOSCALER_DOCKER_REPO = levrado1/autoscaler-onbuild
-DLX_DOCKER_REPO = levrado1/dlx-onbuild
+AUTOSCALER_DOCKER_REPO = quay.io/v3io/autoscaler
+DLX_DOCKER_REPO = quay.io/v3io/dlx
 
 #
 # Docker build
