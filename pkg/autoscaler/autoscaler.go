@@ -3,17 +3,16 @@ package autoscaler
 import (
 	"time"
 
-	"github.com/v3io/scaler/pkg"
-
 	"github.com/nuclio/logger"
+	"github.com/v3io/scaler-types"
 )
 
-type resourceMetricTypeMap map[scaler.Resource]map[string][]metricEntry
+type resourceMetricTypeMap map[scaler_types.Resource]map[string][]metricEntry
 
 type metricEntry struct {
 	timestamp    time.Time
 	value        int64
-	resourceName scaler.Resource
+	resourceName scaler_types.Resource
 	metricName   string
 }
 
@@ -26,14 +25,16 @@ type Autoscaler struct {
 	namespace      string
 	metricsChannel chan metricEntry
 	metricsMap     resourceMetricTypeMap
-	resourceScaler scaler.ResourceScaler
+	resourceScaler scaler_types.ResourceScaler
 	metricName     string
 	scaleInterval  time.Duration
 	windowSize     time.Duration
 	threshold      int64
 }
 
-func NewAutoScaler(parentLogger logger.Logger, options scaler.AutoScalerOptions) (*Autoscaler, error) {
+func NewAutoScaler(parentLogger logger.Logger,
+	resourceScaler scaler_types.ResourceScaler,
+	options scaler_types.AutoScalerOptions) (*Autoscaler, error) {
 	childLogger := parentLogger.GetChild("autoscale")
 	childLogger.DebugWith("Creating Autoscaler",
 		"Namespace", options.Namespace,
@@ -43,7 +44,7 @@ func NewAutoScaler(parentLogger logger.Logger, options scaler.AutoScalerOptions)
 		logger:         childLogger,
 		namespace:      options.Namespace,
 		metricsMap:     make(resourceMetricTypeMap),
-		resourceScaler: options.ResourceScaler,
+		resourceScaler: resourceScaler,
 		metricName:     options.MetricName,
 		windowSize:     options.ScaleWindow,
 		scaleInterval:  options.ScaleInterval,
@@ -52,7 +53,7 @@ func NewAutoScaler(parentLogger logger.Logger, options scaler.AutoScalerOptions)
 	}, nil
 }
 
-func (as *Autoscaler) checkResourceToScale(t time.Time, activeResources []scaler.Resource) {
+func (as *Autoscaler) checkResourceToScale(t time.Time, activeResources []scaler_types.Resource) {
 	for _, resourceName := range activeResources {
 
 		// currently only one type of metric supported from a platform configuration
@@ -104,7 +105,7 @@ func (as *Autoscaler) checkResourceToScale(t time.Time, activeResources []scaler
 	}
 }
 
-func (as *Autoscaler) addMetricEntry(resourceName scaler.Resource, metricType string, entry metricEntry) {
+func (as *Autoscaler) addMetricEntry(resourceName scaler_types.Resource, metricType string, entry metricEntry) {
 	if _, found := as.metricsMap[resourceName]; !found {
 		as.metricsMap[resourceName] = make(map[string][]metricEntry)
 	}
@@ -132,7 +133,7 @@ func (as *Autoscaler) Start() error {
 		for {
 			select {
 			case <-ticker.C:
-				resourcesList, err := as.resourceScaler.GetResources()
+				resourcesList, err := as.resourceScaler.GetResources(as.namespace)
 				if err != nil {
 					as.logger.WarnWith("Failed to build resource map")
 				}

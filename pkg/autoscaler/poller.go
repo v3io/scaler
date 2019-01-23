@@ -3,10 +3,9 @@ package autoscaler
 import (
 	"time"
 
-	"github.com/v3io/scaler/pkg"
-
 	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"
+	"github.com/v3io/scaler-types"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	custommetricsv1 "k8s.io/metrics/pkg/client/custom_metrics"
@@ -22,16 +21,22 @@ type MetricsPoller struct {
 	functionPodNameCache   map[string]string
 }
 
-func NewMetricsPoller(parentLogger logger.Logger, metricReporter MetricReporter, options scaler.PollerOptions) (*MetricsPoller, error) {
+func NewMetricsPoller(parentLogger logger.Logger,
+	metricReporter MetricReporter,
+	customMetricsClientSet custommetricsv1.CustomMetricsClient,
+	options scaler_types.PollerOptions) (*MetricsPoller, error) {
 	var err error
 
 	loggerInstance := parentLogger.GetChild("metrics")
+	loggerInstance.DebugWith("Creating metrics poller",
+		"namespace", options.Namespace,
+		"metricName", options.MetricName)
 
 	ticker := time.NewTicker(options.MetricInterval)
 
 	newMetricsOperator := &MetricsPoller{
 		logger:                 loggerInstance,
-		customMetricsClientSet: options.CustomMetricsClientSet,
+		customMetricsClientSet: customMetricsClientSet,
 		metricReporter:         metricReporter,
 		ticker:                 ticker,
 		namespace:              options.Namespace,
@@ -65,7 +70,7 @@ func (mp *MetricsPoller) getResourceMetrics() error {
 		newEntry := metricEntry{
 			timestamp:    time.Now(),
 			value:        item.Value.MilliValue(),
-			resourceName: scaler.Resource(item.DescribedObject.Name),
+			resourceName: scaler_types.Resource(item.DescribedObject.Name),
 			metricName:   mp.metricName,
 		}
 		err := mp.metricReporter.ReportMetric(newEntry)

@@ -4,12 +4,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/v3io/scaler/pkg"
-
 	"github.com/nuclio/logger"
 	"github.com/nuclio/zap"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	"github.com/v3io/scaler-types"
 )
 
 type autoScalerTest struct {
@@ -20,16 +19,16 @@ type autoScalerTest struct {
 	ch         chan metricEntry
 }
 
-func (suite *autoScalerTest) SetScale(namespace string, resource scaler.Resource, scale int) error {
+func (suite *autoScalerTest) SetScale(namespace string, resource scaler_types.Resource, scale int) error {
 	suite.Called(namespace, resource)
 	return nil
 }
 
-func (suite *autoScalerTest) GetResources() ([]scaler.Resource, error) {
-	return []scaler.Resource{}, nil
+func (suite *autoScalerTest) GetResources(namespace string) ([]scaler_types.Resource, error) {
+	return []scaler_types.Resource{}, nil
 }
 
-func (suite *autoScalerTest) GetConfig() (*scaler.ResourceScalerConfig, error) {
+func (suite *autoScalerTest) GetConfig() (*scaler_types.ResourceScalerConfig, error) {
 	return nil, nil
 }
 
@@ -64,7 +63,7 @@ func (suite *autoScalerTest) TestScaleToZero() {
 		metricName:   "fakeSource",
 	})
 
-	suite.autoscaler.checkResourceToScale(time.Now(), []scaler.Resource{"f"})
+	suite.autoscaler.checkResourceToScale(time.Now(), []scaler_types.Resource{"f"})
 
 	suite.AssertNumberOfCalls(suite.T(), "SetScale", 1)
 }
@@ -77,7 +76,7 @@ func (suite *autoScalerTest) TestNotScale() {
 		suite.addEntry("f", duration, 0)
 	}
 
-	suite.autoscaler.checkResourceToScale(time.Now(), []scaler.Resource{"f"})
+	suite.autoscaler.checkResourceToScale(time.Now(), []scaler_types.Resource{"f"})
 	suite.AssertNumberOfCalls(suite.T(), "SetScale", 0)
 
 	for _, duration := range []string{"50s", "40s", "30s", "20s", "10s"} {
@@ -85,12 +84,12 @@ func (suite *autoScalerTest) TestNotScale() {
 	}
 	suite.addEntry("f", "5s", 9)
 
-	suite.autoscaler.checkResourceToScale(time.Now(), []scaler.Resource{"f"})
+	suite.autoscaler.checkResourceToScale(time.Now(), []scaler_types.Resource{"f"})
 	suite.AssertNumberOfCalls(suite.T(), "SetScale", 0)
 }
 
 func (suite *autoScalerTest) TestScaleToZeroWithNoEvents() {
-	suite.autoscaler.checkResourceToScale(time.Now(), []scaler.Resource{"f"})
+	suite.autoscaler.checkResourceToScale(time.Now(), []scaler_types.Resource{"f"})
 	suite.AssertNumberOfCalls(suite.T(), "SetScale", 0)
 }
 
@@ -112,14 +111,14 @@ func (suite *autoScalerTest) TestScaleToZeroMultipleResources() {
 		metricName:   "fakeSource",
 	})
 
-	suite.autoscaler.checkResourceToScale(time.Now(), []scaler.Resource{"foo", "bar"})
+	suite.autoscaler.checkResourceToScale(time.Now(), []scaler_types.Resource{"foo", "bar"})
 
 	suite.AssertNumberOfCalls(suite.T(), "SetScale", 1)
 }
 
 func (suite *autoScalerTest) addEntry(key string, duration string, value int64) {
 	t, _ := time.ParseDuration(duration)
-	suite.autoscaler.addMetricEntry(scaler.Resource(key), "fakeSource", metricEntry{
+	suite.autoscaler.addMetricEntry(scaler_types.Resource(key), "fakeSource", metricEntry{
 		timestamp:    time.Now().Add(-t),
 		value:        value,
 		resourceName: "bb",

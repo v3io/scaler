@@ -3,24 +3,31 @@ package app
 import (
 	"os"
 
-	"github.com/v3io/scaler/pkg"
 	"github.com/v3io/scaler/pkg/dlx"
-	"github.com/v3io/scaler/pkg/resourcescaler"
+	"github.com/v3io/scaler/pkg/pluginloader"
 
 	"github.com/nuclio/errors"
 	"github.com/nuclio/zap"
+	"github.com/v3io/scaler-types"
 )
 
 func Run(namespace string, targetNameHeader string, targetPathHeader string, targetPort int, listenAddress string) error {
-	resourceScaler := resourcescaler.New()
+	pluginLoader, err := pluginloader.New()
+	if err != nil {
+		return errors.Wrap(err, "Failed to initialize plugin loader")
+	}
 
-	dlxOptions := scaler.DLXOptions{
+	resourceScaler, err := pluginLoader.Load()
+	if err != nil {
+		return errors.Wrap(err, "Failed to load plugin")
+	}
+
+	dlxOptions := scaler_types.DLXOptions{
 		TargetNameHeader: targetNameHeader,
 		TargetPathHeader: targetPathHeader,
 		TargetPort:       targetPort,
 		ListenAddress:    listenAddress,
 		Namespace:        namespace,
-		ResourceScaler:   resourceScaler,
 	}
 
 	// see if resource scaler wants to override the arguments
@@ -33,7 +40,7 @@ func Run(namespace string, targetNameHeader string, targetPathHeader string, tar
 		dlxOptions = resourceScalerConfig.DLXOptions
 	}
 
-	newDLX, err := createDLX(dlxOptions)
+	newDLX, err := createDLX(resourceScaler, dlxOptions)
 	if err != nil {
 		return errors.Wrap(err, "Failed to create dlx")
 	}
@@ -46,13 +53,13 @@ func Run(namespace string, targetNameHeader string, targetPathHeader string, tar
 	select {}
 }
 
-func createDLX(options scaler.DLXOptions) (*dlx.DLX, error) {
+func createDLX(resourceScaler scaler_types.ResourceScaler, options scaler_types.DLXOptions) (*dlx.DLX, error) {
 	rootLogger, err := nucliozap.NewNuclioZap("dlx", "console", os.Stdout, os.Stderr, nucliozap.DebugLevel)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to initialize root logger")
 	}
 
-	newScaler, err := dlx.NewDLX(rootLogger, options)
+	newScaler, err := dlx.NewDLX(rootLogger, resourceScaler, options)
 
 	if err != nil {
 		return nil, err

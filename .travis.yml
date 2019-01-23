@@ -10,7 +10,7 @@ addons:
 
 language: go
 go_import_path: github.com/v3io/scaler
-go: "1.10"
+go: "1.11"
 
 script:
   - make lint test
@@ -27,6 +27,6 @@ after_success:
   - echo $TRAVIS_BRANCH
   - if [ -n "$SCALER_LABEL" ]; then
     echo "$DOCKER_PASSWORD" | docker login -u="$DOCKER_USERNAME" --password-stdin &&
-    make docker-images push-docker-images
+    make docker-images push-docker-images;
     fi
   - echo "Done."
