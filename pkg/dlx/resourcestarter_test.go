@@ -7,12 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/v3io/scaler/pkg"
-
 	"github.com/nuclio/logger"
 	"github.com/nuclio/zap"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	"github.com/v3io/scaler-types"
 )
 
 type resourceStarterTest struct {
@@ -26,16 +25,16 @@ type mocker struct {
 	mock.Mock
 }
 
-func (suite *resourceStarterTest) SetScale(logger logger.Logger, namespace string, resourceName scaler.Resource, scale int) error {
+func (suite *resourceStarterTest) SetScale(namespace string, resourceName scaler_types.Resource, scale int) error {
 	suite.mocker.Called(resourceName)
 	return nil
 }
 
-func (suite *resourceStarterTest) GetResources(namespace string) ([]scaler.Resource, error) {
-	return []scaler.Resource{}, nil
+func (suite *resourceStarterTest) GetResources(namespace string) ([]scaler_types.Resource, error) {
+	return []scaler_types.Resource{}, nil
 }
 
-func (suite *resourceStarterTest) GetConfig() (*scaler.ResourceScalerConfig, error) {
+func (suite *resourceStarterTest) GetConfig() (*scaler_types.ResourceScalerConfig, error) {
 	return nil, nil
 }
 
@@ -45,7 +44,7 @@ func (suite *resourceStarterTest) SetupTest() {
 		resourceSinksMap:         make(resourceSinksMap),
 		namespace:                "default",
 		resourceReadinessTimeout: time.Duration(1 * time.Second),
-		scaler:                   suite,
+		scaler: suite,
 	}
 	suite.mocker = new(mocker)
 }
