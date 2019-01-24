@@ -26,7 +26,7 @@ after_success:
   - echo $TRAVIS_PULL_REQUEST
   - echo $TRAVIS_BRANCH
   - if [ -n "$SCALER_LABEL" ]; then
-    echo "$DOCKER_PASSWORD" | docker login -u="$DOCKER_USERNAME" --password-stdin &&
+    echo "$DOCKER_PASSWORD" | docker login -u="$DOCKER_USERNAME" --password-stdin quay.io &&
     make docker-images push-docker-images;
     fi
   - echo "Done."
