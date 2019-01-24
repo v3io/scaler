@@ -8,13 +8,8 @@ RUN apk --update --no-cache add \
 WORKDIR /go/src/github.com/v3io/scaler
 COPY . .
 
-# if build passes a resource scaler go file
-ONBUILD ARG RESOURCE_SCALER_GO_FILE=./pkg/resourcescaler/resourcescaler.go
+RUN go get github.com/v3io/scaler-types
 
-ONBUILD COPY ${RESOURCE_SCALER_GO_FILE} /go/src/github.com/v3io/scaler/pkg/resourcescaler/resourcescaler.go
-
-ONBUILD RUN mkdir -p /home/v3io/bin \
+RUN mkdir -p /home/v3io/bin \
             && GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-s -w" -o /home/v3io/bin/autoscaler cmd/autoscaler/main.go \
             && rm -rf /go/src/github/v3io/scaler
-
-CMD ["/home/v3io/bin/autoscaler"]
