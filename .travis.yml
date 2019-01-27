@@ -13,6 +13,7 @@ go_import_path: github.com/v3io/scaler
 go: "1.11"
 
 script:
+  - go get github.com/v3io/scaler-types
   - make lint test
 
 after_success:
