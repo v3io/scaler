@@ -19,12 +19,12 @@ type autoScalerTest struct {
 	ch         chan metricEntry
 }
 
-func (suite *autoScalerTest) SetScale(namespace string, resource scaler_types.Resource, scale int) error {
-	suite.Called(namespace, resource)
+func (suite *autoScalerTest) SetScale(resource scaler_types.Resource, scale int) error {
+	suite.Called(resource)
 	return nil
 }
 
-func (suite *autoScalerTest) GetResources(namespace string) ([]scaler_types.Resource, error) {
+func (suite *autoScalerTest) GetResources() ([]scaler_types.Resource, error) {
 	return []scaler_types.Resource{}, nil
 }
 

@@ -25,12 +25,12 @@ type mocker struct {
 	mock.Mock
 }
 
-func (suite *resourceStarterTest) SetScale(namespace string, resourceName scaler_types.Resource, scale int) error {
+func (suite *resourceStarterTest) SetScale(resourceName scaler_types.Resource, scale int) error {
 	suite.mocker.Called(resourceName)
 	return nil
 }
 
-func (suite *resourceStarterTest) GetResources(namespace string) ([]scaler_types.Resource, error) {
+func (suite *resourceStarterTest) GetResources() ([]scaler_types.Resource, error) {
 	return []scaler_types.Resource{}, nil
 }
 

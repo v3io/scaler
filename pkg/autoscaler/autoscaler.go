@@ -77,7 +77,7 @@ func (as *Autoscaler) checkResourceToScale(t time.Time, activeResources []scaler
 				"deltaSeconds", t.Sub(minMetric.timestamp).Seconds(),
 				"windowSize", as.windowSize)
 
-			err := as.resourceScaler.SetScale(as.namespace, resourceName, 0)
+			err := as.resourceScaler.SetScale(resourceName, 0)
 			if err != nil {
 				as.logger.WarnWith("Failed to set scale", "err", err)
 			}
@@ -133,7 +133,7 @@ func (as *Autoscaler) Start() error {
 		for {
 			select {
 			case <-ticker.C:
-				resourcesList, err := as.resourceScaler.GetResources(as.namespace)
+				resourcesList, err := as.resourceScaler.GetResources()
 				if err != nil {
 					as.logger.WarnWith("Failed to build resource map")
 				}
