@@ -10,6 +10,7 @@ import (
 )
 
 func main() {
+	kubeconfigPath := flag.String("kubeconfig-path", os.Getenv("KUBECONFIG"), "Path of kubeconfig file")
 	namespace := flag.String("namepsace", "", "Kubernetes namespace")
 	targetNameHeader := flag.String("target-name-header", "", "Name of the header that holds information on target name")
 	targetPathHeader := flag.String("target-path-header", "", "Name of the header that holds information on target path")
@@ -17,7 +18,7 @@ func main() {
 	listenAddress := flag.String("listen-address", ":8090", "Address to listen upon for http proxy")
 	flag.Parse()
 
-	if err := app.Run(*namespace, *targetNameHeader, *targetPathHeader, *targetPort, *listenAddress); err != nil {
+	if err := app.Run(*kubeconfigPath, *namespace, *targetNameHeader, *targetPathHeader, *targetPort, *listenAddress); err != nil {
 		errors.PrintErrorStack(os.Stderr, err, 5)
 
 		os.Exit(1)

@@ -8,7 +8,7 @@ import (
 	"github.com/v3io/scaler-types"
 )
 
-type resourceScalerNewFunc func() (scaler_types.ResourceScaler, error)
+type resourceScalerNewFunc func(string, string) (scaler_types.ResourceScaler, error)
 
 type PluginLoader struct{}
 
@@ -16,7 +16,7 @@ func New() (*PluginLoader, error) {
 	return &PluginLoader{}, nil
 }
 
-func (p *PluginLoader) Load() (scaler_types.ResourceScaler, error) {
+func (p *PluginLoader) Load(kubeconfigPath string, namespace string) (scaler_types.ResourceScaler, error) {
 	var funcNew resourceScalerNewFunc
 	var ok bool
 
@@ -37,11 +37,11 @@ func (p *PluginLoader) Load() (scaler_types.ResourceScaler, error) {
 			return nil, errors.Wrap(err, "Failed to find New symbol")
 		}
 
-		funcNew, ok = symbol.(func() (scaler_types.ResourceScaler, error))
+		funcNew, ok = symbol.(resourceScalerNewFunc)
 		if !ok {
 			return nil, errors.New("Failed to cast New function of plugin")
 		}
 	}
 
-	return funcNew()
+	return funcNew(kubeconfigPath, namespace)
 }
