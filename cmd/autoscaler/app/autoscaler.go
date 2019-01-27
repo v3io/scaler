@@ -40,7 +40,8 @@ func Run(kubeconfigPath string,
 	if err != nil {
 		return errors.Wrap(err, "Failed to initialize plugin loader")
 	}
-	resourceScaler, err := pluginLoader.Load()
+
+	resourceScaler, err := pluginLoader.Load(kubeconfigPath, namespace)
 	if err != nil {
 		return errors.Wrap(err, "Failed to load plugin")
 	}

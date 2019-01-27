@@ -6,7 +6,7 @@ import (
 
 type NopResourceScaler struct{}
 
-func New() (scaler_types.ResourceScaler, error) { // nolint: deadcode
+func New(kubeconfigPath string, namespace string) (scaler_types.ResourceScaler, error) { // nolint: deadcode
 	return &NopResourceScaler{}, nil
 }
 

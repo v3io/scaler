@@ -11,13 +11,18 @@ import (
 	"github.com/v3io/scaler-types"
 )
 
-func Run(namespace string, targetNameHeader string, targetPathHeader string, targetPort int, listenAddress string) error {
+func Run(kubeconfigPath string,
+	namespace string,
+	targetNameHeader string,
+	targetPathHeader string,
+	targetPort int,
+	listenAddress string) error {
 	pluginLoader, err := pluginloader.New()
 	if err != nil {
 		return errors.Wrap(err, "Failed to initialize plugin loader")
 	}
 
-	resourceScaler, err := pluginLoader.Load()
+	resourceScaler, err := pluginLoader.Load(kubeconfigPath, namespace)
 	if err != nil {
 		return errors.Wrap(err, "Failed to load plugin")
 	}
