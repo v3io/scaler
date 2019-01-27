@@ -1,4 +1,4 @@
-FROM golang:1.12-rc-alpine3.8
+FROM golang:1.10-alpine3.7
 
 RUN apk --update --no-cache add \
     git \
