@@ -21,7 +21,7 @@ func main() {
 	scaleThreshold := flag.Int64("scale-threshold", 0, "Maximum allowed value for metric to be considered below active")
 	flag.Parse()
 
-	*namespace = scaler_common.GetNamespace(*namespace)
+	*namespace = common.GetNamespace(*namespace)
 
 	if err := app.Run(*kubeconfigPath,
 		*namespace,

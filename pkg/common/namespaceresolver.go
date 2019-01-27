@@ -1,4 +1,4 @@
-package scaler_common
+package common
 
 import (
 	"io/ioutil"

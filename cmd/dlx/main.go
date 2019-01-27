@@ -19,7 +19,7 @@ func main() {
 	listenAddress := flag.String("listen-address", ":8090", "Address to listen upon for http proxy")
 	flag.Parse()
 
-	*namespace = scaler_common.GetNamespace(*namespace)
+	*namespace = common.GetNamespace(*namespace)
 
 	if err := app.Run(*kubeconfigPath, *namespace, *targetNameHeader, *targetPathHeader, *targetPort, *listenAddress); err != nil {
 		errors.PrintErrorStack(os.Stderr, err, 5)
