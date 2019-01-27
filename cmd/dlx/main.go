@@ -12,7 +12,7 @@ import (
 
 func main() {
 	kubeconfigPath := flag.String("kubeconfig-path", os.Getenv("KUBECONFIG"), "Path of kubeconfig file")
-	namespace := flag.String("namepsace", "", "Kubernetes namespace")
+	namespace := flag.String("namespace", "", "Kubernetes namespace")
 	targetNameHeader := flag.String("target-name-header", "", "Name of the header that holds information on target name")
 	targetPathHeader := flag.String("target-path-header", "", "Name of the header that holds information on target path")
 	targetPort := flag.Int("target-port", 0, "Name of the header that holds information on target port")
