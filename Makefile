@@ -72,8 +72,6 @@ GO_BUILD_TOOL = docker run \
 
 .PHONY: lint
 lint:
-	go get -u github.com/v3io/scaler-types
-
 	@echo Installing linters...
 	go get -u github.com/pavius/impi/cmd/impi
 	go get -u gopkg.in/alecthomas/gometalinter.v2
