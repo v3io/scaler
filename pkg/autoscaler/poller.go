@@ -18,7 +18,7 @@ type MetricsPoller struct {
 	ticker                 *time.Ticker
 	namespace              string
 	metricName             string
-	functionPodNameCache   map[string]string
+	groupKind              string
 }
 
 func NewMetricsPoller(parentLogger logger.Logger,
@@ -41,7 +41,7 @@ func NewMetricsPoller(parentLogger logger.Logger,
 		ticker:                 ticker,
 		namespace:              options.Namespace,
 		metricName:             options.MetricName,
-		functionPodNameCache:   make(map[string]string),
+		groupKind:              options.GroupKind,
 	}
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create project operator")
@@ -51,12 +51,12 @@ func NewMetricsPoller(parentLogger logger.Logger,
 }
 
 func (mp *MetricsPoller) getResourceMetrics() error {
-	schemaGroupKind := schema.GroupKind{Group: "", Kind: "Function"}
-	functionLabels := labels.Everything()
+	schemaGroupKind := schema.GroupKind{Group: "", Kind: mp.groupKind}
+	resourceLabels := labels.Everything()
 	c := mp.customMetricsClientSet.NamespacedMetrics(mp.namespace)
 	cm, err := c.
 		GetForObjects(schemaGroupKind,
-			functionLabels,
+			resourceLabels,
 			mp.metricName)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get custom metrics")
@@ -65,7 +65,7 @@ func (mp *MetricsPoller) getResourceMetrics() error {
 	for _, item := range cm.Items {
 
 		mp.logger.DebugWith("Publishing new metric",
-			"function", item.DescribedObject.Name,
+			"resource", item.DescribedObject.Name,
 			"value", item.Value.MilliValue())
 		newEntry := metricEntry{
 			timestamp:    time.Now(),
@@ -86,7 +86,7 @@ func (mp *MetricsPoller) Start() error {
 		for range mp.ticker.C {
 			err := mp.getResourceMetrics()
 			if err != nil {
-				mp.logger.WarnWith("Failed to get function metrics", "err", err)
+				mp.logger.WarnWith("Failed to get resource metrics", "err", err)
 			}
 		}
 	}()
