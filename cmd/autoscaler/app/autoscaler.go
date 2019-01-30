@@ -21,7 +21,8 @@ func Run(kubeconfigPath string,
 	scaleWindow time.Duration,
 	metricName string,
 	scaleThreshold int64,
-	metricsInterval time.Duration) error {
+	metricsInterval time.Duration,
+	metricsGroupKind string) error {
 	autoScalerOptions := scaler_types.AutoScalerOptions{
 		Namespace:     namespace,
 		ScaleInterval: scaleInterval,
@@ -34,6 +35,7 @@ func Run(kubeconfigPath string,
 		Namespace:      namespace,
 		MetricName:     metricName,
 		MetricInterval: metricsInterval,
+		GroupKind:      metricsGroupKind,
 	}
 
 	pluginLoader, err := pluginloader.New()
