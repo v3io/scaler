@@ -78,10 +78,6 @@ func Run(kubeconfigPath string,
 		return errors.Wrap(err, "Failed to create poller")
 	}
 
-	if err = newScaler.Start(); err != nil {
-		return errors.Wrap(err, "Failed to start scaler")
-	}
-
 	if err := newPoller.Start(); err != nil {
 		return errors.Wrap(err, "Failed to start poller")
 	}
