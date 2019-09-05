@@ -6,6 +6,7 @@ import (
 	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"
 	"github.com/v3io/scaler-types"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	custommetricsv1 "k8s.io/metrics/pkg/client/custom_metrics"
@@ -59,6 +60,9 @@ func (mp *MetricsPoller) getResourceMetrics() error {
 			resourceLabels,
 			mp.metricName)
 	if err != nil {
+		if k8serrors.IsNotFound(err) {
+			return nil
+		}
 		return errors.Wrap(err, "Failed to get custom metrics")
 	}
 
