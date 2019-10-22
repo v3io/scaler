@@ -18,24 +18,21 @@ import (
 func Run(kubeconfigPath string,
 	namespace string,
 	scaleInterval time.Duration,
-	scaleWindow time.Duration,
-	metricName string,
 	scaleThreshold int64,
+	metricsPollerReconfigureInterval time.Duration,
 	metricsInterval time.Duration,
 	metricsGroupKind string) error {
 	autoScalerOptions := scaler_types.AutoScalerOptions{
 		Namespace:     namespace,
 		ScaleInterval: scaleInterval,
-		ScaleWindow:   scaleWindow,
 		Threshold:     scaleThreshold,
-		MetricName:    metricName,
 	}
 
 	pollerOptions := scaler_types.PollerOptions{
-		Namespace:      namespace,
-		MetricName:     metricName,
-		MetricInterval: metricsInterval,
-		GroupKind:      metricsGroupKind,
+		Namespace:           namespace,
+		ReconfigureInterval: metricsPollerReconfigureInterval,
+		MetricInterval:      metricsInterval,
+		GroupKind:           metricsGroupKind,
 	}
 
 	pluginLoader, err := pluginloader.New()
@@ -73,7 +70,7 @@ func Run(kubeconfigPath string,
 		return errors.Wrap(err, "Failed to start scaler")
 	}
 
-	newPoller, err := createPoller(restConfig, newScaler, pollerOptions)
+	newPoller, err := createPoller(restConfig, newScaler, resourceScaler, pollerOptions)
 	if err != nil {
 		return errors.Wrap(err, "Failed to create poller")
 	}
@@ -104,6 +101,7 @@ func createAutoScaler(restConfig *rest.Config,
 
 func createPoller(restConfig *rest.Config,
 	reporter autoscaler.MetricReporter,
+	resourceScaler scaler_types.ResourceScaler,
 	options scaler_types.PollerOptions) (*autoscaler.MetricsPoller, error) {
 	rootLogger, err := nucliozap.NewNuclioZap("autoscaler", "console", os.Stdout, os.Stderr, nucliozap.DebugLevel)
 	if err != nil {
@@ -115,7 +113,7 @@ func createPoller(restConfig *rest.Config,
 		return nil, errors.Wrap(err, "Failed create custom metrics client set")
 	}
 
-	newPoller, err := autoscaler.NewMetricsPoller(rootLogger, reporter, customMetricsClient, options)
+	newPoller, err := autoscaler.NewMetricsPoller(rootLogger, reporter, customMetricsClient, resourceScaler, options)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create metrics poller")
 	}
