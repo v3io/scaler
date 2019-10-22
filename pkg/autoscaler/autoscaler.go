@@ -11,7 +11,7 @@ type resourceMetricTypeMap map[string]map[string][]metricEntry
 
 type metricEntry struct {
 	timestamp    time.Time
-	value        int64
+	value        int
 	resourceName string
 	metricName   string
 }
@@ -27,7 +27,6 @@ type Autoscaler struct {
 	metricsMap     resourceMetricTypeMap
 	resourceScaler scaler_types.ResourceScaler
 	scaleInterval  time.Duration
-	threshold      int64
 }
 
 func NewAutoScaler(parentLogger logger.Logger,
@@ -43,7 +42,6 @@ func NewAutoScaler(parentLogger logger.Logger,
 		metricsMap:     make(resourceMetricTypeMap),
 		resourceScaler: resourceScaler,
 		scaleInterval:  options.ScaleInterval,
-		threshold:      options.Threshold,
 		metricsChannel: make(chan metricEntry, 1024),
 	}, nil
 }
@@ -51,9 +49,9 @@ func NewAutoScaler(parentLogger logger.Logger,
 func (as *Autoscaler) checkResourceToScale(t time.Time, activeResources []scaler_types.Resource) {
 	for _, resource := range activeResources {
 		shouldScaleToZero := false
-		for _, metricName := range resource.MetricNames {
-			oldestEntry := as.getOldestBelowThresholdMetricEntry(resource.Name, metricName)
-			shouldScaleToZero = as.shouldScaleToZero(t, resource, oldestEntry)
+		for _, scaleResource := range resource.ScaleResources {
+			oldestEntry := as.getOldestBelowThresholdMetricEntry(resource.Name, scaleResource)
+			shouldScaleToZero = as.shouldScaleToZero(t, resource.Name, scaleResource, oldestEntry)
 
 			// if one metric does not point that we should scale to zero - scale to zero won't happen,
 			// so no need to check the other metrics
@@ -71,15 +69,15 @@ func (as *Autoscaler) checkResourceToScale(t time.Time, activeResources []scaler
 	}
 }
 
-func (as *Autoscaler) getOldestBelowThresholdMetricEntry(resourceName string, metricName string) *metricEntry {
-	resourceMetrics := as.metricsMap[resourceName][metricName]
+func (as *Autoscaler) getOldestBelowThresholdMetricEntry(resourceName string, scaleResource scaler_types.ScaleResource) *metricEntry {
+	resourceMetrics := as.metricsMap[resourceName][scaleResource.MetricName]
 
 	var oldestBelowThresholdMetricEntry *metricEntry
 	for _, metricEntry := range resourceMetrics {
 
-		if metricEntry.value <= as.threshold && oldestBelowThresholdMetricEntry == nil {
+		if metricEntry.value <= scaleResource.Threshold && oldestBelowThresholdMetricEntry == nil {
 			oldestBelowThresholdMetricEntry = &metricEntry
-		} else if metricEntry.value > as.threshold {
+		} else if metricEntry.value > scaleResource.Threshold {
 			oldestBelowThresholdMetricEntry = nil
 		}
 	}
@@ -87,25 +85,29 @@ func (as *Autoscaler) getOldestBelowThresholdMetricEntry(resourceName string, me
 	return oldestBelowThresholdMetricEntry
 }
 
-func (as *Autoscaler) shouldScaleToZero(t time.Time, resource scaler_types.Resource, oldestEntry *metricEntry) bool {
-	if oldestEntry != nil && t.Sub(oldestEntry.timestamp) > resource.WindowSize {
+func (as *Autoscaler) shouldScaleToZero(t time.Time, resourceName string, scaleResource scaler_types.ScaleResource, oldestEntry *metricEntry) bool {
+	if oldestEntry != nil && t.Sub(oldestEntry.timestamp) > scaleResource.WindowSize {
 		as.logger.DebugWith("Metric value is below threshold and passed the window",
 			"metricValue", oldestEntry.value,
-			"resource", resource.Name,
+			"resourceName", resourceName,
+			"metricName", scaleResource.MetricName,
+			"threshold", scaleResource.Threshold,
 			"deltaSeconds", t.Sub(oldestEntry.timestamp).Seconds(),
-			"windowSize", resource.WindowSize)
+			"windowSize", scaleResource.WindowSize)
 		return true
 	} else if oldestEntry != nil {
 		as.logger.DebugWith("Resource values are still in window",
-			"resourceName", resource.Name,
+			"resourceName", resourceName,
+			"metricName", scaleResource.MetricName,
 			"value", oldestEntry.value,
 			"deltaSeconds", t.Sub(oldestEntry.timestamp).Seconds(),
-			"windowSize", resource.WindowSize)
+			"windowSize", scaleResource.WindowSize)
 		return false
 	} else {
 		as.logger.Debug("Resource metrics are above threshold",
-			"resourceName", resource.Name,
-			"threshold", as.threshold)
+			"resourceName", resourceName,
+			"metricName", scaleResource.MetricName,
+			"threshold", scaleResource.Threshold)
 		return false
 	}
 }
@@ -116,16 +118,16 @@ func (as *Autoscaler) cleanMetrics(t time.Time, resource scaler_types.Resource, 
 	if scaledToZero {
 		delete(as.metricsMap, resource.Name)
 	} else {
-		for _, metricName := range resource.MetricNames {
+		for _, scaleResource := range resource.ScaleResources {
 
 			// rebuild the slice, excluding any old metrics
 			var newMetrics []metricEntry
-			for _, metric := range as.metricsMap[resource.Name][metricName] {
-				if t.Sub(metric.timestamp) <= resource.WindowSize {
+			for _, metric := range as.metricsMap[resource.Name][scaleResource.MetricName] {
+				if t.Sub(metric.timestamp) <= scaleResource.WindowSize {
 					newMetrics = append(newMetrics, metric)
 				}
 			}
-			as.metricsMap[resource.Name][metricName] = newMetrics
+			as.metricsMap[resource.Name][scaleResource.MetricName] = newMetrics
 		}
 	}
 }

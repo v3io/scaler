@@ -18,7 +18,6 @@ func main() {
 	metricsInterval := flag.Duration("metrics-poll-interval", 10*time.Second, "Interval to poll custom metrics")
 	metricsGroupKind := flag.String("metrics-group-kind", "", "Metrics resource kind")
 	metricsPollerReconfigureInterval := flag.Duration("metrics-poller-reconfigure-interval", 30*time.Second, "Interval to reconfigure custom metrics poller")
-	scaleThreshold := flag.Int64("scale-threshold", 0, "Maximum allowed value for metric to be considered below active")
 	flag.Parse()
 
 	*namespace = common.GetNamespace(*namespace)
@@ -26,7 +25,6 @@ func main() {
 	if err := app.Run(*kubeconfigPath,
 		*namespace,
 		*scaleInterval,
-		*scaleThreshold,
 		*metricsPollerReconfigureInterval,
 		*metricsInterval,
 		*metricsGroupKind); err != nil {

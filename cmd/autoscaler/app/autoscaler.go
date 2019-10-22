@@ -18,14 +18,12 @@ import (
 func Run(kubeconfigPath string,
 	namespace string,
 	scaleInterval time.Duration,
-	scaleThreshold int64,
 	metricsPollerReconfigureInterval time.Duration,
 	metricsInterval time.Duration,
 	metricsGroupKind string) error {
 	autoScalerOptions := scaler_types.AutoScalerOptions{
 		Namespace:     namespace,
 		ScaleInterval: scaleInterval,
-		Threshold:     scaleThreshold,
 	}
 
 	pollerOptions := scaler_types.PollerOptions{

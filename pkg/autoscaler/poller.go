@@ -80,10 +80,11 @@ func (mp *MetricsPoller) getResourceMetrics() error {
 
 			mp.logger.DebugWith("Publishing new metric",
 				"resource", item.DescribedObject.Name,
+				"metricName", metricName,
 				"value", item.Value.MilliValue())
 			newEntry := metricEntry{
 				timestamp:    time.Now(),
-				value:        item.Value.MilliValue(),
+				value:        int(item.Value.MilliValue()),
 				resourceName: item.DescribedObject.Name,
 				metricName:   metricName,
 			}
@@ -104,8 +105,8 @@ func (mp *MetricsPoller) reconfigure() error {
 		return errors.Wrap(err, "Failed to get resources")
 	}
 	for _, resource := range resourcesList {
-		for _, metricName := range resource.MetricNames {
-			metricNames = append(metricNames, metricName)
+		for _, scaleResource := range resource.ScaleResources {
+			metricNames = append(metricNames, scaleResource.MetricName)
 		}
 	}
 	mp.metricNames = common.UniquifyStringList(metricNames)
