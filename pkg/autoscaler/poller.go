@@ -108,7 +108,7 @@ func (mp *MetricsPoller) reconfigure() error {
 			metricNames = append(metricNames, metricName)
 		}
 	}
-	mp.metricNames = common.CreateStringSet(metricNames)
+	mp.metricNames = common.UniquifyStringList(metricNames)
 	mp.logger.DebugWith("Poller reconfigured", "metricNames", mp.metricNames)
 	return nil
 }

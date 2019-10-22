@@ -1,6 +1,6 @@
 package common
 
-func CreateStringSet(stringList []string) []string {
+func UniquifyStringList(stringList []string) []string {
 	keys := make(map[string]bool)
 	var list []string
 	for _, entry := range stringList {
