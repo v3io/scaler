@@ -1,8 +1,9 @@
 package autoscaler
 
 import (
-	"github.com/v3io/scaler/pkg/common"
 	"time"
+
+	"github.com/v3io/scaler/pkg/common"
 
 	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"

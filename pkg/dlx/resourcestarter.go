@@ -78,7 +78,7 @@ func (r *ResourceStarter) startResource(resourceSinkChannel chan responseChannel
 	resourceReadyChannel := make(chan error, 1)
 	defer close(resourceReadyChannel)
 
-	go r.waitResourceReadiness(scaler_types.Resource(resourceName), resourceReadyChannel)
+	go r.waitResourceReadiness(scaler_types.Resource{Name: resourceName}, resourceReadyChannel)
 
 	select {
 	case <-time.After(r.resourceReadinessTimeout):
@@ -121,8 +121,8 @@ func (r *ResourceStarter) startResource(resourceSinkChannel chan responseChannel
 	}
 }
 
-func (r *ResourceStarter) waitResourceReadiness(resourceName scaler_types.Resource, resourceReadyChannel chan error) {
-	err := r.scaler.SetScale(resourceName, 1)
+func (r *ResourceStarter) waitResourceReadiness(resource scaler_types.Resource, resourceReadyChannel chan error) {
+	err := r.scaler.SetScale(resource, 1)
 	resourceReadyChannel <- err
 }
 
