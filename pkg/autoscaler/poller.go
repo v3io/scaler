@@ -72,7 +72,7 @@ func (mp *MetricsPoller) getResourceMetrics() error {
 			metricName)
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
-				return nil
+				continue
 			}
 			return errors.Wrap(err, "Failed to get custom metrics")
 		}
