@@ -73,10 +73,10 @@ func (as *Autoscaler) getOldestBelowThresholdMetricEntry(resourceName string, sc
 	resourceMetrics := as.metricsMap[resourceName][scaleResource.MetricName]
 
 	var oldestBelowThresholdMetricEntry *metricEntry
-	for _, metricEntry := range resourceMetrics {
+	for idx, metricEntry := range resourceMetrics {
 
 		if metricEntry.value <= scaleResource.Threshold && oldestBelowThresholdMetricEntry == nil {
-			oldestBelowThresholdMetricEntry = &metricEntry
+			oldestBelowThresholdMetricEntry = &resourceMetrics[idx]
 		} else if metricEntry.value > scaleResource.Threshold {
 			oldestBelowThresholdMetricEntry = nil
 		}
