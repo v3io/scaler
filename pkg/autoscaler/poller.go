@@ -117,7 +117,7 @@ func (mp *MetricsPoller) reconfigure() error {
 
 func (mp *MetricsPoller) Start() error {
 
-	// Start from one reconfigure (to fill metric names)
+	// First configure the poller (to fill metric names)
 	err := mp.reconfigure()
 	if err != nil {
 		mp.logger.WarnWith("Failed to configure poller", "err", err)
