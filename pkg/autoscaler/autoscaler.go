@@ -104,7 +104,7 @@ func (as *Autoscaler) shouldScaleToZero(t time.Time, resourceName string, scaleR
 			"windowSize", scaleResource.WindowSize)
 		return false
 	} else {
-		as.logger.Debug("Resource metrics are above threshold",
+		as.logger.DebugWith("Resource metrics are above threshold",
 			"resourceName", resourceName,
 			"metricName", scaleResource.MetricName,
 			"threshold", scaleResource.Threshold)
