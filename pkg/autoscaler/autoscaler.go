@@ -127,6 +127,11 @@ func (as *Autoscaler) cleanMetrics(t time.Time, resource scaler_types.Resource, 
 					newMetrics = append(newMetrics, metric)
 				}
 			}
+
+			if _, found := as.metricsMap[resource.Name]; !found {
+				as.metricsMap[resource.Name] = make(map[string][]metricEntry)
+			}
+
 			as.metricsMap[resource.Name][scaleResource.MetricName] = newMetrics
 		}
 	}
