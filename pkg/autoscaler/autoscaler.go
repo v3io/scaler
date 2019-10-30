@@ -1,159 +1,197 @@
 package autoscaler
 
 import (
+	"fmt"
+	"github.com/nuclio/errors"
+	"github.com/v3io/scaler/pkg/common"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	custommetricsv1 "k8s.io/metrics/pkg/client/custom_metrics"
 	"time"
 
 	"github.com/nuclio/logger"
 	"github.com/v3io/scaler-types"
 )
 
-type resourceMetricTypeMap map[string]map[string][]metricEntry
-
-type metricEntry struct {
-	timestamp    time.Time
-	value        int
-	resourceName string
-	metricName   string
-}
-
-type MetricReporter interface {
-	ReportMetric(metricEntry) error
-}
-
 type Autoscaler struct {
-	logger         logger.Logger
-	namespace      string
-	metricsChannel chan metricEntry
-	metricsMap     resourceMetricTypeMap
-	resourceScaler scaler_types.ResourceScaler
-	scaleInterval  time.Duration
+	logger                  logger.Logger
+	namespace               string
+	resourceScaler          scaler_types.ResourceScaler
+	scaleInterval           time.Duration
+	inScaleToZeroProcessMap map[string]bool
+	groupKind               string
+	customMetricsClientSet  custommetricsv1.CustomMetricsClient
 }
 
 func NewAutoScaler(parentLogger logger.Logger,
 	resourceScaler scaler_types.ResourceScaler,
+	customMetricsClientSet custommetricsv1.CustomMetricsClient,
 	options scaler_types.AutoScalerOptions) (*Autoscaler, error) {
-	childLogger := parentLogger.GetChild("autoscale")
+	childLogger := parentLogger.GetChild("autoscaler")
 	childLogger.DebugWith("Creating Autoscaler",
 		"options", options)
 
 	return &Autoscaler{
-		logger:         childLogger,
-		namespace:      options.Namespace,
-		metricsMap:     make(resourceMetricTypeMap),
-		resourceScaler: resourceScaler,
-		scaleInterval:  options.ScaleInterval,
-		metricsChannel: make(chan metricEntry, 1024),
+		logger:                  childLogger,
+		namespace:               options.Namespace,
+		resourceScaler:          resourceScaler,
+		scaleInterval:           options.ScaleInterval,
+		groupKind:               options.GroupKind,
+		customMetricsClientSet:  customMetricsClientSet,
+		inScaleToZeroProcessMap: make(map[string]bool),
 	}, nil
 }
 
-func (as *Autoscaler) checkResourceToScale(t time.Time, activeResources []scaler_types.Resource) {
-	for _, resource := range activeResources {
-		shouldScaleToZero := false
+func (as *Autoscaler) getMetricNames(resources []scaler_types.Resource) []string {
+	var metricNames []string
+	for _, resource := range resources {
 		for _, scaleResource := range resource.ScaleResources {
-			oldestEntry := as.getOldestBelowThresholdMetricEntry(resource.Name, scaleResource)
-			shouldScaleToZero = as.shouldScaleToZero(t, resource.Name, scaleResource, oldestEntry)
-
-			// if one metric does not point that we should scale to zero - scale to zero won't happen,
-			// so no need to check the other metrics
-			if !shouldScaleToZero {
-				break
-			}
-		}
-		if shouldScaleToZero {
-			err := as.resourceScaler.SetScale(resource, 0)
-			if err != nil {
-				as.logger.WarnWith("Failed to set scale", "err", err)
-			}
-		}
-		as.cleanMetrics(t, resource, shouldScaleToZero)
-	}
-}
-
-func (as *Autoscaler) getOldestBelowThresholdMetricEntry(resourceName string, scaleResource scaler_types.ScaleResource) *metricEntry {
-	resourceMetrics := as.metricsMap[resourceName][scaleResource.MetricName]
-
-	var oldestBelowThresholdMetricEntry *metricEntry
-	for idx, metricEntry := range resourceMetrics {
-
-		if metricEntry.value <= scaleResource.Threshold && oldestBelowThresholdMetricEntry == nil {
-			oldestBelowThresholdMetricEntry = &resourceMetrics[idx]
-		} else if metricEntry.value > scaleResource.Threshold {
-			oldestBelowThresholdMetricEntry = nil
+			fullMetricName := fmt.Sprintf("%s_%s", scaleResource.MetricName, scaleResource.WindowSize)
+			metricNames = append(metricNames, fullMetricName)
 		}
 	}
-
-	return oldestBelowThresholdMetricEntry
+	metricNames = common.UniquifyStringList(metricNames)
+	as.logger.DebugWith("Got metric names", "metricNames", metricNames)
+	return metricNames
 }
 
-func (as *Autoscaler) shouldScaleToZero(t time.Time, resourceName string, scaleResource scaler_types.ScaleResource, oldestEntry *metricEntry) bool {
-	if oldestEntry != nil && t.Sub(oldestEntry.timestamp) > scaleResource.WindowSize {
-		as.logger.DebugWith("Metric value is below threshold and passed the window",
-			"metricValue", oldestEntry.value,
-			"resourceName", resourceName,
+func (as *Autoscaler) getResourcesMetrics(metricNames []string) (map[string]map[string]int, error) {
+	resourcesMetricsMap := make(map[string]map[string]int)
+
+	schemaGroupKind := schema.GroupKind{Group: "", Kind: as.groupKind}
+	resourceLabels := labels.Everything()
+	c := as.customMetricsClientSet.NamespacedMetrics(as.namespace)
+
+	for _, metricName := range metricNames {
+		cm, err := c.GetForObjects(schemaGroupKind,
+			resourceLabels,
+			metricName)
+		if err != nil {
+			if k8serrors.IsNotFound(err) {
+				continue
+			}
+			return make(map[string]map[string]int), errors.Wrap(err, "Failed to get custom metrics")
+		}
+
+		for _, item := range cm.Items {
+
+			resourceName := item.DescribedObject.Name
+			value := int(item.Value.MilliValue())
+
+			as.logger.DebugWith("Got Metric Entry",
+				"resourceName", resourceName,
+				"metricName", metricName,
+				"value", value)
+
+			if _, found := resourcesMetricsMap[resourceName]; !found {
+				resourcesMetricsMap[resourceName] = make(map[string]int)
+			}
+
+			// sanity
+			if _, found := resourcesMetricsMap[resourceName][metricName]; !found {
+				return make(map[string]map[string]int), errors.New("Can not have more than one metric value per resource")
+			}
+
+			resourcesMetricsMap[resourceName][metricName] = value
+		}
+	}
+
+	return resourcesMetricsMap, nil
+}
+
+func (as *Autoscaler) checkResourceToScale(resource scaler_types.Resource, resourcesMetricsMap map[string]map[string]int) bool {
+	if _, found := resourcesMetricsMap[resource.Name]; !found {
+		as.logger.DebugWith("Resource does not have metrics data yet, keeping up", "resourceName", resource.Name)
+		return false
+	}
+
+	for _, scaleResource := range resource.ScaleResources {
+		value, found := resourcesMetricsMap[resource.Name][scaleResource.MetricName]
+		if !found {
+			as.logger.DebugWith("One of the metrics is missing data, keeping up",
+				"resourceName", resource.Name,
+				"metricName", scaleResource.MetricName)
+			return false
+		}
+
+		if value > scaleResource.Threshold {
+			as.logger.DebugWith("Metric value above threshold, keeping up",
+				"resourceName", resource.Name,
+				"metricName", scaleResource.MetricName,
+				"threshold", scaleResource.Threshold,
+				"value", value)
+			return false
+		}
+
+		as.logger.DebugWith("Metric value below threshold",
+			"resourceName", resource.Name,
 			"metricName", scaleResource.MetricName,
 			"threshold", scaleResource.Threshold,
-			"deltaSeconds", t.Sub(oldestEntry.timestamp).Seconds(),
-			"windowSize", scaleResource.WindowSize)
-		return true
-	} else if oldestEntry != nil {
-		as.logger.DebugWith("Resource values are still in window",
-			"resourceName", resourceName,
-			"metricName", scaleResource.MetricName,
-			"value", oldestEntry.value,
-			"deltaSeconds", t.Sub(oldestEntry.timestamp).Seconds(),
-			"windowSize", scaleResource.WindowSize)
-		return false
-	} else {
-		as.logger.DebugWith("Resource metrics are above threshold",
-			"resourceName", resourceName,
-			"metricName", scaleResource.MetricName,
-			"threshold", scaleResource.Threshold)
-		return false
+			"value", value)
 	}
+
+	as.logger.DebugWith("All metric values below threshold, should scale to zero", "resourceName", resource.Name)
+	return true
 }
 
-func (as *Autoscaler) cleanMetrics(t time.Time, resource scaler_types.Resource, scaledToZero bool) {
-
-	// If scale to zero occurred, metrics are not needed anymore
-	if scaledToZero {
-		delete(as.metricsMap, resource.Name)
-	} else {
-		for _, scaleResource := range resource.ScaleResources {
-
-			// rebuild the slice, excluding any old metrics
-			var newMetrics []metricEntry
-			for _, metric := range as.metricsMap[resource.Name][scaleResource.MetricName] {
-				if t.Sub(metric.timestamp) <= scaleResource.WindowSize {
-					newMetrics = append(newMetrics, metric)
-				}
-			}
-
-			if _, found := as.metricsMap[resource.Name]; !found {
-				as.metricsMap[resource.Name] = make(map[string][]metricEntry)
-			}
-
-			as.metricsMap[resource.Name][scaleResource.MetricName] = newMetrics
+func (as *Autoscaler) getBiggestWindow(resource scaler_types.Resource) time.Duration {
+	biggestWindow := 0 * time.Second
+	for _, scaleResource := range resource.ScaleResources {
+		if scaleResource.WindowSize > biggestWindow {
+			biggestWindow = scaleResource.WindowSize
 		}
 	}
+	return biggestWindow
 }
 
-func (as *Autoscaler) addMetricEntry(resourceName string, metricType string, entry metricEntry) {
-	if _, found := as.metricsMap[resourceName]; !found {
-		as.metricsMap[resourceName] = make(map[string][]metricEntry)
+func (as *Autoscaler) checkResourcesToScale(t time.Time) error {
+	activeResources, err := as.resourceScaler.GetResources()
+	if err != nil {
+		return errors.Wrap(err, "Failed to get resources")
 	}
-	as.metricsMap[resourceName][metricType] = append(as.metricsMap[resourceName][metricType], entry)
-}
+	metricNames := as.getMetricNames(activeResources)
+	resourcesMetricsMap, err := as.getResourcesMetrics(metricNames)
+	if err != nil {
+		return errors.Wrap(err, "Failed to get resources metrics")
+	}
 
-func (as *Autoscaler) ReportMetric(metric metricEntry) error {
+	for _, resource := range activeResources {
+		inScaleToZeroProcess, found := as.inScaleToZeroProcessMap[resource.Name]
+		if found && inScaleToZeroProcess {
+			as.logger.DebugWith("Already in scale to zero process, skipping",
+				"resourceName", resource.Name)
+			continue
+		}
 
-	// don't block, try and fail fast
-	select {
-	case as.metricsChannel <- metric:
-		return nil
-	default:
-		as.logger.WarnWith("Failed to report metric",
-			"resourceName", metric.resourceName,
-			"MetricName", metric.metricName)
+		biggestWindow := as.getBiggestWindow(resource)
+
+		// if the resource was scaled from zero, and it happened after biggest window ago don't scale
+		if (resource.LastScaleState == scaler_types.ScalingFromZeroScaleState ||
+			resource.LastScaleState == scaler_types.ScaledFromZeroScaleState) &&
+			resource.LastScaleStateTime.After(t.Add(-1*biggestWindow)) {
+			as.logger.DebugWith("Did not passed biggest window from last scale from zero event, keeping up",
+				"resourceName", resource.Name,
+				"lastScaleStateTime", resource.LastScaleStateTime,
+				"biggestWindow", biggestWindow,
+				"time", t)
+			continue
+		}
+
+		shouldScaleToZero := as.checkResourceToScale(resource, resourcesMetricsMap)
+
+		if !shouldScaleToZero {
+			continue
+		}
+
+		as.inScaleToZeroProcessMap[resource.Name] = true
+		go func() {
+			err := as.resourceScaler.SetScale(resource, 0)
+			if err != nil {
+				as.logger.WarnWith("Failed to set scale", "err", errors.GetErrorStackString(err, 10))
+			}
+			delete(as.inScaleToZeroProcessMap, resource.Name)
+		}()
 	}
 	return nil
 }
@@ -165,13 +203,10 @@ func (as *Autoscaler) Start() error {
 		for {
 			select {
 			case <-ticker.C:
-				resourcesList, err := as.resourceScaler.GetResources()
+				err := as.checkResourcesToScale(time.Now())
 				if err != nil {
-					as.logger.WarnWith("Failed to build resource map", "err", err)
+					as.logger.WarnWith("Failed to check resources to scale", "err", errors.GetErrorStackString(err, 10))
 				}
-				as.checkResourceToScale(time.Now(), resourcesList)
-			case metric := <-as.metricsChannel:
-				as.addMetricEntry(metric.resourceName, metric.metricName, metric)
 			}
 		}
 	}()

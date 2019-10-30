@@ -2,6 +2,7 @@ package dlx
 
 import (
 	"fmt"
+	"github.com/nuclio/errors"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -75,7 +76,7 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 	if statusResult.Error != nil {
 		h.logger.WarnWith("Failed to forward request to resource",
 			"resource", statusResult.ResourceName,
-			"err", statusResult.Error)
+			"err", errors.GetErrorStackString(statusResult.Error, 10))
 		res.WriteHeader(statusResult.Status)
 		return
 	}
@@ -87,6 +88,6 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 func (h *Handler) URLBadParse(resourceName string, err error) int {
 	h.logger.Warn("Failed to parse url for resource",
 		"resourceName", resourceName,
-		"err", err)
+		"err", errors.GetErrorStackString(err, 10))
 	return http.StatusBadRequest
 }

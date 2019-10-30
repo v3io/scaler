@@ -90,7 +90,7 @@ func (r *ResourceStarter) startResource(resourceSinkChannel chan responseChannel
 			ResourceName: resourceName,
 		}
 	case err := <-resourceReadyChannel:
-		r.logger.DebugWith("Resource ready", "target", target, "err", err)
+		r.logger.DebugWith("Resource ready", "target", target, "err", errors.GetErrorStackString(err, 10))
 
 		if err == nil {
 			resultStatus = ResourceStatusResult{
