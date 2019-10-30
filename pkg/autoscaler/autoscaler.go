@@ -186,13 +186,21 @@ func (as *Autoscaler) checkResourcesToScale(t time.Time) error {
 
 		as.inScaleToZeroProcessMap[resource.Name] = true
 		go func() {
-			err := as.resourceScaler.SetScale(resource, 0)
+			err := as.scaleResourceToZero(resource)
 			if err != nil {
-				as.logger.WarnWith("Failed to set scale", "err", errors.GetErrorStackString(err, 10))
+				as.logger.WarnWith("Failed to scale resource to zero", "resource", resource, "err", errors.GetErrorStackString(err, 10))
 			}
 			delete(as.inScaleToZeroProcessMap, resource.Name)
 		}()
 	}
+	return nil
+}
+
+func (as *Autoscaler) scaleResourceToZero(resource scaler_types.Resource) error {
+	if err := as.resourceScaler.SetScale(resource, 0); err != nil {
+		return errors.Wrap(err, "Failed to set scale")
+	}
+
 	return nil
 }
 
