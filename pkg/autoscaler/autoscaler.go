@@ -1,16 +1,17 @@
 package autoscaler
 
 import (
-	"github.com/nuclio/errors"
+	"time"
+
 	"github.com/v3io/scaler/pkg/common"
+
+	"github.com/nuclio/errors"
+	"github.com/nuclio/logger"
+	"github.com/v3io/scaler-types"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	custommetricsv1 "k8s.io/metrics/pkg/client/custom_metrics"
-	"time"
-
-	"github.com/nuclio/logger"
-	"github.com/v3io/scaler-types"
 )
 
 type Autoscaler struct {
