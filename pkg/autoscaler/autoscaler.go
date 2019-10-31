@@ -1,7 +1,6 @@
 package autoscaler
 
 import (
-	"fmt"
 	"github.com/nuclio/errors"
 	"github.com/v3io/scaler/pkg/common"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -47,8 +46,7 @@ func (as *Autoscaler) getMetricNames(resources []scaler_types.Resource) []string
 	var metricNames []string
 	for _, resource := range resources {
 		for _, scaleResource := range resource.ScaleResources {
-			fullMetricName := fmt.Sprintf("%s_%s", scaleResource.MetricName, scaleResource.WindowSize)
-			metricNames = append(metricNames, fullMetricName)
+			metricNames = append(metricNames, scaleResource.GetKubernetesMetricName())
 		}
 	}
 	metricNames = common.UniquifyStringList(metricNames)
@@ -89,7 +87,7 @@ func (as *Autoscaler) getResourcesMetrics(metricNames []string) (map[string]map[
 			}
 
 			// sanity
-			if _, found := resourcesMetricsMap[resourceName][metricName]; !found {
+			if _, found := resourcesMetricsMap[resourceName][metricName]; found {
 				return make(map[string]map[string]int), errors.New("Can not have more than one metric value per resource")
 			}
 
@@ -107,18 +105,19 @@ func (as *Autoscaler) checkResourceToScale(resource scaler_types.Resource, resou
 	}
 
 	for _, scaleResource := range resource.ScaleResources {
-		value, found := resourcesMetricsMap[resource.Name][scaleResource.MetricName]
+		metricName := scaleResource.GetKubernetesMetricName()
+		value, found := resourcesMetricsMap[resource.Name][metricName]
 		if !found {
 			as.logger.DebugWith("One of the metrics is missing data, keeping up",
 				"resourceName", resource.Name,
-				"metricName", scaleResource.MetricName)
+				"metricName", metricName)
 			return false
 		}
 
 		if value > scaleResource.Threshold {
 			as.logger.DebugWith("Metric value above threshold, keeping up",
 				"resourceName", resource.Name,
-				"metricName", scaleResource.MetricName,
+				"metricName", metricName,
 				"threshold", scaleResource.Threshold,
 				"value", value)
 			return false
@@ -126,7 +125,7 @@ func (as *Autoscaler) checkResourceToScale(resource scaler_types.Resource, resou
 
 		as.logger.DebugWith("Metric value below threshold",
 			"resourceName", resource.Name,
-			"metricName", scaleResource.MetricName,
+			"metricName", metricName,
 			"threshold", scaleResource.Threshold,
 			"value", value)
 	}
@@ -150,6 +149,10 @@ func (as *Autoscaler) checkResourcesToScale(t time.Time) error {
 	if err != nil {
 		return errors.Wrap(err, "Failed to get resources")
 	}
+	if len(activeResources) == 0 {
+		as.logger.DebugWith("No active resources")
+		return nil
+	}
 	metricNames := as.getMetricNames(activeResources)
 	resourcesMetricsMap, err := as.getResourcesMetrics(metricNames)
 	if err != nil {
@@ -170,7 +173,7 @@ func (as *Autoscaler) checkResourcesToScale(t time.Time) error {
 		if (resource.LastScaleState == scaler_types.ScalingFromZeroScaleState ||
 			resource.LastScaleState == scaler_types.ScaledFromZeroScaleState) &&
 			resource.LastScaleStateTime.After(t.Add(-1*biggestWindow)) {
-			as.logger.DebugWith("Did not passed biggest window from last scale from zero event, keeping up",
+			as.logger.DebugWith("Not enough time passed from last scale from zero event, keeping up",
 				"resourceName", resource.Name,
 				"lastScaleStateTime", resource.LastScaleStateTime,
 				"biggestWindow", biggestWindow,
