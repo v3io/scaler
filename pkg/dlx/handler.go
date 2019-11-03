@@ -2,11 +2,11 @@ package dlx
 
 import (
 	"fmt"
-	"github.com/nuclio/errors"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 
+	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"
 )
 
