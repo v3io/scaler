@@ -43,6 +43,23 @@ func NewAutoScaler(parentLogger logger.Logger,
 	}, nil
 }
 
+func (as *Autoscaler) Start() error {
+	ticker := time.NewTicker(as.scaleInterval)
+
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				err := as.checkResourcesToScale(time.Now())
+				if err != nil {
+					as.logger.WarnWith("Failed to check resources to scale", "err", errors.GetErrorStackString(err, 10))
+				}
+			}
+		}
+	}()
+	return nil
+}
+
 func (as *Autoscaler) getMetricNames(resources []scaler_types.Resource) []string {
 	var metricNames []string
 	for _, resource := range resources {
@@ -205,22 +222,5 @@ func (as *Autoscaler) scaleResourceToZero(resource scaler_types.Resource) error 
 		return errors.Wrap(err, "Failed to set scale")
 	}
 
-	return nil
-}
-
-func (as *Autoscaler) Start() error {
-	ticker := time.NewTicker(as.scaleInterval)
-
-	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				err := as.checkResourcesToScale(time.Now())
-				if err != nil {
-					as.logger.WarnWith("Failed to check resources to scale", "err", errors.GetErrorStackString(err, 10))
-				}
-			}
-		}
-	}()
 	return nil
 }
