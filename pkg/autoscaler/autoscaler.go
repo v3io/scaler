@@ -76,20 +76,25 @@ func (as *Autoscaler) getResourcesMetrics(metricNames []string) (map[string]map[
 
 	schemaGroupKind := schema.GroupKind{Group: "", Kind: as.groupKind}
 	resourceLabels := labels.Everything()
-	c := as.customMetricsClientSet.NamespacedMetrics(as.namespace)
+	metricsClient := as.customMetricsClientSet.NamespacedMetrics(as.namespace)
 
 	for _, metricName := range metricNames {
-		cm, err := c.GetForObjects(schemaGroupKind,
+
+		// getting the metric values for all object of schema group kind (e.g. deployment)
+		metrics, err := metricsClient.GetForObjects(schemaGroupKind,
 			resourceLabels,
 			metricName)
 		if err != nil {
+
+			// if no data points submitted yet it's ok, continue to the next metric
 			if k8serrors.IsNotFound(err) {
 				continue
 			}
 			return make(map[string]map[string]int), errors.Wrap(err, "Failed to get custom metrics")
 		}
 
-		for _, item := range cm.Items {
+		// fill the resourcesMetricsMap with the metrics data we got
+		for _, item := range metrics.Items {
 
 			resourceName := item.DescribedObject.Name
 			value := int(item.Value.MilliValue())
@@ -131,12 +136,8 @@ func (as *Autoscaler) checkResourceToScale(resource scaler_types.Resource, resou
 			return false
 		}
 
+		// Metric value above threshold, keeping up
 		if value > scaleResource.Threshold {
-			as.logger.DebugWith("Metric value above threshold, keeping up",
-				"resourceName", resource.Name,
-				"metricName", metricName,
-				"threshold", scaleResource.Threshold,
-				"value", value)
 			return false
 		}
 
@@ -151,14 +152,14 @@ func (as *Autoscaler) checkResourceToScale(resource scaler_types.Resource, resou
 	return true
 }
 
-func (as *Autoscaler) getBiggestWindow(resource scaler_types.Resource) time.Duration {
-	biggestWindow := 0 * time.Second
+func (as *Autoscaler) getMaxScaleResourceWindowSize(resource scaler_types.Resource) time.Duration {
+	maxWindow := 0 * time.Second
 	for _, scaleResource := range resource.ScaleResources {
-		if scaleResource.WindowSize > biggestWindow {
-			biggestWindow = scaleResource.WindowSize
+		if scaleResource.WindowSize > maxWindow {
+			maxWindow = scaleResource.WindowSize
 		}
 	}
-	return biggestWindow
+	return maxWindow
 }
 
 func (as *Autoscaler) checkResourcesToScale(t time.Time) error {
@@ -184,16 +185,16 @@ func (as *Autoscaler) checkResourcesToScale(t time.Time) error {
 			continue
 		}
 
-		biggestWindow := as.getBiggestWindow(resource)
+		scaleEventDebounceDuration := as.getMaxScaleResourceWindowSize(resource)
 
 		// if the resource was scaled from zero, and it happened after biggest window ago don't scale
 		if (resource.LastScaleState == scaler_types.ScalingFromZeroScaleState ||
 			resource.LastScaleState == scaler_types.ScaledFromZeroScaleState) &&
-			resource.LastScaleStateTime.After(t.Add(-1*biggestWindow)) {
-			as.logger.DebugWith("Not enough time passed from last scale from zero event, keeping up",
+			resource.LastScaleStateTime.After(t.Add(-1*scaleEventDebounceDuration)) {
+			as.logger.DebugWith("Resource in debouncing period, not a scale-to-zero candidate",
 				"resourceName", resource.Name,
 				"lastScaleStateTime", resource.LastScaleStateTime,
-				"biggestWindow", biggestWindow,
+				"scaleEventDebounceDuration", scaleEventDebounceDuration,
 				"time", t)
 			continue
 		}
