@@ -148,7 +148,7 @@ func (as *Autoscaler) checkResourceToScale(resource scaler_types.Resource, resou
 			"value", value)
 	}
 
-	as.logger.DebugWith("All metric values below threshold, should scale to zero", "resourceName", resource.Name)
+	as.logger.InfoWith("All metric values below threshold, should scale to zero", "resourceName", resource.Name)
 	return true
 }
 
