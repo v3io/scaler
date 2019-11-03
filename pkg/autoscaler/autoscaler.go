@@ -172,7 +172,7 @@ func (as *Autoscaler) checkResourcesToScale(t time.Time) error {
 	}
 	metricNames := as.getMetricNames(activeResources)
 	as.logger.DebugWith("Got metric names", "metricNames", metricNames)
-	resourcesMetricsMap, err := as.getResourceMetrics(metricNames)
+	resourceMetricsMap, err := as.getResourceMetrics(metricNames)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get resources metrics")
 	}
@@ -199,7 +199,7 @@ func (as *Autoscaler) checkResourcesToScale(t time.Time) error {
 			continue
 		}
 
-		shouldScaleToZero := as.checkResourceToScale(resource, resourcesMetricsMap)
+		shouldScaleToZero := as.checkResourceToScale(resource, resourceMetricsMap)
 
 		if !shouldScaleToZero {
 			continue
