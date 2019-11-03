@@ -68,7 +68,6 @@ func (as *Autoscaler) getMetricNames(resources []scaler_types.Resource) []string
 		}
 	}
 	metricNames = common.UniquifyStringList(metricNames)
-	as.logger.DebugWith("Got metric names", "metricNames", metricNames)
 	return metricNames
 }
 
@@ -171,6 +170,7 @@ func (as *Autoscaler) checkResourcesToScale(t time.Time) error {
 		return nil
 	}
 	metricNames := as.getMetricNames(activeResources)
+	as.logger.DebugWith("Got metric names", "metricNames", metricNames)
 	resourcesMetricsMap, err := as.getResourcesMetrics(metricNames)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get resources metrics")
