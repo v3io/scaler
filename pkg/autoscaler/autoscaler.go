@@ -189,12 +189,12 @@ func (as *Autoscaler) checkResourcesToScale() error {
 		scaleEventDebounceDuration := as.getMaxScaleResourceWindowSize(resource)
 
 		// if the resource was scaled from zero, and it happened after biggest window ago do not scale
-		if (resource.LastScaleState == scaler_types.ScalingFromZeroScaleState ||
-			resource.LastScaleState == scaler_types.ScaledFromZeroScaleState) &&
-			resource.LastScaleStateTime.After(now.Add(-1*scaleEventDebounceDuration)) {
+		if (resource.LastScaleEvent == scaler_types.ScaleFromZeroStartedScaleEvent ||
+			resource.LastScaleEvent == scaler_types.ScaleFromZeroCompletedScaleEvent) &&
+			resource.LastScaleEventTime.After(now.Add(-1*scaleEventDebounceDuration)) {
 			as.logger.DebugWith("Resource in debouncing period, not a scale-to-zero candidate",
 				"resourceName", resource.Name,
-				"lastScaleStateTime", resource.LastScaleStateTime,
+				"LastScaleEventTime", resource.LastScaleEventTime,
 				"scaleEventDebounceDuration", scaleEventDebounceDuration,
 				"time", now)
 			continue
