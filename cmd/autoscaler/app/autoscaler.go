@@ -18,24 +18,11 @@ import (
 func Run(kubeconfigPath string,
 	namespace string,
 	scaleInterval time.Duration,
-	scaleWindow time.Duration,
-	metricName string,
-	scaleThreshold int64,
-	metricsInterval time.Duration,
 	metricsGroupKind string) error {
 	autoScalerOptions := scaler_types.AutoScalerOptions{
 		Namespace:     namespace,
 		ScaleInterval: scaleInterval,
-		ScaleWindow:   scaleWindow,
-		Threshold:     scaleThreshold,
-		MetricName:    metricName,
-	}
-
-	pollerOptions := scaler_types.PollerOptions{
-		Namespace:      namespace,
-		MetricName:     metricName,
-		MetricInterval: metricsInterval,
-		GroupKind:      metricsGroupKind,
+		GroupKind:     metricsGroupKind,
 	}
 
 	pluginLoader, err := pluginloader.New()
@@ -56,7 +43,6 @@ func Run(kubeconfigPath string,
 	if resourceScalerConfig != nil {
 		kubeconfigPath = resourceScalerConfig.KubeconfigPath
 		autoScalerOptions = resourceScalerConfig.AutoScalerOptions
-		pollerOptions = resourceScalerConfig.PollerOptions
 	}
 
 	restConfig, err := getClientConfig(kubeconfigPath)
@@ -73,15 +59,6 @@ func Run(kubeconfigPath string,
 		return errors.Wrap(err, "Failed to start scaler")
 	}
 
-	newPoller, err := createPoller(restConfig, newScaler, pollerOptions)
-	if err != nil {
-		return errors.Wrap(err, "Failed to create poller")
-	}
-
-	if err := newPoller.Start(); err != nil {
-		return errors.Wrap(err, "Failed to start poller")
-	}
-
 	select {}
 }
 
@@ -93,34 +70,18 @@ func createAutoScaler(restConfig *rest.Config,
 		return nil, errors.Wrap(err, "Failed to initialize root logger")
 	}
 
-	newScaler, err := autoscaler.NewAutoScaler(rootLogger, resourceScaler, options)
+	customMetricsClient, err := custommetricsv1.NewForConfig(restConfig)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed create custom metrics client set")
+	}
+
+	newScaler, err := autoscaler.NewAutoScaler(rootLogger, resourceScaler, customMetricsClient, options)
 
 	if err != nil {
 		return nil, err
 	}
 
 	return newScaler, nil
-}
-
-func createPoller(restConfig *rest.Config,
-	reporter autoscaler.MetricReporter,
-	options scaler_types.PollerOptions) (*autoscaler.MetricsPoller, error) {
-	rootLogger, err := nucliozap.NewNuclioZap("autoscaler", "console", os.Stdout, os.Stderr, nucliozap.DebugLevel)
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to initialize root logger")
-	}
-
-	customMetricsClient, err := custommetricsv1.NewForConfig(restConfig)
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed create custom metrics client set")
-	}
-
-	newPoller, err := autoscaler.NewMetricsPoller(rootLogger, reporter, customMetricsClient, options)
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to create metrics poller")
-	}
-
-	return newPoller, err
 }
 
 func getClientConfig(kubeconfigPath string) (*rest.Config, error) {
