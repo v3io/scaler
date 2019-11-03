@@ -71,7 +71,7 @@ func (as *Autoscaler) getMetricNames(resources []scaler_types.Resource) []string
 	return metricNames
 }
 
-func (as *Autoscaler) getResourcesMetrics(metricNames []string) (map[string]map[string]int, error) {
+func (as *Autoscaler) getResourceMetrics(metricNames []string) (map[string]map[string]int, error) {
 	resourcesMetricsMap := make(map[string]map[string]int)
 
 	schemaGroupKind := schema.GroupKind{Group: "", Kind: as.groupKind}
@@ -172,7 +172,7 @@ func (as *Autoscaler) checkResourcesToScale(t time.Time) error {
 	}
 	metricNames := as.getMetricNames(activeResources)
 	as.logger.DebugWith("Got metric names", "metricNames", metricNames)
-	resourcesMetricsMap, err := as.getResourcesMetrics(metricNames)
+	resourcesMetricsMap, err := as.getResourceMetrics(metricNames)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get resources metrics")
 	}
