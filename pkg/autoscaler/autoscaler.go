@@ -99,7 +99,7 @@ func (as *Autoscaler) getResourceMetrics(metricNames []string) (map[string]map[s
 			resourceName := item.DescribedObject.Name
 			value := int(item.Value.MilliValue())
 
-			as.logger.DebugWith("Got Metric Entry",
+			as.logger.DebugWith("Got metric entry",
 				"resourceName", resourceName,
 				"metricName", metricName,
 				"value", value)
