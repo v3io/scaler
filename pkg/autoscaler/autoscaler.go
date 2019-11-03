@@ -47,13 +47,10 @@ func (as *Autoscaler) Start() error {
 	ticker := time.NewTicker(as.scaleInterval)
 
 	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				err := as.checkResourcesToScale()
-				if err != nil {
-					as.logger.WarnWith("Failed to check resources to scale", "err", errors.GetErrorStackString(err, 10))
-				}
+		for range ticker.C {
+			err := as.checkResourcesToScale()
+			if err != nil {
+				as.logger.WarnWith("Failed to check resources to scale", "err", errors.GetErrorStackString(err, 10))
 			}
 		}
 	}()
@@ -178,7 +175,7 @@ func (as *Autoscaler) checkResourcesToScale() error {
 		return errors.Wrap(err, "Failed to get resources metrics")
 	}
 
-	for _, resource := range activeResources {
+	for idx, resource := range activeResources {
 		inScaleToZeroProcess, found := as.inScaleToZeroProcessMap[resource.Name]
 		if found && inScaleToZeroProcess {
 			as.logger.DebugWith("Already in scale to zero process, skipping",
@@ -207,13 +204,13 @@ func (as *Autoscaler) checkResourcesToScale() error {
 		}
 
 		as.inScaleToZeroProcessMap[resource.Name] = true
-		go func() {
+		go func(resource scaler_types.Resource) {
 			err := as.scaleResourceToZero(resource)
 			if err != nil {
 				as.logger.WarnWith("Failed to scale resource to zero", "resource", resource, "err", errors.GetErrorStackString(err, 10))
 			}
 			delete(as.inScaleToZeroProcessMap, resource.Name)
-		}()
+		}(activeResources[idx])
 	}
 	return nil
 }
