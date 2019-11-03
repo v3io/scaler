@@ -50,7 +50,7 @@ func (as *Autoscaler) Start() error {
 		for {
 			select {
 			case <-ticker.C:
-				err := as.checkResourcesToScale(time.Now())
+				err := as.checkResourcesToScale()
 				if err != nil {
 					as.logger.WarnWith("Failed to check resources to scale", "err", errors.GetErrorStackString(err, 10))
 				}
@@ -162,7 +162,8 @@ func (as *Autoscaler) getMaxScaleResourceWindowSize(resource scaler_types.Resour
 	return maxWindow
 }
 
-func (as *Autoscaler) checkResourcesToScale(t time.Time) error {
+func (as *Autoscaler) checkResourcesToScale() error {
+	now := time.Now()
 	activeResources, err := as.resourceScaler.GetResources()
 	if err != nil {
 		return errors.Wrap(err, "Failed to get resources")
@@ -187,15 +188,15 @@ func (as *Autoscaler) checkResourcesToScale(t time.Time) error {
 
 		scaleEventDebounceDuration := as.getMaxScaleResourceWindowSize(resource)
 
-		// if the resource was scaled from zero, and it happened after biggest window ago don't scale
+		// if the resource was scaled from zero, and it happened after biggest window ago do not scale
 		if (resource.LastScaleState == scaler_types.ScalingFromZeroScaleState ||
 			resource.LastScaleState == scaler_types.ScaledFromZeroScaleState) &&
-			resource.LastScaleStateTime.After(t.Add(-1*scaleEventDebounceDuration)) {
+			resource.LastScaleStateTime.After(now.Add(-1*scaleEventDebounceDuration)) {
 			as.logger.DebugWith("Resource in debouncing period, not a scale-to-zero candidate",
 				"resourceName", resource.Name,
 				"lastScaleStateTime", resource.LastScaleStateTime,
 				"scaleEventDebounceDuration", scaleEventDebounceDuration,
-				"time", t)
+				"time", now)
 			continue
 		}
 
