@@ -168,7 +168,6 @@ func (as *Autoscaler) checkResourcesToScale(t time.Time) error {
 		return errors.Wrap(err, "Failed to get resources")
 	}
 	if len(activeResources) == 0 {
-		as.logger.DebugWith("No active resources")
 		return nil
 	}
 	metricNames := as.getMetricNames(activeResources)
