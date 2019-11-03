@@ -67,7 +67,7 @@ func (as *Autoscaler) getMetricNames(resources []scaler_types.Resource) []string
 			metricNames = append(metricNames, scaleResource.GetKubernetesMetricName())
 		}
 	}
-	metricNames = common.UniquifyStringList(metricNames)
+	metricNames = common.UniquifyStringSlice(metricNames)
 	return metricNames
 }
 
