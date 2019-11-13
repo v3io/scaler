@@ -193,7 +193,8 @@ func (as *Autoscaler) checkResourcesToScale() error {
 			resource.LastScaleEventTime.After(now.Add(-1*scaleEventDebounceDuration)) {
 			as.logger.DebugWith("Resource in debouncing period, not a scale-to-zero candidate",
 				"resourceName", resource.Name,
-				"LastScaleEventTime", resource.LastScaleEventTime,
+				"LastScaleEvent", *resource.LastScaleEvent,
+				"LastScaleEventTime", *resource.LastScaleEventTime,
 				"scaleEventDebounceDuration", scaleEventDebounceDuration,
 				"time", now)
 			continue
