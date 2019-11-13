@@ -2,6 +2,7 @@ package app
 
 import (
 	"os"
+	"time"
 
 	"github.com/v3io/scaler/pkg/dlx"
 	"github.com/v3io/scaler/pkg/pluginloader"
@@ -16,7 +17,8 @@ func Run(kubeconfigPath string,
 	targetNameHeader string,
 	targetPathHeader string,
 	targetPort int,
-	listenAddress string) error {
+	listenAddress string,
+	resourceReadinessTimeout string) error {
 	pluginLoader, err := pluginloader.New()
 	if err != nil {
 		return errors.Wrap(err, "Failed to initialize plugin loader")
@@ -27,12 +29,18 @@ func Run(kubeconfigPath string,
 		return errors.Wrap(err, "Failed to load plugin")
 	}
 
+	resourceReadinessTimeoutDuration, err := time.ParseDuration(resourceReadinessTimeout)
+	if err != nil {
+		return errors.Wrap(err, "Failed to parse resource readiness timeout")
+	}
+
 	dlxOptions := scaler_types.DLXOptions{
-		TargetNameHeader: targetNameHeader,
-		TargetPathHeader: targetPathHeader,
-		TargetPort:       targetPort,
-		ListenAddress:    listenAddress,
-		Namespace:        namespace,
+		TargetNameHeader:         targetNameHeader,
+		TargetPathHeader:         targetPathHeader,
+		TargetPort:               targetPort,
+		ListenAddress:            listenAddress,
+		Namespace:                namespace,
+		ResourceReadinessTimeout: resourceReadinessTimeoutDuration,
 	}
 
 	// see if resource scaler wants to override the arguments

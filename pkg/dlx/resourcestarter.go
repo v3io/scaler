@@ -30,12 +30,13 @@ type ResourceStatusResult struct {
 
 func NewResourceStarter(parentLogger logger.Logger,
 	scaler scaler_types.ResourceScaler,
-	namespace string) (*ResourceStarter, error) {
+	namespace string,
+	resourceReadinessTimeout time.Duration) (*ResourceStarter, error) {
 	fs := &ResourceStarter{
 		logger:                   parentLogger.GetChild("resource-starter"),
 		resourceSinksMap:         make(resourceSinksMap),
 		namespace:                namespace,
-		resourceReadinessTimeout: time.Minute,
+		resourceReadinessTimeout: resourceReadinessTimeout,
 		scaler:                   scaler,
 	}
 	return fs, nil
