@@ -17,7 +17,7 @@ func main() {
 	targetPathHeader := flag.String("target-path-header", "", "Name of the header that holds information on target path")
 	targetPort := flag.Int("target-port", 0, "Name of the header that holds information on target port")
 	listenAddress := flag.String("listen-address", ":8090", "Address to listen upon for http proxy")
-	resourceReadinessTimeout := flag.String("resource-readiness-timeout", "1m", "maximum wait time for the resource to be ready")
+	resourceReadinessTimeout := flag.String("resource-readiness-timeout", "5m", "maximum wait time for the resource to be ready")
 	flag.Parse()
 
 	*namespace = common.GetNamespace(*namespace)
