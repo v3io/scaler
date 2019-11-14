@@ -185,9 +185,9 @@ func (as *Autoscaler) checkResourcesToScale() error {
 
 		scaleEventDebounceDuration := as.getMaxScaleResourceWindowSize(resource)
 
-		// if the resource was scaled from zero or started, and the debounce period from then has not passed yet do not scale
+		// if the resource was scaled from zero or updated, and the debounce period from then has not passed yet do not scale
 		if ((resource.LastScaleEvent != nil) &&
-			(*resource.LastScaleEvent == scaler_types.ResourceStartedScaleEvent ||
+			(*resource.LastScaleEvent == scaler_types.ResourceUpdatedScaleEvent ||
 				*resource.LastScaleEvent == scaler_types.ScaleFromZeroStartedScaleEvent ||
 				*resource.LastScaleEvent == scaler_types.ScaleFromZeroCompletedScaleEvent)) &&
 			resource.LastScaleEventTime.After(now.Add(-1*scaleEventDebounceDuration)) {
