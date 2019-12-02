@@ -15,16 +15,16 @@ and k8s service/s that can be used to route incoming requests.
 For example, when the autoscaler decides it needs to scale some resource to zero, it executes the resource-scaler's
 `SetScale` function which has the knowledge how to scale to zero its specific resource.
 
-**The autoscaler** - Responsible to periodically check whether some resources should be scaled to zero, it does so by 
-querying the custom metrics API. Upon deciding a resource should be scaled to zero, it uses the internal resource-scaler 
-to scale the resource to zero.
+**The autoscaler** - Responsible for periodically checking whether some resources should be scaled to zero. this is 
+performed by by querying the custom metrics API. Upon deciding a resource should be scaled to zero, it uses the internal 
+resource-scaler module to scale the resource to zero.
 The resource-scaler will first route all incoming traffic to the DLX, which in terms of K8s is done by changing a 
 service selector, after that, it will scale the resource to zero.
 
-**The DLX** - responsible for receiving and buffering requests of scaled to zero resources, when it gets a message it 
-creates a buffer for the messages, and tells the resource-scaler to scale the service back from zero.
-The resource-scaler will scale the resource back up and then route the traffic back to the service (by changing the svc 
-selector).
+**The DLX** - Responsible for receiving and buffering requests of scaled to zero resources, Upon receiving an incoming 
+request it creates a buffer for the messages, and tells the resource-scaler to scale the service back from zero.
+The resource-scaler will scale the resource back up and then route the traffic back to the service (by modifying the k8s 
+service selector).
 
 ## Prerequisites
 
@@ -38,8 +38,8 @@ but you can use which ever you want! You can find some recommended implementatio
 [here](https://github.com/kubernetes/metrics/blob/master/IMPLEMENTATIONS.md#custom-metrics-api)
 
 ## Getting Started
-This infrastructure designed to be generic and extendable, it can scale any resource.
-All you have to do is implement the specific resource-scaler for your resource. The interface between your 
+The infrastructure is designed to be generic, flexible and extendable, so as to serve any resource we'd wish to scale 
+to/from zero. All you have to do is implement the specific resource-scaler for your resource. The interface between your 
 resource-scaler and the scale-to-zero infrastructure's components is defined in 
 [scaler-types](https://github.com/v3io/scaler-types)
 
@@ -53,13 +53,13 @@ Examples:
 ## Installing
 [Go plugins](https://appliedgo.net/plugins/) is the magic that glues the resource-scaler and this infrastructure 
 components together.<br>
-First you'll need to build the resource scaler as a Go plugin, for example: <br>
+First you'll need to build the resource-scaler as a Go plugin, for example: <br>
 ```sh
 GOOS=linux GOARCH=amd64 go build -buildmode=plugin -a -installsuffix cgo -ldflags="-s -w" -o ./plugin.so ./resourcescaler.go
 ```
 The autoscaler/dlx looks for the plugin using this path (from the execution directory) `./plugins/*.so` so you should 
-move the outcome of the build command (the `plugin.so` file) to the `plugins` directory
-It is much easier to do everything using a Dockerfile, here are some great examples: 
+move the binary artifact of the build command (the `plugin.so` file) to the `plugins` directory
+It is much easier to do everything using Dockerfiles, here are some great examples: 
 * [Nuclio function Autoscaler dockerfile](https://github.com/nuclio/nuclio/blob/master/cmd/autoscaler/Dockerfile)  
 * [Nuclio function DLX dockerfile](https://github.com/nuclio/nuclio/blob/master/cmd/dlx/Dockerfile)
 * [Iguazio's app service Autoscaler dockerfile](https://github.com/v3io/app-resource-scaler/blob/development/autoscaler/Dockerfile)  
