@@ -13,7 +13,7 @@ There are several possible tools that implement it, we internally use
 but you can use which ever you want... you can find [here](https://github.com/kubernetes/metrics/blob/master/IMPLEMENTATIONS.md#custom-metrics-api) 
 recommended implementations
 
-### Design:
+## Design:
 ![Design scheme](https://www.lucidchart.com/publicSegments/view/cc8927a6-537f-4fe6-95e1-731503bc7996/image.jpeg)
 
 **The autoscaler** - responsible to periodically check whether resources should be scale to zero, it does that by 
@@ -27,7 +27,7 @@ creates a buffer for the messages, and tells the resource scaler to scale the se
 The resource scaler will scale the resource back up and then route the traffic back to the service (by changing the svc 
 selector).
 
-### Getting Started
+## Getting Started
 This infrastructure designed to be generic and extendable, it can scale any resource.
 All you have to do is implement the resource scaler, the interface between it and this infrastructure's components is 
 defined in [scaler-types](https://github.com/v3io/scaler-types)
@@ -39,7 +39,7 @@ Examples:
 * [Nuclio functions resource scaler](https://github.com/nuclio/nuclio/blob/master/pkg/platform/kube/resourcescaler/resourcescaler.go)
 * [Iguazio's app service resource scaler](https://github.com/v3io/app-resource-scaler/blob/development/resourcescaler.go)  
 
-### Installing
+## Installing
 Go plugin is the magic that glues the resource scaler and this infrastructure components together
 First you'll need to build a Dockerfile that builds your resource scaler as a Go plugin, and transplant it in this 
 repo released images
@@ -51,7 +51,7 @@ Here's some great examples:
 * [Iguazio's app service DLX dockerfile](https://github.com/v3io/app-resource-scaler/blob/development/dlx/Dockerfile)
 
 
-### Versioning
+## Versioning
 
 We use [SemVer](http://semver.org/) for versioning. For the versions available, see the 
 [releases on this repository](https://github.com/v3io/scaler/releases).
