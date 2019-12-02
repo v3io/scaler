@@ -4,19 +4,17 @@ Infrastructure to scale any resource to and from zero
 
 ## Prerequisites
 
-**Custom metrics API implementation** - 
+**Custom metrics API implementation:**
+
 The Autoscaler takes decisions based on data queried from Kubernetes 
-[custom metrics API](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/instrumentation/custom-metrics-api.md)
-There are several possible tools that implement the custom metrics API, we internally use
+[custom metrics API.](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/instrumentation/custom-metrics-api.md)
+There are several possible tools that implement it, we internally use
 [Prometheus](https://prometheus.io/) with the [Prometheus-Adapter](https://github.com/DirectXMan12/k8s-prometheus-adapter)
-but you can use which ever you want
+but you can use which ever you want... you can find [here](https://github.com/kubernetes/metrics/blob/master/IMPLEMENTATIONS.md#custom-metrics-api) 
+recommended implementations
 
 ### Design:
 ![Design scheme](https://www.lucidchart.com/publicSegments/view/cc8927a6-537f-4fe6-95e1-731503bc7996/image.jpeg)
-
-This infrastructure designed to be generic and extendable, it can scale any resource.
-The interface between this infrastructure's components and the specific resource scaler implementation is defined in 
-[scaler-types](https://github.com/v3io/scaler-types)
 
 **The autoscaler** - responsible to periodically check whether resources should be scale to zero, it does that by 
 querying the custom metrics API. When it decide a resource should be scaled to zero it tells the resource scaler to 
@@ -30,8 +28,10 @@ The resource scaler will scale the resource back up and then route the traffic b
 selector).
 
 ### Getting Started
-Sorry, but we've done almost everything, all you have to do is implement the resource scaler.
-The interface is defined in [scaler-types](https://github.com/v3io/scaler-types)
+This infrastructure designed to be generic and extendable, it can scale any resource.
+All you have to do is implement the resource scaler, the interface between it and this infrastructure's components is 
+defined in [scaler-types](https://github.com/v3io/scaler-types)
+
 **Note:** Incompatibility between the scaler repo vendor dir and the resource scale vendor dir may break things, 
 therefore it's suggested to put the resource scaler in its own repo
 
