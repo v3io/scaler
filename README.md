@@ -1,53 +1,57 @@
-# Scaler
-[![Build Status](https://travis-ci.org/v3io/scaler.svg?branch=master)](https://travis-ci.org/v3io/scaler)
+# Scale to Zero
 
-Building blocks to create a scaler (to and from zero instances) based on custom metrics.
+Infrastructure to scale any resource to and from zero
 
-Prerequisites:
+## Prerequisites
 
-https://github.com/prometheus/prometheus <br>
-https://github.com/kubernetes-incubator/metrics-server <br>
-https://github.com/DirectXMan12/k8s-prometheus-adapter <br>
+**Custom metrics API implementation** - 
+The Autoscaler takes decisions based on data queried from Kubernetes 
+[custom metrics API](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/instrumentation/custom-metrics-api.md)
+There are several possible tools that implement the custom metrics API, we internally use
+[Prometheus](https://prometheus.io/) with the [Prometheus-Adapter](https://github.com/DirectXMan12/k8s-prometheus-adapter)
+but you can use which ever you want
 
-Schema:
-```
+### Design:
+![Design scheme](https://www.lucidchart.com/publicSegments/view/cc8927a6-537f-4fe6-95e1-731503bc7996/image.jpeg)
 
-                   Your Pod
-                   To scale
- ------------     ------------       ------------       ------------       ------------       ------------  
-|            |   | /metrics   |     | Prometheus |     | Prometheus |     | Metrics    |     | Metrics    |                
-| Service    |-> |            |<--- |            |<--- | Adapter    |<--- | Aggregator |---> | Server     |
-|            |   |            |     |            |     |            |     |            |     |            |
- ------------     ------------       ------------       ------------       ------------       ------------   
-      |                                                                         /\
-      |                                                                     ------------ 
-      | Resource                                                           |            |
-      | Scaled to zero                                                     | Autoscaler |
-      |                                                                    |            |
-      |                                                                     ------------
-      |                                                    
-      |                     ------------                 
-      |                    |            |
-       ------------------> |    DLX     |
-                           |            |         
-                            ------------   
-                                                         
-                                                          
-                                                         
-```
+This infrastructure designed to be generic and extendable, it can scale any resource.
+The interface between this infrastructure's components and the specific resource scaler implementation is defined in 
+[scaler-types](https://github.com/v3io/scaler-types)
 
-### Autoscaler
-Based on custom metric name, will call `ResourceScaler` interface function `Scale` with a `Resource` from a list of known `Resource`'s (`GetResources` function)
-Config for service includes:
-```
-    Namespace     - kubernetes namespace of the resources
-    ScaleWindow   - an allowed period for the resource to be inactive before calling the `Scale` function
-    MetricName    - name of the metric to monitor for the resource
-    Threshold     - A threshold for a metric to concider the resource being inactive
-    ScaleInterval - an interval to call scale function which checks if a resource has passed the scale window, if not the scale window is being considered the longest duration of time where the metric for the resource is under the threshold
-```
-Scaler should change the resource service to point to DLX service and not to the scaled down pod (to be changed by `ResourceScaler` or some other external entity)
+**The autoscaler** - responsible to periodically check whether resources should be scale to zero, it does that by 
+querying the custom metrics API. When it decide a resource should be scaled to zero it tells the resource scaler to 
+scale the resource to zero.
+The resource scaler will route the traffic to the DLX, which in terms of K8s is done by changing the svc selector, 
+after that, it will scale the resource to zero.
 
-### DLX
-A service that listens on http requests for a given namespace, when a request is received, it's being saved in-memory until `Scale` function returns, this is an indication that the resource is ready and any changes that were made by autoscaler were reverted (i.e. changing where service points to), that request is then being proxied to the new instance and the response from it returns to the user.
+**The DLX** - responsible for receiving and buffering requests of scaled to zero resources, when it gets a message it 
+creates a buffer for the messages, and tells the resource scaler to scale the service back from zero.
+The resource scaler will scale the resource back up and then route the traffic back to the service (by changing the svc 
+selector).
 
+### Getting Started
+Sorry, but we've done almost everything, all you have to do is implement the resource scaler.
+The interface is defined in [scaler-types](https://github.com/v3io/scaler-types)
+**Note:** Incompatibility between the scaler repo vendor dir and the resource scale vendor dir may break things, 
+therefore it's suggested to put the resource scaler in its own repo
+
+Examples:
+* [Nuclio functions resource scaler](https://github.com/nuclio/nuclio/blob/master/pkg/platform/kube/resourcescaler/resourcescaler.go)
+* [Iguazio's app service resource scaler](https://github.com/v3io/app-resource-scaler/blob/development/resourcescaler.go)  
+
+### Installing
+Go plugin is the magic that glues the resource scaler and this infrastructure components together
+First you'll need to build a Dockerfile that builds your resource scaler as a Go plugin, and transplant it in this 
+repo released images
+
+Here's some great examples:
+* [Nuclio function Autoscaler dockerfile](https://github.com/nuclio/nuclio/blob/master/cmd/autoscaler/Dockerfile)  
+* [Nuclio function DLX dockerfile](https://github.com/nuclio/nuclio/blob/master/cmd/dlx/Dockerfile)
+* [Iguazio's app service Autoscaler dockerfile](https://github.com/v3io/app-resource-scaler/blob/development/autoscaler/Dockerfile)  
+* [Iguazio's app service DLX dockerfile](https://github.com/v3io/app-resource-scaler/blob/development/dlx/Dockerfile)
+
+
+### Versioning
+
+We use [SemVer](http://semver.org/) for versioning. For the versions available, see the 
+[releases on this repository](https://github.com/v3io/scaler/releases).
