@@ -54,7 +54,9 @@ Examples:
 [Go plugins](https://appliedgo.net/plugins/) is the magic that glues the resource-scaler and this infrastructure 
 components together.<br>
 First you'll need to build the resource scaler as a Go plugin, for example: <br>
-`GOOS=linux GOARCH=amd64 go build -buildmode=plugin -a -installsuffix cgo -ldflags="-s -w" -o ./plugin.so ./resourcescaler.go`<br>
+```sh
+GOOS=linux GOARCH=amd64 go build -buildmode=plugin -a -installsuffix cgo -ldflags="-s -w" -o ./plugin.so ./resourcescaler.go
+```
 The autoscaler/dlx looks for the plugin using this path (from the execution directory) `./plugins/*.so` so you should 
 move the outcome of the build command (the `plugin.so` file) to the `plugins` directory
 It is much easier to do everything using a Dockerfile, here are some great examples: 
