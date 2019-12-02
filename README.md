@@ -44,11 +44,14 @@ Go plugin is the magic that glues the resource scaler and this infrastructure co
 First you'll need to build a Dockerfile that builds your resource scaler as a Go plugin, and transplant it in this 
 repo released images
 
-Here's some great examples:
+Here are some great examples:
 * [Nuclio function Autoscaler dockerfile](https://github.com/nuclio/nuclio/blob/master/cmd/autoscaler/Dockerfile)  
 * [Nuclio function DLX dockerfile](https://github.com/nuclio/nuclio/blob/master/cmd/dlx/Dockerfile)
 * [Iguazio's app service Autoscaler dockerfile](https://github.com/v3io/app-resource-scaler/blob/development/autoscaler/Dockerfile)  
 * [Iguazio's app service DLX dockerfile](https://github.com/v3io/app-resource-scaler/blob/development/dlx/Dockerfile)
+
+You can install the components using the [scaler helm chart](https://github.com/v3io/helm-charts/tree/development/stable/scaler)<br>
+`$ helm install --name my-release v3io-stable/scaler`
 
 
 ## Versioning
