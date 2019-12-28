@@ -147,7 +147,7 @@ func (as *Autoscaler) checkResourceToScale(resource scaler_types.Resource, resou
 			"value", value)
 	}
 
-	as.logger.InfoWith("All metric values below threshold, should scale to zero", "resourceName", resource.Name)
+	as.logger.DebugWith("All metric values below threshold, should scale to zero", "resourceName", resource.Name)
 	return true
 }
 
@@ -215,6 +215,7 @@ func (as *Autoscaler) checkResourcesToScale() error {
 
 	if len(resourcesToScale) > 0 {
 		go func(resources []scaler_types.Resource) {
+			as.logger.InfoWith("Scaling resources to zero", "resources", resources)
 			err := as.scaleResourcesToZero(resources)
 			if err != nil {
 				as.logger.WarnWith("Failed to scale resources to zero", "resources", resources, "err", errors.GetErrorStackString(err, 10))
