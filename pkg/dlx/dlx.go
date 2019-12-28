@@ -14,15 +14,18 @@ type DLX struct {
 	handler       Handler
 }
 
-func NewDLX(logger logger.Logger,
+func NewDLX(parentLogger logger.Logger,
 	resourceScaler scaler_types.ResourceScaler,
 	options scaler_types.DLXOptions) (*DLX, error) {
-	resourceStarter, err := NewResourceStarter(logger, resourceScaler, options.Namespace, options.ResourceReadinessTimeout)
+	childLogger := parentLogger.GetChild("autoscaler")
+	childLogger.InfoWith("Creating DLX",
+		"options", options)
+	resourceStarter, err := NewResourceStarter(childLogger, resourceScaler, options.Namespace, options.ResourceReadinessTimeout)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create function starter")
 	}
 
-	handler, err := NewHandler(logger,
+	handler, err := NewHandler(childLogger,
 		resourceStarter,
 		options.TargetNameHeader,
 		options.TargetPathHeader,
@@ -32,14 +35,14 @@ func NewDLX(logger logger.Logger,
 	}
 
 	return &DLX{
-		logger:        logger,
+		logger:        childLogger,
 		listenAddress: options.ListenAddress,
 		handler:       handler,
 	}, nil
 }
 
 func (d *DLX) Start() error {
-	d.logger.InfoWith("Starting",
+	d.logger.DebugWith("Starting",
 		"listenAddress", d.listenAddress)
 
 	http.HandleFunc("/", d.handler.HandleFunc)

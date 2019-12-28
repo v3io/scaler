@@ -29,7 +29,7 @@ func NewAutoScaler(parentLogger logger.Logger,
 	customMetricsClientSet custommetricsv1.CustomMetricsClient,
 	options scaler_types.AutoScalerOptions) (*Autoscaler, error) {
 	childLogger := parentLogger.GetChild("autoscaler")
-	childLogger.DebugWith("Creating Autoscaler",
+	childLogger.InfoWith("Creating Autoscaler",
 		"options", options)
 
 	return &Autoscaler{
@@ -218,6 +218,7 @@ func (as *Autoscaler) checkResourcesToScale() error {
 		if err != nil {
 			as.logger.WarnWith("Failed to scale resources to zero", "resources", resources, "err", errors.GetErrorStackString(err, 10))
 		}
+		as.logger.InfoWith("Successfully scaled resources to zero", "resources", resources)
 		for _, resource := range resources {
 			delete(as.inScaleToZeroProcessMap, resource.Name)
 		}
