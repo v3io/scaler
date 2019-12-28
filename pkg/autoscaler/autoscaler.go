@@ -213,16 +213,18 @@ func (as *Autoscaler) checkResourcesToScale() error {
 		resourcesToScale = append(resourcesToScale, activeResources[idx])
 	}
 
-	go func(resources []scaler_types.Resource) {
-		err := as.scaleResourcesToZero(resources)
-		if err != nil {
-			as.logger.WarnWith("Failed to scale resources to zero", "resources", resources, "err", errors.GetErrorStackString(err, 10))
-		}
-		as.logger.InfoWith("Successfully scaled resources to zero", "resources", resources)
-		for _, resource := range resources {
-			delete(as.inScaleToZeroProcessMap, resource.Name)
-		}
-	}(resourcesToScale)
+	if len(resourcesToScale) > 0 {
+		go func(resources []scaler_types.Resource) {
+			err := as.scaleResourcesToZero(resources)
+			if err != nil {
+				as.logger.WarnWith("Failed to scale resources to zero", "resources", resources, "err", errors.GetErrorStackString(err, 10))
+			}
+			as.logger.InfoWith("Successfully scaled resources to zero", "resources", resources)
+			for _, resource := range resources {
+				delete(as.inScaleToZeroProcessMap, resource.Name)
+			}
+		}(resourcesToScale)
+	}
 
 	return nil
 }
