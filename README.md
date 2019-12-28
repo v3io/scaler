@@ -15,7 +15,7 @@ and k8s service/s that can be used to route incoming requests.
 For example, when the autoscaler decides it needs to scale some resource to zero, it executes the resource-scaler's
 `SetScale` function which has the knowledge how to scale to zero its specific resource.
 
-**The autoscaler** - Responsible for periodically checking whether some resources should be scaled to zero. this is 
+**The autoscaler** - Responsible for periodically checking whether some resources should be scaled to zero. This is 
 performed by by querying the custom metrics API. Upon deciding a resource should be scaled to zero, it uses the internal 
 resource-scaler module to scale the resource to zero.
 The resource-scaler will first route all incoming traffic to the DLX, which in terms of K8s is done by changing a 
