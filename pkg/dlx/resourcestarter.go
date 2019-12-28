@@ -123,7 +123,7 @@ func (r *ResourceStarter) startResource(resourceSinkChannel chan responseChannel
 }
 
 func (r *ResourceStarter) waitResourceReadiness(resource scaler_types.Resource, resourceReadyChannel chan error) {
-	err := r.scaler.SetScale(resource, 1)
+	err := r.scaler.SetScale([]scaler_types.Resource{resource}, 1)
 	resourceReadyChannel <- err
 }
 
