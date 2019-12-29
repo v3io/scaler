@@ -41,8 +41,7 @@ func NewDLX(parentLogger logger.Logger,
 }
 
 func (d *DLX) Start() error {
-	d.logger.DebugWith("Starting",
-		"listenAddress", d.listenAddress)
+	d.logger.DebugWith("Starting", "listenAddress", d.listenAddress)
 
 	http.HandleFunc("/", d.handler.HandleFunc)
 	if err := http.ListenAndServe(d.listenAddress, nil); err != nil {
