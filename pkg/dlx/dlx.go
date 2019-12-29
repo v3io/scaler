@@ -17,7 +17,7 @@ type DLX struct {
 func NewDLX(parentLogger logger.Logger,
 	resourceScaler scaler_types.ResourceScaler,
 	options scaler_types.DLXOptions) (*DLX, error) {
-	childLogger := parentLogger.GetChild("autoscaler")
+	childLogger := parentLogger.GetChild("dlx")
 	childLogger.InfoWith("Creating DLX", "options", options)
 	resourceStarter, err := NewResourceStarter(childLogger, resourceScaler, options.Namespace, options.ResourceReadinessTimeout)
 	if err != nil {
