@@ -19,7 +19,7 @@ func NewDLX(parentLogger logger.Logger,
 	options scaler_types.DLXOptions) (*DLX, error) {
 	childLogger := parentLogger.GetChild("dlx")
 	childLogger.InfoWith("Creating DLX", "options", options)
-	resourceStarter, err := NewResourceStarter(childLogger, resourceScaler, options.Namespace, options.ResourceReadinessTimeout)
+	resourceStarter, err := NewResourceStarter(childLogger, resourceScaler, options.Namespace, options.ResourceReadinessTimeout.Duration)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create function starter")
 	}

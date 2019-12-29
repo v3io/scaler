@@ -21,7 +21,7 @@ func Run(kubeconfigPath string,
 	metricsGroupKind string) error {
 	autoScalerOptions := scaler_types.AutoScalerOptions{
 		Namespace:     namespace,
-		ScaleInterval: scaleInterval,
+		ScaleInterval: scaler_types.Duration{Duration: scaleInterval},
 		GroupKind:     metricsGroupKind,
 	}
 
