@@ -40,7 +40,7 @@ func Run(kubeconfigPath string,
 		TargetPort:               targetPort,
 		ListenAddress:            listenAddress,
 		Namespace:                namespace,
-		ResourceReadinessTimeout: resourceReadinessTimeoutDuration,
+		ResourceReadinessTimeout: scaler_types.Duration{Duration: resourceReadinessTimeoutDuration},
 	}
 
 	// see if resource scaler wants to override the arguments

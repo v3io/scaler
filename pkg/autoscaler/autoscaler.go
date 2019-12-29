@@ -18,7 +18,7 @@ type Autoscaler struct {
 	logger                  logger.Logger
 	namespace               string
 	resourceScaler          scaler_types.ResourceScaler
-	scaleInterval           time.Duration
+	scaleInterval           scaler_types.Duration
 	inScaleToZeroProcessMap map[string]bool
 	groupKind               string
 	customMetricsClientSet  custommetricsv1.CustomMetricsClient
@@ -46,7 +46,7 @@ func NewAutoScaler(parentLogger logger.Logger,
 func (as *Autoscaler) Start() error {
 	as.logger.DebugWith("Starting",
 		"scaleInterval", as.scaleInterval)
-	ticker := time.NewTicker(as.scaleInterval)
+	ticker := time.NewTicker(as.scaleInterval.Duration)
 
 	go func() {
 		for range ticker.C {
@@ -154,8 +154,8 @@ func (as *Autoscaler) checkResourceToScale(resource scaler_types.Resource, resou
 func (as *Autoscaler) getMaxScaleResourceWindowSize(resource scaler_types.Resource) time.Duration {
 	maxWindow := 0 * time.Second
 	for _, scaleResource := range resource.ScaleResources {
-		if scaleResource.WindowSize > maxWindow {
-			maxWindow = scaleResource.WindowSize
+		if scaleResource.WindowSize.Duration > maxWindow {
+			maxWindow = scaleResource.WindowSize.Duration
 		}
 	}
 	return maxWindow
