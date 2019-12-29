@@ -19,13 +19,13 @@ type Handler struct {
 	targetPort       int
 }
 
-func NewHandler(logger logger.Logger,
+func NewHandler(parentLogger logger.Logger,
 	resourceStarter *ResourceStarter,
 	targetNameHeader string,
 	targetPathHeader string,
 	targetPort int) (Handler, error) {
 	h := Handler{
-		logger:           logger,
+		logger:           parentLogger.GetChild("handler"),
 		resourceStarter:  resourceStarter,
 		targetNameHeader: targetNameHeader,
 		targetPathHeader: targetPathHeader,

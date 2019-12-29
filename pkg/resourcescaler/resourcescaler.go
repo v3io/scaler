@@ -10,7 +10,7 @@ func New(kubeconfigPath string, namespace string) (scaler_types.ResourceScaler, 
 	return &NopResourceScaler{}, nil
 }
 
-func (r *NopResourceScaler) SetScale(resource scaler_types.Resource, scale int) error {
+func (r *NopResourceScaler) SetScale(resources []scaler_types.Resource, scale int) error {
 	return nil
 }
 

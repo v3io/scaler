@@ -29,7 +29,7 @@ func NewAutoScaler(parentLogger logger.Logger,
 	customMetricsClientSet custommetricsv1.CustomMetricsClient,
 	options scaler_types.AutoScalerOptions) (*Autoscaler, error) {
 	childLogger := parentLogger.GetChild("autoscaler")
-	childLogger.DebugWith("Creating Autoscaler",
+	childLogger.InfoWith("Creating Autoscaler",
 		"options", options)
 
 	return &Autoscaler{
@@ -44,6 +44,8 @@ func NewAutoScaler(parentLogger logger.Logger,
 }
 
 func (as *Autoscaler) Start() error {
+	as.logger.DebugWith("Starting",
+		"scaleInterval", as.scaleInterval)
 	ticker := time.NewTicker(as.scaleInterval)
 
 	go func() {
@@ -145,7 +147,7 @@ func (as *Autoscaler) checkResourceToScale(resource scaler_types.Resource, resou
 			"value", value)
 	}
 
-	as.logger.InfoWith("All metric values below threshold, should scale to zero", "resourceName", resource.Name)
+	as.logger.DebugWith("All metric values below threshold, should scale to zero", "resourceName", resource.Name)
 	return true
 }
 
@@ -175,6 +177,7 @@ func (as *Autoscaler) checkResourcesToScale() error {
 		return errors.Wrap(err, "Failed to get resources metrics")
 	}
 
+	resourcesToScale := make([]scaler_types.Resource, 0)
 	for idx, resource := range activeResources {
 		inScaleToZeroProcess, found := as.inScaleToZeroProcessMap[resource.Name]
 		if found && inScaleToZeroProcess {
@@ -207,19 +210,28 @@ func (as *Autoscaler) checkResourcesToScale() error {
 		}
 
 		as.inScaleToZeroProcessMap[resource.Name] = true
-		go func(resource scaler_types.Resource) {
-			err := as.scaleResourceToZero(resource)
-			if err != nil {
-				as.logger.WarnWith("Failed to scale resource to zero", "resource", resource, "err", errors.GetErrorStackString(err, 10))
-			}
-			delete(as.inScaleToZeroProcessMap, resource.Name)
-		}(activeResources[idx])
+		resourcesToScale = append(resourcesToScale, activeResources[idx])
 	}
+
+	if len(resourcesToScale) > 0 {
+		go func(resources []scaler_types.Resource) {
+			as.logger.InfoWith("Scaling resources to zero", "resources", resources)
+			err := as.scaleResourcesToZero(resources)
+			if err != nil {
+				as.logger.WarnWith("Failed to scale resources to zero", "resources", resources, "err", errors.GetErrorStackString(err, 10))
+			}
+			as.logger.InfoWith("Successfully scaled resources to zero", "resources", resources)
+			for _, resource := range resources {
+				delete(as.inScaleToZeroProcessMap, resource.Name)
+			}
+		}(resourcesToScale)
+	}
+
 	return nil
 }
 
-func (as *Autoscaler) scaleResourceToZero(resource scaler_types.Resource) error {
-	if err := as.resourceScaler.SetScale(resource, 0); err != nil {
+func (as *Autoscaler) scaleResourcesToZero(resources []scaler_types.Resource) error {
+	if err := as.resourceScaler.SetScale(resources, 0); err != nil {
 		return errors.Wrap(err, "Failed to set scale")
 	}
 

@@ -75,7 +75,7 @@ func (r *ResourceStarter) startResource(resourceSinkChannel chan responseChannel
 	// simple for now
 	resourceName := target
 
-	r.logger.DebugWith("Starting resource", "resource", resourceName)
+	r.logger.InfoWith("Starting resource", "resource", resourceName)
 	resourceReadyChannel := make(chan error, 1)
 	defer close(resourceReadyChannel)
 
@@ -91,7 +91,7 @@ func (r *ResourceStarter) startResource(resourceSinkChannel chan responseChannel
 			ResourceName: resourceName,
 		}
 	case err := <-resourceReadyChannel:
-		r.logger.DebugWith("Resource ready", "target", target, "err", errors.GetErrorStackString(err, 10))
+		r.logger.InfoWith("Resource ready", "target", target, "err", errors.GetErrorStackString(err, 10))
 
 		if err == nil {
 			resultStatus = ResourceStatusResult{
@@ -123,7 +123,7 @@ func (r *ResourceStarter) startResource(resourceSinkChannel chan responseChannel
 }
 
 func (r *ResourceStarter) waitResourceReadiness(resource scaler_types.Resource, resourceReadyChannel chan error) {
-	err := r.scaler.SetScale(resource, 1)
+	err := r.scaler.SetScale([]scaler_types.Resource{resource}, 1)
 	resourceReadyChannel <- err
 }
 
