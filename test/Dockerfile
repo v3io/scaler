@@ -1,8 +1,10 @@
-FROM golang:1.10
+FROM golang:1.14
 
-# download docker client to /usr/bin/docker
-RUN curl https://download.docker.com/linux/static/stable/x86_64/docker-17.09.1-ce.tgz > /tmp/docker.tgz \
-     && tar zxvf /tmp/docker.tgz --strip=1 -C /usr/bin docker/docker \
-     && rm /tmp/docker.tgz
+ARG DOCKER_CLI_VERSION="18.09.6"
 
-RUN go get github.com/v3io/scaler-types
+ENV DOWNLOAD_URL="https://download.docker.com/linux/static/stable/x86_64/docker-$DOCKER_CLI_VERSION.tgz"
+
+RUN mkdir -p /tmp/download \
+     && curl -L $DOWNLOAD_URL | tar -xz -C /tmp/download \
+     && mv /tmp/download/docker/docker /usr/local/bin/ \
+     && rm -rf /tmp/download

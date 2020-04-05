@@ -1,4 +1,3 @@
-GO_VERSION := $(shell go version | cut -d " " -f 3)
 GOPATH ?= $(shell go env GOPATH)
 OS_NAME = $(shell uname)
 
@@ -8,7 +7,7 @@ SCALER_DEFAULT_ARCH := $(shell go env GOARCH)
 
 ifeq ($(OS_NAME), Linux)
 	SCALER_DEFAULT_TEST_HOST := $(shell docker network inspect bridge | grep "Gateway" | grep -o '"[^"]*"$$')
-	# On EC2 we don't have gateway, use default
+# On EC2 we don't have gateway, use default
 	ifeq ($(SCALER_DEFAULT_TEST_HOST),)
 		SCALER_DEFAULT_TEST_HOST := "172.17.0.1"
 	endif
@@ -32,6 +31,9 @@ DLX_DOCKER_REPO = quay.io/v3io/dlx
 # Docker build
 #
 
+.PHONY: docker-images
+docker-images: autoscaler-onbuild dlx-onbuild
+
 .PHONY: autoscaler-onbuild
 autoscaler-onbuild:
 	@echo Building autoscaler-onbuild
@@ -41,9 +43,6 @@ autoscaler-onbuild:
 dlx-onbuild:
 	@echo Building dlx-onbuild
 	docker build -f cmd/dlx/Dockerfile -t $(DLX_DOCKER_REPO):$(SCALER_LABEL) .
-
-.PHONY: docker-images
-docker-images: autoscaler-onbuild dlx-onbuild
 
 .PHONY: push-docker-images
 push-docker-images:
@@ -56,29 +55,22 @@ push-docker-images:
 #
 
 # tools get built with the specified OS/arch and inject version
-GO_BUILD_TOOL_WORKDIR = /go/src/github.com/v3io/scaler
-GO_BUILD_TOOL = docker run \
-	--volume $(shell pwd):$(GO_BUILD_TOOL_WORKDIR) \
-	--volume $(shell pwd)/../logger:$(GO_BUILD_TOOL_WORKDIR)/../logger \
-	--volume $(GOPATH)/bin:/go/bin \
-	--workdir $(GO_BUILD_TOOL_WORKDIR) \
-	--env GOOS=$(SCALER_OS) \
-	--env GOARCH=$(SCALER_ARCH) \
-	golang:1.10 \
-	go build -a \
-	-installsuffix cgo \
-	-ldflags="$(GO_LINK_FLAGS_INJECT_VERSION)"
-
+GO_BUILD_TOOL_WORKDIR = /scaler
 
 .PHONY: lint
-lint:
+lint: modules
 	@echo Installing linters...
-	go get -u github.com/pavius/impi/cmd/impi
-	go get -u gopkg.in/alecthomas/gometalinter.v2
-	@$(GOPATH)/bin/gometalinter.v2 --install
+	@test -e $(GOPATH)/bin/impi || \
+		curl -s https://api.github.com/repos/pavius/impi/releases/latest \
+			| grep -i "browser_download_url.*impi.*$(OS_NAME)" \
+			| cut -d : -f 2,3 \
+			| tr -d \" \
+			| wget -O $(GOPATH)/bin/impi -qi -
+	@test -e $(GOPATH)/bin/golangci-lint || \
+	  	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOPATH)/bin v1.24.0
 
 	@echo Verifying imports...
-	$(GOPATH)/bin/impi \
+	chmod +x $(GOPATH)/bin/impi && $(GOPATH)/bin/impi \
 		--local github.com/v3io/scaler/ \
 		--scheme stdLocalThirdParty \
 		--skip pkg/platform/kube/apis \
@@ -86,47 +78,22 @@ lint:
 		./cmd/... ./pkg/...
 
 	@echo Linting...
-	@$(GOPATH)/bin/gometalinter.v2 \
-		--deadline=300s \
-		--disable-all \
-		--enable-gc \
-		--enable=deadcode \
-		--enable=goconst \
-		--enable=gofmt \
-		--enable=golint \
-		--enable=gosimple \
-		--enable=ineffassign \
-		--enable=interfacer \
-		--enable=misspell \
-		--enable=staticcheck \
-		--enable=unconvert \
-		--enable=varcheck \
-		--enable=vet \
-		--enable=vetshadow \
-		--enable=errcheck \
-		--exclude="_test.go" \
-		--exclude="comment on" \
-		--exclude="error should be the last" \
-		--exclude="should have comment" \
-		--skip=pkg/platform/kube/apis \
-		--skip=pkg/platform/kube/client \
-		./cmd/... ./pkg/...
-
+	$(GOPATH)/bin/golangci-lint run -v
 	@echo Done.
 
 .PHONY: test-undockerized
-test-undockerized: ensure-gopath
+test-undockerized: modules
 	go test -v ./pkg/... -p 1
 
 .PHONY: test
-test: ensure-gopath
+test:
 	docker build --file $(SCALER_DOCKER_TEST_DOCKERFILE_PATH) \
 	--tag $(SCALER_DOCKER_TEST_TAG) .
 
 	docker run --rm --volume /var/run/docker.sock:/var/run/docker.sock \
 	--volume $(shell pwd):$(GO_BUILD_TOOL_WORKDIR) \
 	--volume /tmp:/tmp \
-	--workdir /go/src/github.com/v3io/scaler \
+	--workdir $(GO_BUILD_TOOL_WORKDIR) \
 	--env SCALER_TEST_HOST=$(SCALER_TEST_HOST) \
 	$(SCALER_DOCKER_TEST_TAG) \
 	/bin/bash -c "make test-undockerized"
@@ -136,3 +103,8 @@ ensure-gopath:
 ifndef GOPATH
 	$(error GOPATH must be set)
 endif
+
+.PHONY: modules
+modules: ensure-gopath
+	@echo Getting go modules
+	@go mod download
