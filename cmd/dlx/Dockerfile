@@ -1,15 +1,20 @@
-FROM golang:1.10-alpine3.7
+FROM golang:1.14-alpine3.11 AS builder
 
 RUN apk --update --no-cache add \
     git \
     gcc \
     musl-dev
 
-WORKDIR /go/src/github.com/v3io/scaler
+WORKDIR /dlx
+
+COPY go.mod go.sum ./
+
+RUN go mod download
+
 COPY . .
 
-RUN go get github.com/v3io/scaler-types
+RUN GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-s -w" -o dlx cmd/dlx/main.go
 
-RUN mkdir -p /home/v3io/bin \
-            && GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-s -w" -o /home/v3io/bin/dlx cmd/dlx/main.go \
-            && rm -rf /go/src/github/v3io/scaler
+FROM scratch
+
+COPY --from=builder dlx /home/v3io/bin/dlx

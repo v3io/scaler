@@ -8,7 +8,7 @@ SCALER_DEFAULT_ARCH := $(shell go env GOARCH)
 
 ifeq ($(OS_NAME), Linux)
 	SCALER_DEFAULT_TEST_HOST := $(shell docker network inspect bridge | grep "Gateway" | grep -o '"[^"]*"$$')
-	# On EC2 we don't have gateway, use default
+# On EC2 we don't have gateway, use default
 	ifeq ($(SCALER_DEFAULT_TEST_HOST),)
 		SCALER_DEFAULT_TEST_HOST := "172.17.0.1"
 	endif
@@ -32,6 +32,9 @@ DLX_DOCKER_REPO = quay.io/v3io/dlx
 # Docker build
 #
 
+.PHONY: docker-images
+docker-images: autoscaler-onbuild dlx-onbuild
+
 .PHONY: autoscaler-onbuild
 autoscaler-onbuild:
 	@echo Building autoscaler-onbuild
@@ -41,9 +44,6 @@ autoscaler-onbuild:
 dlx-onbuild:
 	@echo Building dlx-onbuild
 	docker build -f cmd/dlx/Dockerfile -t $(DLX_DOCKER_REPO):$(SCALER_LABEL) .
-
-.PHONY: docker-images
-docker-images: autoscaler-onbuild dlx-onbuild
 
 .PHONY: push-docker-images
 push-docker-images:
