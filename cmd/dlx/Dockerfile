@@ -15,6 +15,6 @@ COPY . .
 
 RUN GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-s -w" -o dlx cmd/dlx/main.go
 
-FROM scratch
+FROM alpine:3.11
 
-COPY --from=builder dlx /home/v3io/bin/dlx
+COPY --from=builder /dlx/dlx /home/v3io/bin/dlx

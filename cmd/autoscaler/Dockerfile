@@ -15,6 +15,6 @@ COPY . .
 
 RUN GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-s -w" -o autoscaler cmd/autoscaler/main.go
 
-FROM scratch
+FROM alpine:3.11
 
-COPY --from=builder autoscaler /home/v3io/bin/autoscaler
+COPY --from=builder /autoscaler/autoscaler /home/v3io/bin/autoscaler
