@@ -51,7 +51,7 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 	forwardedHost := req.Header.Get("X-Forwarded-Host")
 	forwardedPort := req.Header.Get("X-Forwarded-Port")
 	originalURI := req.Header.Get("X-Original-Uri")
-	resourceName = req.Header.Get("X-Resource-Name")
+	resourceName = req.Header.Get("X-Service-Name")
 
 	if forwardedHost != "" && forwardedPort != "" && resourceName != "" {
 		targetURL, err = url.Parse(fmt.Sprintf("http://%s:%s/%s", forwardedHost, forwardedPort, originalURI))
