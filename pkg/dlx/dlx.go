@@ -26,6 +26,7 @@ func NewDLX(parentLogger logger.Logger,
 
 	handler, err := NewHandler(childLogger,
 		resourceStarter,
+		resourceScaler,
 		options.TargetNameHeader,
 		options.TargetPathHeader,
 		options.TargetPort)

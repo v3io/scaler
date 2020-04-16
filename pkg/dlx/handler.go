@@ -8,12 +8,14 @@ import (
 
 	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"
+	"github.com/v3io/scaler-types"
 )
 
 type Handler struct {
 	logger           logger.Logger
 	HandleFunc       func(http.ResponseWriter, *http.Request)
 	resourceStarter  *ResourceStarter
+	resourceScaler   scaler_types.ResourceScaler
 	targetNameHeader string
 	targetPathHeader string
 	targetPort       int
@@ -21,12 +23,14 @@ type Handler struct {
 
 func NewHandler(parentLogger logger.Logger,
 	resourceStarter *ResourceStarter,
+	resourceScaler scaler_types.ResourceScaler,
 	targetNameHeader string,
 	targetPathHeader string,
 	targetPort int) (Handler, error) {
 	h := Handler{
 		logger:           parentLogger.GetChild("handler"),
 		resourceStarter:  resourceStarter,
+		resourceScaler:   resourceScaler,
 		targetNameHeader: targetNameHeader,
 		targetPathHeader: targetPathHeader,
 		targetPort:       targetPort,
@@ -47,7 +51,7 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 	forwardedHost := req.Header.Get("X-Forwarded-Host")
 	forwardedPort := req.Header.Get("X-Forwarded-Port")
 	originalURI := req.Header.Get("X-Original-Uri")
-	resourceName = req.Header.Get("X-Service-Name")
+	resourceName = req.Header.Get("X-Resource-Name")
 
 	if forwardedHost != "" && forwardedPort != "" && resourceName != "" {
 		targetURL, err = url.Parse(fmt.Sprintf("http://%s:%s/%s", forwardedHost, forwardedPort, originalURI))
@@ -63,7 +67,14 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 			res.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		targetURL, err = url.Parse(fmt.Sprintf("http://%s:%d/%s", resourceName, h.targetPort, path))
+		serviceName, err := h.resourceScaler.ResolveServiceName(scaler_types.Resource{Name: resourceName})
+		if err != nil {
+			h.logger.WarnWith("Failed resolving service name",
+				"err", errors.GetErrorStackString(err, 10))
+			res.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		targetURL, err = url.Parse(fmt.Sprintf("http://%s:%d/%s", serviceName, h.targetPort, path))
 		if err != nil {
 			res.WriteHeader(h.URLBadParse(resourceName, err))
 			return
@@ -81,6 +92,7 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	h.logger.DebugWith("Creating reverse proxy", "targetURL", targetURL)
 	proxy := httputil.NewSingleHostReverseProxy(targetURL)
 	proxy.ServeHTTP(res, req)
 }
