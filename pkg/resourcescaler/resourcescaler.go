@@ -21,3 +21,7 @@ func (r *NopResourceScaler) GetResources() ([]scaler_types.Resource, error) {
 func (r *NopResourceScaler) GetConfig() (*scaler_types.ResourceScalerConfig, error) {
 	return nil, nil
 }
+
+func (r *NopResourceScaler) ResolveServiceName(resource scaler_types.Resource) (string, error) {
+	return resource.Name, nil
+}
