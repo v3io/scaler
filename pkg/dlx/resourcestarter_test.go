@@ -23,7 +23,6 @@ type resourceStarterTest struct {
 
 type mocker struct {
 	mock.Mock
-	scaler_types.ResourceScaler
 }
 
 func (m *mocker) SetScale(resourceName []scaler_types.Resource, scale int) error {
@@ -37,6 +36,10 @@ func (m *mocker) GetResources() ([]scaler_types.Resource, error) {
 
 func (m *mocker) GetConfig() (*scaler_types.ResourceScalerConfig, error) {
 	return nil, nil
+}
+
+func (m *mocker) ResolveServiceName(resource scaler_types.Resource) (string, error) {
+	return resource.Name, nil
 }
 
 func (suite *resourceStarterTest) SetupTest() {
