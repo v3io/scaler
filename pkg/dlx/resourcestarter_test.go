@@ -25,8 +25,8 @@ type mocker struct {
 	mock.Mock
 }
 
-func (suite *resourceStarterTest) SetScale(resourceName scaler_types.Resource, scale int) error {
-	suite.mocker.Called(resourceName)
+func (suite *resourceStarterTest) SetScale(resources []scaler_types.Resource, scale int) error {
+	suite.mocker.Called(resources)
 	return nil
 }
 
@@ -38,13 +38,17 @@ func (suite *resourceStarterTest) GetConfig() (*scaler_types.ResourceScalerConfi
 	return nil, nil
 }
 
+func (suite *resourceStarterTest) ResolveServiceName(resource scaler_types.Resource) (string, error) {
+	return resource.Name, nil
+}
+
 func (suite *resourceStarterTest) SetupTest() {
 	suite.functionStarter = &ResourceStarter{
 		logger:                   suite.logger,
 		resourceSinksMap:         make(resourceSinksMap),
 		namespace:                "default",
 		resourceReadinessTimeout: time.Duration(1 * time.Second),
-		scaler: suite,
+		scaler:                   suite,
 	}
 	suite.mocker = new(mocker)
 }
