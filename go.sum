@@ -63,6 +63,7 @@ github.com/stretchr/testify v1.5.1 h1:nOGnQDM7FYENwehXlg/kFVnos3rEvtKTjRvOWSzb6H
 github.com/stretchr/testify v1.5.1/go.mod h1:5W2xD1RspED5o8YsWQXVCued0rvSQ+mT+I5cxcmMvtA=
 github.com/v3io/scaler-types v1.5.0 h1:3nA56ewksIWmcGPW45wXUBMT3AZ4m61HMInR33j4uvY=
 github.com/v3io/scaler-types v1.5.0/go.mod h1:Q2xufg8/9sLUOHh8/ckhHaAzZy2M8AgEknMTJ5HxvFI=
+github.com/v3io/scaler-types v1.6.0/go.mod h1:Q2xufg8/9sLUOHh8/ckhHaAzZy2M8AgEknMTJ5HxvFI=
 go.uber.org/atomic v1.4.0 h1:cxzIVoETapQEqDhQu3QfnvXAV4AlzcvUCxkVUFw3+EU=
 go.uber.org/atomic v1.4.0/go.mod h1:gD2HeocX3+yG+ygLZcrzQJaqmWj9AIm7n08wl/qW/PE=
 go.uber.org/multierr v1.1.0 h1:HoEmRHQPVSqub6w2z2d2EOVs2fjyFRGyofhKuyDq0QI=
