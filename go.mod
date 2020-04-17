@@ -37,7 +37,3 @@ require (
 	k8s.io/client-go v7.0.0+incompatible
 	k8s.io/metrics v0.0.0-20190116212108-c656f2547d11
 )
-
-replace (
-    github.com/v3io/scaler-types => github.com/hedingber/scaler-types v1.6.0
-)
