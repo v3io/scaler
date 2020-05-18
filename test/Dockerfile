@@ -1,4 +1,4 @@
-FROM golang:1.14
+FROM golang:1.14.3
 
 ARG DOCKER_CLI_VERSION="18.09.6"
 
