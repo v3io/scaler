@@ -13,7 +13,7 @@ RUN go mod download
 
 COPY . .
 
-RUN GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-s -w" -o dlx cmd/dlx/main.go
+RUN GOOS=linux GOARCH=amd64 go build -a -trimpath -installsuffix cgo -ldflags="-s -w" -o dlx cmd/dlx/main.go
 
 FROM alpine:3.11
 
