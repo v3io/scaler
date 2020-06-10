@@ -14,9 +14,9 @@ require (
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
-	github.com/nuclio/errors v0.0.2
+	github.com/nuclio/errors v0.0.3
 	github.com/nuclio/logger v0.0.1
-	github.com/nuclio/zap v0.0.2
+	github.com/nuclio/zap v0.0.3
 	github.com/pavius/zap v1.4.2-0.20180228181622-8d52692529b8 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/spf13/pflag v1.0.3 // indirect
