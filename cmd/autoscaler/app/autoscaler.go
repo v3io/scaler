@@ -10,9 +10,12 @@ import (
 	"github.com/nuclio/errors"
 	"github.com/nuclio/zap"
 	"github.com/v3io/scaler-types"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	custommetricsv1 "k8s.io/metrics/pkg/client/custom_metrics"
+	"k8s.io/metrics/pkg/client/custom_metrics"
+	"k8s.io/metrics/pkg/client/custom_metrics/scheme"
 )
 
 func Run(kubeconfigPath string,
@@ -75,11 +78,13 @@ func createAutoScaler(restConfig *rest.Config,
 		return nil, errors.Wrap(err, "Failed to initialize root logger")
 	}
 
-	customMetricsClient, err := custommetricsv1.NewForConfig(restConfig)
+	defaultRESTMapper := meta.NewDefaultRESTMapper(schema.GroupVersions{scheme.SchemeGroupVersion})
+	customMetricsClient, err := custom_metrics.NewForVersionForConfig(restConfig,
+		defaultRESTMapper,
+		scheme.SchemeGroupVersion)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed create custom metrics client set")
 	}
-
 	newScaler, err := autoscaler.NewAutoScaler(rootLogger, resourceScaler, customMetricsClient, options)
 
 	if err != nil {

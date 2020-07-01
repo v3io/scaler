@@ -11,7 +11,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	custommetricsv1 "k8s.io/metrics/pkg/client/custom_metrics"
+	"k8s.io/metrics/pkg/client/custom_metrics"
 )
 
 type Autoscaler struct {
@@ -21,12 +21,12 @@ type Autoscaler struct {
 	scaleInterval           scaler_types.Duration
 	inScaleToZeroProcessMap map[string]bool
 	groupKind               string
-	customMetricsClientSet  custommetricsv1.CustomMetricsClient
+	customMetricsClientSet  custom_metrics.CustomMetricsClient
 }
 
 func NewAutoScaler(parentLogger logger.Logger,
 	resourceScaler scaler_types.ResourceScaler,
-	customMetricsClientSet custommetricsv1.CustomMetricsClient,
+	customMetricsClientSet custom_metrics.CustomMetricsClient,
 	options scaler_types.AutoScalerOptions) (*Autoscaler, error) {
 	childLogger := parentLogger.GetChild("autoscaler")
 	childLogger.InfoWith("Creating Autoscaler",
@@ -82,7 +82,8 @@ func (as *Autoscaler) getResourceMetrics(metricNames []string) (map[string]map[s
 		// getting the metric values for all object of schema group kind (e.g. deployment)
 		metrics, err := metricsClient.GetForObjects(schemaGroupKind,
 			resourceLabels,
-			metricName)
+			metricName,
+			labels.Everything())
 		if err != nil {
 
 			// if no data points submitted yet it's ok, continue to the next metric
