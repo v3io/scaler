@@ -83,13 +83,13 @@ func createAutoScaler(restConfig *rest.Config,
 		return nil, errors.Wrap(err, "Failed to initialize root logger")
 	}
 
-	dc, err := discovery.NewDiscoveryClientForConfig(restConfig)
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(restConfig)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Failed to create discovery client")
 	}
-	availableAPIsGetter := custom_metrics.NewAvailableAPIsGetter(dc)
-	mapper := restmapper.NewDeferredDiscoveryRESTMapper(memory.NewMemCacheClient(dc))
-	customMetricsClient := custom_metrics.NewForConfig(restConfig, mapper, availableAPIsGetter)
+	availableAPIsGetter := custom_metrics.NewAvailableAPIsGetter(discoveryClient)
+	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(memory.NewMemCacheClient(discoveryClient))
+	customMetricsClient := custom_metrics.NewForConfig(restConfig, restMapper, availableAPIsGetter)
 
 	// create auto scaler
 	newScaler, err := autoscaler.NewAutoScaler(rootLogger, resourceScaler, customMetricsClient, options)
