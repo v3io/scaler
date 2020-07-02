@@ -1,10 +1,6 @@
 package app
 
 import (
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/discovery/cached/memory"
-	"k8s.io/client-go/restmapper"
 	"os"
 	"time"
 
@@ -14,7 +10,11 @@ import (
 	"github.com/nuclio/errors"
 	"github.com/nuclio/zap"
 	"github.com/v3io/scaler-types"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/metrics/pkg/client/custom_metrics"
 )
@@ -22,11 +22,15 @@ import (
 func Run(kubeconfigPath string,
 	namespace string,
 	scaleInterval time.Duration,
-	metricsGroupKind string) error {
+	metricsGroupKind string,
+	metricsGroupName string) error {
 	autoScalerOptions := scaler_types.AutoScalerOptions{
 		Namespace:     namespace,
 		ScaleInterval: scaler_types.Duration{Duration: scaleInterval},
-		GroupKind:     metricsGroupKind,
+		GroupKind: schema.GroupKind{
+			Group: metricsGroupName,
+			Kind:  metricsGroupKind,
+		},
 	}
 
 	pluginLoader, err := pluginloader.New()
@@ -83,17 +87,9 @@ func createAutoScaler(restConfig *rest.Config,
 	if err != nil {
 		return nil, err
 	}
+	availableAPIsGetter := custom_metrics.NewAvailableAPIsGetter(dc)
 	mapper := restmapper.NewDeferredDiscoveryRESTMapper(memory.NewMemCacheClient(dc))
-
-	customMetricsClient, err := custom_metrics.NewForVersionForConfig(restConfig,
-		mapper,
-		schema.GroupKind{
-			Kind:  options.GroupKind,
-			Group: "nuclio.io",
-		}.WithVersion("").GroupVersion())
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to create custom metrics client set")
-	}
+	customMetricsClient := custom_metrics.NewForConfig(restConfig, mapper, availableAPIsGetter)
 
 	// create auto scaler
 	newScaler, err := autoscaler.NewAutoScaler(rootLogger, resourceScaler, customMetricsClient, options)

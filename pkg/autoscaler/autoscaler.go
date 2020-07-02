@@ -20,7 +20,7 @@ type Autoscaler struct {
 	resourceScaler          scaler_types.ResourceScaler
 	scaleInterval           scaler_types.Duration
 	inScaleToZeroProcessMap map[string]bool
-	groupKind               string
+	groupKind               schema.GroupKind
 	customMetricsClientSet  custom_metrics.CustomMetricsClient
 }
 
@@ -72,18 +72,14 @@ func (as *Autoscaler) getMetricNames(resources []scaler_types.Resource) []string
 
 func (as *Autoscaler) getResourceMetrics(metricNames []string) (map[string]map[string]int, error) {
 	resourcesMetricsMap := make(map[string]map[string]int)
-
-	schemaGroupKind := schema.GroupKind{Group: "nuclio.io", Kind: as.groupKind}
 	resourceLabels := labels.Everything()
+	metricSelectorLabels := labels.Everything()
 	metricsClient := as.customMetricsClientSet.NamespacedMetrics(as.namespace)
 
 	for _, metricName := range metricNames {
 
 		// getting the metric values for all object of schema group kind (e.g. deployment)
-		metrics, err := metricsClient.GetForObjects(schemaGroupKind,
-			resourceLabels,
-			metricName,
-			nil)
+		metrics, err := metricsClient.GetForObjects(as.groupKind, resourceLabels, metricName, metricSelectorLabels)
 		if err != nil {
 
 			// if no data points submitted yet it's ok, continue to the next metric

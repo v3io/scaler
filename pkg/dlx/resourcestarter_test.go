@@ -45,7 +45,7 @@ func (suite *resourceStarterTest) SetupTest() {
 		logger:                   suite.logger,
 		resourceSinksMap:         make(resourceSinksMap),
 		namespace:                "default",
-		resourceReadinessTimeout: time.Duration(1 * time.Second),
+		resourceReadinessTimeout: 1 * time.Second,
 		scaler:                   suite.mocker,
 	}
 }
@@ -60,14 +60,14 @@ func (suite *resourceStarterTest) TestDlxMultipleRequests() {
 
 	for i := 0; i < 200; i++ {
 		wg.Add(1)
-		go func() {
+		go func(testIndex int) {
 			ch := make(responseChannel)
-			suite.functionStarter.handleResourceStart(fmt.Sprintf("test%d", i), ch)
+			suite.functionStarter.handleResourceStart(fmt.Sprintf("test%d", testIndex), ch)
 			r := <-ch
 			suite.logger.DebugWith("Got response", "r", r)
 			wg.Done()
 			suite.Require().Equal(http.StatusOK, r.Status)
-		}()
+		}(i)
 	}
 	wg.Wait()
 }
