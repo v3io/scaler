@@ -1,9 +1,6 @@
 name: CI
 
-on:
-  pull_request:
-    branches:
-      - development
+on: [push, pull_request]
 
 jobs:
   lint:

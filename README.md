@@ -1,3 +1,7 @@
+<a id="top"></a>
+[![Build Status](https://github.com/v3io/scaler/workflows/CI/badge.svg)](https://github.com/v3io/scaler/actions)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
 # Scale to Zero
 
 Infrastructure to scale any resource to and from zero
