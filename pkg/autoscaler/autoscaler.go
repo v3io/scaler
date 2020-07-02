@@ -73,7 +73,7 @@ func (as *Autoscaler) getMetricNames(resources []scaler_types.Resource) []string
 func (as *Autoscaler) getResourceMetrics(metricNames []string) (map[string]map[string]int, error) {
 	resourcesMetricsMap := make(map[string]map[string]int)
 
-	schemaGroupKind := schema.GroupKind{Group: "", Kind: as.groupKind}
+	schemaGroupKind := schema.GroupKind{Group: "nuclio.io", Kind: as.groupKind}
 	resourceLabels := labels.Everything()
 	metricsClient := as.customMetricsClientSet.NamespacedMetrics(as.namespace)
 
@@ -83,14 +83,14 @@ func (as *Autoscaler) getResourceMetrics(metricNames []string) (map[string]map[s
 		metrics, err := metricsClient.GetForObjects(schemaGroupKind,
 			resourceLabels,
 			metricName,
-			labels.Everything())
+			nil)
 		if err != nil {
 
 			// if no data points submitted yet it's ok, continue to the next metric
 			if k8serrors.IsNotFound(err) {
 				continue
 			}
-			return make(map[string]map[string]int), errors.Wrap(err, "Failed to get custom metrics")
+			return nil, errors.Wrap(err, "Failed to get custom metrics")
 		}
 
 		// fill the resourcesMetricsMap with the metrics data we got
@@ -110,7 +110,7 @@ func (as *Autoscaler) getResourceMetrics(metricNames []string) (map[string]map[s
 
 			// sanity
 			if _, found := resourcesMetricsMap[resourceName][metricName]; found {
-				return make(map[string]map[string]int), errors.New("Can not have more than one metric value per resource")
+				return nil, errors.New("Can not have more than one metric value per resource")
 			}
 
 			resourcesMetricsMap[resourceName][metricName] = value

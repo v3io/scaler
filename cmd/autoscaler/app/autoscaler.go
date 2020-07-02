@@ -1,6 +1,10 @@
 package app
 
 import (
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/discovery/cached/memory"
+	"k8s.io/client-go/restmapper"
 	"os"
 	"time"
 
@@ -10,12 +14,9 @@ import (
 	"github.com/nuclio/errors"
 	"github.com/nuclio/zap"
 	"github.com/v3io/scaler-types"
-	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/metrics/pkg/client/custom_metrics"
-	"k8s.io/metrics/pkg/client/custom_metrics/scheme"
 )
 
 func Run(kubeconfigPath string,
@@ -78,17 +79,26 @@ func createAutoScaler(restConfig *rest.Config,
 		return nil, errors.Wrap(err, "Failed to initialize root logger")
 	}
 
-	defaultRESTMapper := meta.NewDefaultRESTMapper(schema.GroupVersions{scheme.SchemeGroupVersion})
-	customMetricsClient, err := custom_metrics.NewForVersionForConfig(restConfig,
-		defaultRESTMapper,
-		scheme.SchemeGroupVersion)
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed create custom metrics client set")
-	}
-	newScaler, err := autoscaler.NewAutoScaler(rootLogger, resourceScaler, customMetricsClient, options)
-
+	dc, err := discovery.NewDiscoveryClientForConfig(restConfig)
 	if err != nil {
 		return nil, err
+	}
+	mapper := restmapper.NewDeferredDiscoveryRESTMapper(memory.NewMemCacheClient(dc))
+
+	customMetricsClient, err := custom_metrics.NewForVersionForConfig(restConfig,
+		mapper,
+		schema.GroupKind{
+			Kind:  options.GroupKind,
+			Group: "nuclio.io",
+		}.WithVersion("").GroupVersion())
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to create custom metrics client set")
+	}
+
+	// create auto scaler
+	newScaler, err := autoscaler.NewAutoScaler(rootLogger, resourceScaler, customMetricsClient, options)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to create auto scaler")
 	}
 
 	return newScaler, nil
