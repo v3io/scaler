@@ -81,6 +81,10 @@ lint: modules
 	$(GOPATH)/bin/golangci-lint run -v
 	@echo Done.
 
+.PHONY: fmt
+fmt:
+	gofmt -s -w .
+
 .PHONY: test-undockerized
 test-undockerized: modules
 	go test -v ./pkg/... -p 1

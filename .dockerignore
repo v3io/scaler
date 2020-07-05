@@ -5,7 +5,6 @@
 
 !cmd/
 !pkg/
-!vendor/
 !test/
 
 **/Dockerfile

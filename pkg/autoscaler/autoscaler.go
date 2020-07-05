@@ -11,7 +11,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	custommetricsv1 "k8s.io/metrics/pkg/client/custom_metrics"
+	"k8s.io/metrics/pkg/client/custom_metrics"
 )
 
 type Autoscaler struct {
@@ -20,13 +20,13 @@ type Autoscaler struct {
 	resourceScaler          scaler_types.ResourceScaler
 	scaleInterval           scaler_types.Duration
 	inScaleToZeroProcessMap map[string]bool
-	groupKind               string
-	customMetricsClientSet  custommetricsv1.CustomMetricsClient
+	groupKind               schema.GroupKind
+	customMetricsClientSet  custom_metrics.CustomMetricsClient
 }
 
 func NewAutoScaler(parentLogger logger.Logger,
 	resourceScaler scaler_types.ResourceScaler,
-	customMetricsClientSet custommetricsv1.CustomMetricsClient,
+	customMetricsClientSet custom_metrics.CustomMetricsClient,
 	options scaler_types.AutoScalerOptions) (*Autoscaler, error) {
 	childLogger := parentLogger.GetChild("autoscaler")
 	childLogger.InfoWith("Creating Autoscaler",
@@ -72,24 +72,21 @@ func (as *Autoscaler) getMetricNames(resources []scaler_types.Resource) []string
 
 func (as *Autoscaler) getResourceMetrics(metricNames []string) (map[string]map[string]int, error) {
 	resourcesMetricsMap := make(map[string]map[string]int)
-
-	schemaGroupKind := schema.GroupKind{Group: "", Kind: as.groupKind}
 	resourceLabels := labels.Everything()
+	metricSelectorLabels := labels.Everything()
 	metricsClient := as.customMetricsClientSet.NamespacedMetrics(as.namespace)
 
 	for _, metricName := range metricNames {
 
 		// getting the metric values for all object of schema group kind (e.g. deployment)
-		metrics, err := metricsClient.GetForObjects(schemaGroupKind,
-			resourceLabels,
-			metricName)
+		metrics, err := metricsClient.GetForObjects(as.groupKind, resourceLabels, metricName, metricSelectorLabels)
 		if err != nil {
 
 			// if no data points submitted yet it's ok, continue to the next metric
 			if k8serrors.IsNotFound(err) {
 				continue
 			}
-			return make(map[string]map[string]int), errors.Wrap(err, "Failed to get custom metrics")
+			return nil, errors.Wrap(err, "Failed to get custom metrics")
 		}
 
 		// fill the resourcesMetricsMap with the metrics data we got
@@ -109,7 +106,7 @@ func (as *Autoscaler) getResourceMetrics(metricNames []string) (map[string]map[s
 
 			// sanity
 			if _, found := resourcesMetricsMap[resourceName][metricName]; found {
-				return make(map[string]map[string]int), errors.New("Can not have more than one metric value per resource")
+				return nil, errors.New("Can not have more than one metric value per resource")
 			}
 
 			resourcesMetricsMap[resourceName][metricName] = value

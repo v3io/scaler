@@ -15,17 +15,14 @@ linters:
     - vet
     - vetshadow
     - errcheck
+    - govet
+    - structcheck
+    - typecheck
 
 run:
 
   # timeout for analysis
   timeout: 5m
-
-  # include test files or not, default is true
-  tests: false
-
-  skip-dirs:
-    - test
 
 issues:
 
@@ -34,3 +31,10 @@ issues:
     - "comment on"
     - "error should be the last"
     - "should have comment"
+
+  exclude-rules:
+
+    # list of excluded linters applied on test files
+    - path: _test\.go
+      linters:
+        - goconst
