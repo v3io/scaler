@@ -15,8 +15,8 @@ func main() {
 	kubeconfigPath := flag.String("kubeconfig-path", os.Getenv("KUBECONFIG"), "Path of kubeconfig file")
 	namespace := flag.String("namespace", "", "Namespace to listen on, or * for all")
 	scaleInterval := flag.Duration("scale-interval", time.Minute, "Interval to call check scale function")
-	metricsResourceKind := flag.String("metrics-kind", "", "Metrics resource kind")
-	metricsResourceGroup := flag.String("metrics-group", "", "Metrics resource group")
+	metricsResourceKind := flag.String("metrics-resource-kind", "", "Resource kind (e.g. NuclioFunction)")
+	metricsResourceGroup := flag.String("metrics-resource-group", "", "Resource group (e.g. nuclio.io)")
 	flag.Parse()
 
 	*namespace = common.GetNamespace(*namespace)
