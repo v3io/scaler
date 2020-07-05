@@ -22,14 +22,14 @@ import (
 func Run(kubeconfigPath string,
 	namespace string,
 	scaleInterval time.Duration,
-	metricsGroupKind string,
-	metricsGroupName string) error {
+	metricsResourceKind string,
+	metricsResourceGroup string) error {
 	autoScalerOptions := scaler_types.AutoScalerOptions{
 		Namespace:     namespace,
 		ScaleInterval: scaler_types.Duration{Duration: scaleInterval},
 		GroupKind: schema.GroupKind{
-			Group: metricsGroupName,
-			Kind:  metricsGroupKind,
+			Kind:  metricsResourceKind,
+			Group: metricsResourceGroup,
 		},
 	}
 

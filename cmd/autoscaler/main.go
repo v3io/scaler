@@ -15,8 +15,8 @@ func main() {
 	kubeconfigPath := flag.String("kubeconfig-path", os.Getenv("KUBECONFIG"), "Path of kubeconfig file")
 	namespace := flag.String("namespace", "", "Namespace to listen on, or * for all")
 	scaleInterval := flag.Duration("scale-interval", time.Minute, "Interval to call check scale function")
-	metricsGroupName := flag.String("metrics-group-name", "", "Metrics resource group name")
-	metricsGroupKind := flag.String("metrics-group-kind", "", "Metrics resource group kind")
+	metricsResourceKind := flag.String("metrics-kind", "", "Metrics resource kind")
+	metricsResourceGroup := flag.String("metrics-group", "", "Metrics resource group")
 	flag.Parse()
 
 	*namespace = common.GetNamespace(*namespace)
@@ -24,8 +24,8 @@ func main() {
 	if err := app.Run(*kubeconfigPath,
 		*namespace,
 		*scaleInterval,
-		*metricsGroupKind,
-		*metricsGroupName); err != nil {
+		*metricsResourceKind,
+		*metricsResourceGroup); err != nil {
 		errors.PrintErrorStack(os.Stderr, err, 5)
 
 		os.Exit(1)
