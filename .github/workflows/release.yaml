@@ -1,0 +1,74 @@
+name: Release
+
+on:
+  release:
+    types:
+    - created
+
+  # Run Release on push to development for unstable
+  push:
+    branches:
+    - development
+
+env:
+  AUTOSCALER_DOCKER_REPO: quay.io/v3io/autoscaler
+  DLX_DOCKER_REPO: quay.io/v3io/dlx
+
+jobs:
+  release:
+    name: Release Docker Images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump github context
+        run: echo "$GITHUB_CONTEXT"
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+
+      - name: Dump runner context
+        run: echo "$RUNNER_CONTEXT"
+        env:
+          RUNNER_CONTEXT: ${{ toJson(runner) }}
+
+      - name: Dump github ref
+        run: echo "$GITHUB_REF"
+
+      - name: Extract ref info
+        id: release_info
+        run: |
+          echo ::set-output name=REF_BRANCH::${GITHUB_REF#refs/heads/}
+          echo ::set-output name=REF_TAG::${GITHUB_REF#refs/tags/}
+
+      - name: Set SCALER_LABEL to unstable
+        if: github.event_name == 'push' && steps.release_info.outputs.REF_BRANCH == 'development'
+        run: |
+          echo "SCALER_LABEL=unstable" >> $GITHUB_ENV
+
+      - name: Set SCALER_LABEL to release tag
+        if: github.event_name == 'release'
+        run: |
+          echo "SCALER_LABEL=${{ steps.release_info.outputs.REF_TAG }}" >> $GITHUB_ENV
+
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-go@v2
+        with:
+          go-version: "^1.14.3"
+
+      - uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - uses: azure/docker-login@v1
+        with:
+          login-server: quay.io
+          username: ${{ secrets.QUAYIO_DOCKER_USERNAME }}
+          password: ${{ secrets.QUAYIO_DOCKER_PASSWORD }}
+
+      - name: Build docker images
+        run: make docker-images
+
+      - name: Push docker images
+        run: make push-docker-images
