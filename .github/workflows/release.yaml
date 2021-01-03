@@ -9,7 +9,6 @@ on:
   push:
     branches:
     - development
-    - travis_to_gh
 
 env:
   AUTOSCALER_DOCKER_REPO: quay.io/v3io/autoscaler
