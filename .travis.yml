@@ -30,7 +30,7 @@ after_success:
   - echo $TRAVIS_PULL_REQUEST
   - echo $TRAVIS_BRANCH
   - if [ -n "$SCALER_LABEL" ]; then
-    echo "$DOCKER_PASSWORD" | docker login -u="$DOCKER_USERNAME" --password-stdin quay.io &&
+    echo "$GCR_CREDS" | docker login -u _json_key --password-stdin https://gcr.io
     make docker-images push-docker-images;
     fi
   - echo "Done."
