@@ -69,7 +69,7 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 			res.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		h.logger.DebugWith("Resolving service name", resourceName)
+		h.logger.DebugWith("Resolving service name", "resourceName", resourceName)
 		serviceName, err := h.resourceScaler.ResolveServiceName(scalertypes.Resource{Name: resourceName})
 		if err != nil {
 			h.logger.WarnWith("Failed resolving service name",
