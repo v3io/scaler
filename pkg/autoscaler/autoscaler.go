@@ -61,12 +61,10 @@ func (as *Autoscaler) Start() error {
 }
 
 func (as *Autoscaler) Stop() error {
-	if as.ticker == nil {
-		return nil
+	if as.ticker != nil {
+		as.logger.Debug("Stopping")
+		as.ticker.Stop()
 	}
-
-	as.logger.DebugWith("Stopping")
-	as.ticker.Stop()
 	return nil
 }
 
