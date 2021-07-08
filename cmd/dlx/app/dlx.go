@@ -6,10 +6,10 @@ import (
 
 	"github.com/v3io/scaler/pkg/dlx"
 	"github.com/v3io/scaler/pkg/pluginloader"
+	"github.com/v3io/scaler/pkg/scalertypes"
 
 	"github.com/nuclio/errors"
 	"github.com/nuclio/zap"
-	"github.com/v3io/scaler-types"
 )
 
 func Run(kubeconfigPath string,
@@ -34,13 +34,13 @@ func Run(kubeconfigPath string,
 		return errors.Wrap(err, "Failed to parse resource readiness timeout")
 	}
 
-	dlxOptions := scaler_types.DLXOptions{
+	dlxOptions := scalertypes.DLXOptions{
 		TargetNameHeader:         targetNameHeader,
 		TargetPathHeader:         targetPathHeader,
 		TargetPort:               targetPort,
 		ListenAddress:            listenAddress,
 		Namespace:                namespace,
-		ResourceReadinessTimeout: scaler_types.Duration{Duration: resourceReadinessTimeoutDuration},
+		ResourceReadinessTimeout: scalertypes.Duration{Duration: resourceReadinessTimeoutDuration},
 	}
 
 	// see if resource scaler wants to override the arguments
@@ -66,7 +66,7 @@ func Run(kubeconfigPath string,
 	select {}
 }
 
-func createDLX(resourceScaler scaler_types.ResourceScaler, options scaler_types.DLXOptions) (*dlx.DLX, error) {
+func createDLX(resourceScaler scalertypes.ResourceScaler, options scalertypes.DLXOptions) (*dlx.DLX, error) {
 	rootLogger, err := nucliozap.NewNuclioZap("scaler",
 		"console",
 		nil,

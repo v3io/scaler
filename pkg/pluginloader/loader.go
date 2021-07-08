@@ -4,11 +4,12 @@ import (
 	"path/filepath"
 	"plugin"
 
+	"github.com/v3io/scaler/pkg/scalertypes"
+
 	"github.com/nuclio/errors"
-	"github.com/v3io/scaler-types"
 )
 
-type resourceScalerNewFunc func(string, string) (scaler_types.ResourceScaler, error)
+type resourceScalerNewFunc func(string, string) (scalertypes.ResourceScaler, error)
 
 type PluginLoader struct{}
 
@@ -16,7 +17,7 @@ func New() (*PluginLoader, error) {
 	return &PluginLoader{}, nil
 }
 
-func (p *PluginLoader) Load(kubeconfigPath string, namespace string) (scaler_types.ResourceScaler, error) {
+func (p *PluginLoader) Load(kubeconfigPath string, namespace string) (scalertypes.ResourceScaler, error) {
 	var funcNew resourceScalerNewFunc
 	var ok bool
 
@@ -38,7 +39,7 @@ func (p *PluginLoader) Load(kubeconfigPath string, namespace string) (scaler_typ
 		}
 
 		// don't use resourceScalerNewFunc as the cast type cause of some bug :(
-		funcNew, ok = symbol.(func(string, string) (scaler_types.ResourceScaler, error))
+		funcNew, ok = symbol.(func(string, string) (scalertypes.ResourceScaler, error))
 		if !ok {
 			return nil, errors.New("Failed to cast New function of plugin")
 		}

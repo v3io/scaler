@@ -1,25 +1,30 @@
 package dlx
 
 import (
+	"context"
 	"net/http"
+
+	"github.com/v3io/scaler/pkg/scalertypes"
 
 	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"
-	"github.com/v3io/scaler-types"
 )
 
 type DLX struct {
-	logger        logger.Logger
-	listenAddress string
-	handler       Handler
+	logger  logger.Logger
+	handler Handler
+	server  *http.Server
 }
 
 func NewDLX(parentLogger logger.Logger,
-	resourceScaler scaler_types.ResourceScaler,
-	options scaler_types.DLXOptions) (*DLX, error) {
+	resourceScaler scalertypes.ResourceScaler,
+	options scalertypes.DLXOptions) (*DLX, error) {
 	childLogger := parentLogger.GetChild("dlx")
 	childLogger.InfoWith("Creating DLX", "options", options)
-	resourceStarter, err := NewResourceStarter(childLogger, resourceScaler, options.Namespace, options.ResourceReadinessTimeout.Duration)
+	resourceStarter, err := NewResourceStarter(childLogger,
+		resourceScaler,
+		options.Namespace,
+		options.ResourceReadinessTimeout.Duration)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create function starter")
 	}
@@ -35,18 +40,22 @@ func NewDLX(parentLogger logger.Logger,
 	}
 
 	return &DLX{
-		logger:        childLogger,
-		listenAddress: options.ListenAddress,
-		handler:       handler,
+		logger:  childLogger,
+		handler: handler,
+		server: &http.Server{
+			Addr: options.ListenAddress,
+		},
 	}, nil
 }
 
 func (d *DLX) Start() error {
-	d.logger.DebugWith("Starting", "listenAddress", d.listenAddress)
-
+	d.logger.DebugWith("Starting", "server", d.server.Addr)
 	http.HandleFunc("/", d.handler.HandleFunc)
-	if err := http.ListenAndServe(d.listenAddress, nil); err != nil {
-		return errors.Wrap(err, "Failed to serve dlx service")
-	}
+	go d.server.ListenAndServe() // nolint: errcheck
 	return nil
+}
+
+func (d *DLX) Stop(context context.Context) error {
+	d.logger.DebugWith("Stopping", "server", d.server.Addr)
+	return d.server.Shutdown(context)
 }

@@ -6,10 +6,10 @@ import (
 
 	"github.com/v3io/scaler/pkg/autoscaler"
 	"github.com/v3io/scaler/pkg/pluginloader"
+	"github.com/v3io/scaler/pkg/scalertypes"
 
 	"github.com/nuclio/errors"
 	"github.com/nuclio/zap"
-	"github.com/v3io/scaler-types"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/discovery/cached/memory"
@@ -24,9 +24,9 @@ func Run(kubeconfigPath string,
 	scaleInterval time.Duration,
 	metricsResourceKind string,
 	metricsResourceGroup string) error {
-	autoScalerOptions := scaler_types.AutoScalerOptions{
+	autoScalerOptions := scalertypes.AutoScalerOptions{
 		Namespace:     namespace,
-		ScaleInterval: scaler_types.Duration{Duration: scaleInterval},
+		ScaleInterval: scalertypes.Duration{Duration: scaleInterval},
 		GroupKind: schema.GroupKind{
 			Kind:  metricsResourceKind,
 			Group: metricsResourceGroup,
@@ -71,8 +71,8 @@ func Run(kubeconfigPath string,
 }
 
 func createAutoScaler(restConfig *rest.Config,
-	resourceScaler scaler_types.ResourceScaler,
-	options scaler_types.AutoScalerOptions) (*autoscaler.Autoscaler, error) {
+	resourceScaler scalertypes.ResourceScaler,
+	options scalertypes.AutoScalerOptions) (*autoscaler.Autoscaler, error) {
 	rootLogger, err := nucliozap.NewNuclioZap("scaler",
 		"console",
 		nil,
