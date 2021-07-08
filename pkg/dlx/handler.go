@@ -6,16 +6,17 @@ import (
 	"net/http/httputil"
 	"net/url"
 
+	"github.com/v3io/scaler/pkg/scalertypes"
+
 	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"
-	"github.com/v3io/scaler-types"
 )
 
 type Handler struct {
 	logger           logger.Logger
 	HandleFunc       func(http.ResponseWriter, *http.Request)
 	resourceStarter  *ResourceStarter
-	resourceScaler   scaler_types.ResourceScaler
+	resourceScaler   scalertypes.ResourceScaler
 	targetNameHeader string
 	targetPathHeader string
 	targetPort       int
@@ -23,7 +24,7 @@ type Handler struct {
 
 func NewHandler(parentLogger logger.Logger,
 	resourceStarter *ResourceStarter,
-	resourceScaler scaler_types.ResourceScaler,
+	resourceScaler scalertypes.ResourceScaler,
 	targetNameHeader string,
 	targetPathHeader string,
 	targetPort int) (Handler, error) {
@@ -63,11 +64,13 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 		resourceName = req.Header.Get(h.targetNameHeader)
 		path := req.Header.Get(h.targetPathHeader)
 		if resourceName == "" {
-			h.logger.WarnWith("When ingress not set, must pass header value", "missingHeader", h.targetNameHeader)
+			h.logger.WarnWith("When ingress not set, must pass header value",
+				"missingHeader", h.targetNameHeader)
 			res.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		serviceName, err := h.resourceScaler.ResolveServiceName(scaler_types.Resource{Name: resourceName})
+		h.logger.DebugWith("Resolving service name", resourceName)
+		serviceName, err := h.resourceScaler.ResolveServiceName(scalertypes.Resource{Name: resourceName})
 		if err != nil {
 			h.logger.WarnWith("Failed resolving service name",
 				"err", errors.GetErrorStackString(err, 10))

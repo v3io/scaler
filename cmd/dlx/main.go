@@ -22,7 +22,13 @@ func main() {
 
 	*namespace = common.GetNamespace(*namespace)
 
-	if err := app.Run(*kubeconfigPath, *namespace, *targetNameHeader, *targetPathHeader, *targetPort, *listenAddress, *resourceReadinessTimeout); err != nil {
+	if err := app.Run(*kubeconfigPath,
+		*namespace,
+		*targetNameHeader,
+		*targetPathHeader,
+		*targetPort,
+		*listenAddress,
+		*resourceReadinessTimeout); err != nil {
 		errors.PrintErrorStack(os.Stderr, err, 5)
 
 		os.Exit(1)

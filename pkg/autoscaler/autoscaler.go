@@ -4,10 +4,10 @@ import (
 	"time"
 
 	"github.com/v3io/scaler/pkg/common"
+	"github.com/v3io/scaler/pkg/scalertypes"
 
 	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"
-	"github.com/v3io/scaler-types"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -17,17 +17,18 @@ import (
 type Autoscaler struct {
 	logger                  logger.Logger
 	namespace               string
-	resourceScaler          scaler_types.ResourceScaler
-	scaleInterval           scaler_types.Duration
+	resourceScaler          scalertypes.ResourceScaler
+	scaleInterval           scalertypes.Duration
 	inScaleToZeroProcessMap map[string]bool
 	groupKind               schema.GroupKind
 	customMetricsClientSet  custom_metrics.CustomMetricsClient
+	ticker                  *time.Ticker
 }
 
 func NewAutoScaler(parentLogger logger.Logger,
-	resourceScaler scaler_types.ResourceScaler,
+	resourceScaler scalertypes.ResourceScaler,
 	customMetricsClientSet custom_metrics.CustomMetricsClient,
-	options scaler_types.AutoScalerOptions) (*Autoscaler, error) {
+	options scalertypes.AutoScalerOptions) (*Autoscaler, error) {
 	childLogger := parentLogger.GetChild("autoscaler")
 	childLogger.InfoWith("Creating Autoscaler",
 		"options", options)
@@ -40,26 +41,35 @@ func NewAutoScaler(parentLogger logger.Logger,
 		groupKind:               options.GroupKind,
 		customMetricsClientSet:  customMetricsClientSet,
 		inScaleToZeroProcessMap: make(map[string]bool),
+		ticker:                  time.NewTicker(options.ScaleInterval.Duration),
 	}, nil
 }
 
 func (as *Autoscaler) Start() error {
-	as.logger.DebugWith("Starting",
-		"scaleInterval", as.scaleInterval)
-	ticker := time.NewTicker(as.scaleInterval.Duration)
-
+	as.logger.DebugWith("Starting", "scaleInterval", as.scaleInterval)
 	go func() {
-		for range ticker.C {
-			err := as.checkResourcesToScale()
-			if err != nil {
-				as.logger.WarnWith("Failed to check resources to scale", "err", errors.GetErrorStackString(err, 10))
+		for range as.ticker.C {
+			if err := as.checkResourcesToScale(); err != nil {
+				as.logger.WarnWith("Failed to check resources to scale",
+					"err", errors.GetErrorStackString(err, 10))
 			}
 		}
+		as.logger.Debug("Stopped ticking")
 	}()
 	return nil
 }
 
-func (as *Autoscaler) getMetricNames(resources []scaler_types.Resource) []string {
+func (as *Autoscaler) Stop() error {
+	if as.ticker == nil {
+		return nil
+	}
+
+	as.logger.DebugWith("Stopping")
+	as.ticker.Stop()
+	return nil
+}
+
+func (as *Autoscaler) getMetricNames(resources []scalertypes.Resource) []string {
 	var metricNames []string
 	for _, resource := range resources {
 		for _, scaleResource := range resource.ScaleResources {
@@ -116,7 +126,7 @@ func (as *Autoscaler) getResourceMetrics(metricNames []string) (map[string]map[s
 	return resourcesMetricsMap, nil
 }
 
-func (as *Autoscaler) checkResourceToScale(resource scaler_types.Resource, resourcesMetricsMap map[string]map[string]int) bool {
+func (as *Autoscaler) checkResourceToScale(resource scalertypes.Resource, resourcesMetricsMap map[string]map[string]int) bool {
 	if _, found := resourcesMetricsMap[resource.Name]; !found {
 		as.logger.DebugWith("Resource does not have metrics data yet, keeping up", "resourceName", resource.Name)
 		return false
@@ -148,7 +158,7 @@ func (as *Autoscaler) checkResourceToScale(resource scaler_types.Resource, resou
 	return true
 }
 
-func (as *Autoscaler) getMaxScaleResourceWindowSize(resource scaler_types.Resource) time.Duration {
+func (as *Autoscaler) getMaxScaleResourceWindowSize(resource scalertypes.Resource) time.Duration {
 	maxWindow := 0 * time.Second
 	for _, scaleResource := range resource.ScaleResources {
 		if scaleResource.WindowSize.Duration > maxWindow {
@@ -174,7 +184,7 @@ func (as *Autoscaler) checkResourcesToScale() error {
 		return errors.Wrap(err, "Failed to get resources metrics")
 	}
 
-	resourcesToScale := make([]scaler_types.Resource, 0)
+	resourcesToScale := make([]scalertypes.Resource, 0)
 	for idx, resource := range activeResources {
 		inScaleToZeroProcess, found := as.inScaleToZeroProcessMap[resource.Name]
 		if found && inScaleToZeroProcess {
@@ -187,9 +197,9 @@ func (as *Autoscaler) checkResourcesToScale() error {
 
 		// if the resource was scaled from zero or updated, and the debounce period from then has not passed yet do not scale
 		if ((resource.LastScaleEvent != nil) &&
-			(*resource.LastScaleEvent == scaler_types.ResourceUpdatedScaleEvent ||
-				*resource.LastScaleEvent == scaler_types.ScaleFromZeroStartedScaleEvent ||
-				*resource.LastScaleEvent == scaler_types.ScaleFromZeroCompletedScaleEvent)) &&
+			(*resource.LastScaleEvent == scalertypes.ResourceUpdatedScaleEvent ||
+				*resource.LastScaleEvent == scalertypes.ScaleFromZeroStartedScaleEvent ||
+				*resource.LastScaleEvent == scalertypes.ScaleFromZeroCompletedScaleEvent)) &&
 			resource.LastScaleEventTime.After(now.Add(-1*scaleEventDebounceDuration)) {
 			as.logger.DebugWith("Resource in debouncing period, not a scale-to-zero candidate",
 				"resourceName", resource.Name,
@@ -211,11 +221,12 @@ func (as *Autoscaler) checkResourcesToScale() error {
 	}
 
 	if len(resourcesToScale) > 0 {
-		go func(resources []scaler_types.Resource) {
+		go func(resources []scalertypes.Resource) {
 			as.logger.InfoWith("Scaling resources to zero", "resources", resources)
-			err := as.scaleResourcesToZero(resources)
-			if err != nil {
-				as.logger.WarnWith("Failed to scale resources to zero", "resources", resources, "err", errors.GetErrorStackString(err, 10))
+			if err := as.scaleResourcesToZero(resources); err != nil {
+				as.logger.WarnWith("Failed to scale resources to zero",
+					"resources", resources,
+					"err", errors.GetErrorStackString(err, 10))
 			}
 			as.logger.InfoWith("Successfully scaled resources to zero", "resources", resources)
 			for _, resource := range resources {
@@ -227,7 +238,7 @@ func (as *Autoscaler) checkResourcesToScale() error {
 	return nil
 }
 
-func (as *Autoscaler) scaleResourcesToZero(resources []scaler_types.Resource) error {
+func (as *Autoscaler) scaleResourcesToZero(resources []scalertypes.Resource) error {
 	if err := as.resourceScaler.SetScale(resources, 0); err != nil {
 		return errors.Wrap(err, "Failed to set scale")
 	}

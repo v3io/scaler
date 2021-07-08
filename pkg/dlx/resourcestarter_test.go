@@ -7,11 +7,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/v3io/scaler/pkg/scalertypes"
+
 	"github.com/nuclio/logger"
 	"github.com/nuclio/zap"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
-	"github.com/v3io/scaler-types"
 )
 
 type resourceStarterTest struct {
@@ -23,19 +24,19 @@ type resourceStarterTest struct {
 
 type mocker struct {
 	mock.Mock
-	scaler_types.ResourceScaler
+	scalertypes.ResourceScaler
 }
 
-func (m *mocker) SetScale(resourceName []scaler_types.Resource, scale int) error {
+func (m *mocker) SetScale(resourceName []scalertypes.Resource, scale int) error {
 	m.Called(resourceName)
 	return nil
 }
 
-func (m *mocker) GetResources() ([]scaler_types.Resource, error) {
-	return []scaler_types.Resource{}, nil
+func (m *mocker) GetResources() ([]scalertypes.Resource, error) {
+	return []scalertypes.Resource{}, nil
 }
 
-func (m *mocker) GetConfig() (*scaler_types.ResourceScalerConfig, error) {
+func (m *mocker) GetConfig() (*scalertypes.ResourceScalerConfig, error) {
 	return nil, nil
 }
 

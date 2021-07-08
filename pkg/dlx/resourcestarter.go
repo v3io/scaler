@@ -5,9 +5,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/v3io/scaler/pkg/scalertypes"
+
 	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"
-	"github.com/v3io/scaler-types"
 )
 
 type responseChannel chan ResourceStatusResult
@@ -19,7 +20,7 @@ type ResourceStarter struct {
 	resourceSinksMap         resourceSinksMap
 	resourceSinkMutex        sync.Mutex
 	resourceReadinessTimeout time.Duration
-	scaler                   scaler_types.ResourceScaler
+	scaler                   scalertypes.ResourceScaler
 }
 
 type ResourceStatusResult struct {
@@ -29,7 +30,7 @@ type ResourceStatusResult struct {
 }
 
 func NewResourceStarter(parentLogger logger.Logger,
-	scaler scaler_types.ResourceScaler,
+	scaler scalertypes.ResourceScaler,
 	namespace string,
 	resourceReadinessTimeout time.Duration) (*ResourceStarter, error) {
 	fs := &ResourceStarter{
@@ -79,7 +80,12 @@ func (r *ResourceStarter) startResource(resourceSinkChannel chan responseChannel
 	resourceReadyChannel := make(chan error, 1)
 	defer close(resourceReadyChannel)
 
-	go r.waitResourceReadiness(scaler_types.Resource{Name: resourceName}, resourceReadyChannel)
+	go r.waitResourceReadiness(scalertypes.Resource{
+		Name: resourceName,
+
+		// TODO: get a argument or it won't know which function on what namespace it should wake up
+		Namespace: r.namespace,
+	}, resourceReadyChannel)
 
 	select {
 	case <-time.After(r.resourceReadinessTimeout):
@@ -91,7 +97,9 @@ func (r *ResourceStarter) startResource(resourceSinkChannel chan responseChannel
 			ResourceName: resourceName,
 		}
 	case err := <-resourceReadyChannel:
-		r.logger.InfoWith("Resource ready", "target", target, "err", errors.GetErrorStackString(err, 10))
+		r.logger.InfoWith("Resource ready",
+			"target", target,
+			"err", errors.GetErrorStackString(err, 10))
 
 		if err == nil {
 			resultStatus = ResourceStatusResult{
@@ -122,8 +130,8 @@ func (r *ResourceStarter) startResource(resourceSinkChannel chan responseChannel
 	}
 }
 
-func (r *ResourceStarter) waitResourceReadiness(resource scaler_types.Resource, resourceReadyChannel chan error) {
-	err := r.scaler.SetScale([]scaler_types.Resource{resource}, 1)
+func (r *ResourceStarter) waitResourceReadiness(resource scalertypes.Resource, resourceReadyChannel chan error) {
+	err := r.scaler.SetScale([]scalertypes.Resource{resource}, 1)
 	resourceReadyChannel <- err
 }
 
