@@ -41,12 +41,12 @@ func NewAutoScaler(parentLogger logger.Logger,
 		groupKind:               options.GroupKind,
 		customMetricsClientSet:  customMetricsClientSet,
 		inScaleToZeroProcessMap: make(map[string]bool),
-		ticker:                  time.NewTicker(options.ScaleInterval.Duration),
 	}, nil
 }
 
 func (as *Autoscaler) Start() error {
 	as.logger.DebugWith("Starting", "scaleInterval", as.scaleInterval)
+	as.ticker = time.NewTicker(as.scaleInterval.Duration)
 	go func() {
 		for range as.ticker.C {
 			if err := as.checkResourcesToScale(); err != nil {
@@ -55,6 +55,7 @@ func (as *Autoscaler) Start() error {
 			}
 		}
 		as.logger.Debug("Stopped ticking")
+		as.ticker = nil
 	}()
 	return nil
 }
