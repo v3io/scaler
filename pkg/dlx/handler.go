@@ -126,15 +126,17 @@ func (h *Handler) startResources(resourceNames []string) *ResourceStatusResult {
 	responseChannel := make(chan ResourceStatusResult, len(resourceNames))
 	defer close(responseChannel)
 
+	// Start all resources in separate go routines
 	for _, resourceName := range resourceNames {
 		h.resourceStarter.handleResourceStart(resourceName, responseChannel)
 	}
 
+	// Wait for all resources to finish starting
 	for range resourceNames {
 		statusResult := <-responseChannel
 
 		if statusResult.Error != nil {
-			h.logger.WarnWith("Failed to forward request to resource",
+			h.logger.WarnWith("Failed to start resource",
 				"resource", statusResult.ResourceName,
 				"err", errors.GetErrorStackString(statusResult.Error, 10))
 			return &statusResult
