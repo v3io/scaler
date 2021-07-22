@@ -2,13 +2,14 @@ package dlx
 
 import (
 	"fmt"
-	"github.com/v3io/scaler/pkg/scalertypes"
 	"math/rand"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/v3io/scaler/pkg/scalertypes"
 
 	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"
