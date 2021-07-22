@@ -2,7 +2,9 @@ package main
 
 import (
 	"flag"
+	"math/rand"
 	"os"
+	"time"
 
 	"github.com/v3io/scaler/cmd/dlx/app"
 	"github.com/v3io/scaler/pkg/common"
@@ -11,6 +13,7 @@ import (
 )
 
 func main() {
+	rand.Seed(time.Now().Unix())
 	kubeconfigPath := flag.String("kubeconfig-path", os.Getenv("KUBECONFIG"), "Path of kubeconfig file")
 	namespace := flag.String("namespace", "", "Kubernetes namespace")
 	targetNameHeader := flag.String("target-name-header", "", "Name of the header that holds information on target name")
