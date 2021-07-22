@@ -34,7 +34,8 @@ func NewDLX(parentLogger logger.Logger,
 		resourceScaler,
 		options.TargetNameHeader,
 		options.TargetPathHeader,
-		options.TargetPort)
+		options.TargetPort,
+		options.MultiTargetStrategy)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create handler")
 	}

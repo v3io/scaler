@@ -18,7 +18,8 @@ func Run(kubeconfigPath string,
 	targetPathHeader string,
 	targetPort int,
 	listenAddress string,
-	resourceReadinessTimeout string) error {
+	resourceReadinessTimeout string,
+	multiTargetStrategy string) error {
 	pluginLoader, err := pluginloader.New()
 	if err != nil {
 		return errors.Wrap(err, "Failed to initialize plugin loader")
@@ -41,6 +42,7 @@ func Run(kubeconfigPath string,
 		ListenAddress:            listenAddress,
 		Namespace:                namespace,
 		ResourceReadinessTimeout: scalertypes.Duration{Duration: resourceReadinessTimeoutDuration},
+		MultiTargetStrategy:      scalertypes.MultiTargetStrategy(multiTargetStrategy),
 	}
 
 	// see if resource scaler wants to override the arguments

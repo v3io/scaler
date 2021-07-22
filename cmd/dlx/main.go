@@ -18,6 +18,7 @@ func main() {
 	targetPort := flag.Int("target-port", 0, "Name of the header that holds information on target port")
 	listenAddress := flag.String("listen-address", ":8090", "Address to listen upon for http proxy")
 	resourceReadinessTimeout := flag.String("resource-readiness-timeout", "5m", "maximum wait time for the resource to be ready")
+	multiTargetStrategy := flag.String("multi-target-strategy", "random", "Strategy for selecting to which target to send the request")
 	flag.Parse()
 
 	*namespace = common.GetNamespace(*namespace)
@@ -28,7 +29,8 @@ func main() {
 		*targetPathHeader,
 		*targetPort,
 		*listenAddress,
-		*resourceReadinessTimeout); err != nil {
+		*resourceReadinessTimeout,
+		*multiTargetStrategy); err != nil {
 		errors.PrintErrorStack(os.Stderr, err, 5)
 
 		os.Exit(1)

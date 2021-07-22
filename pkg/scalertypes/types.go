@@ -22,6 +22,14 @@ type ResourceScalerConfig struct {
 	DLXOptions        DLXOptions
 }
 
+type MultiTargetStrategy string
+
+const (
+	MultiTargetStrategyRandom  MultiTargetStrategy = "random"
+	MultiTargetStrategyPrimary MultiTargetStrategy = "primary"
+	MultiTargetStrategyCanary  MultiTargetStrategy = "canary"
+)
+
 type DLXOptions struct {
 	Namespace string
 
@@ -31,6 +39,7 @@ type DLXOptions struct {
 	TargetPort               int
 	ListenAddress            string
 	ResourceReadinessTimeout Duration
+	MultiTargetStrategy      MultiTargetStrategy
 }
 
 type ResourceScaler interface {
