@@ -121,7 +121,7 @@ func (h *Handler) startResources(resourceNames []string) *ResourceStatusResult {
 
 	// Start all resources in separate go routines
 	for _, resourceName := range resourceNames {
-		h.resourceStarter.handleResourceStart(resourceName, responseChannel)
+		go h.resourceStarter.handleResourceStart(resourceName, responseChannel)
 	}
 
 	// Wait for all resources to finish starting
