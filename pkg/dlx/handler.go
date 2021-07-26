@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"time"
 
 	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"
@@ -92,6 +93,8 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// let the function http trigger server some time before blasting him
+	time.Sleep(3 * time.Second)
 	h.logger.DebugWith("Creating reverse proxy", "targetURL", targetURL)
 	proxy := httputil.NewSingleHostReverseProxy(targetURL)
 	proxy.ServeHTTP(res, req)
