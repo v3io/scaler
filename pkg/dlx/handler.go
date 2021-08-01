@@ -2,14 +2,15 @@ package dlx
 
 import (
 	"fmt"
-	"github.com/nuclio/errors"
-	"github.com/nuclio/logger"
-	"github.com/v3io/scaler-types"
 	"math/rand"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"strings"
+
+	"github.com/nuclio/errors"
+	"github.com/nuclio/logger"
+	"github.com/v3io/scaler-types"
 )
 
 type Handler struct {
