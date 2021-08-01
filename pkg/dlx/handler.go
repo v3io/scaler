@@ -141,10 +141,9 @@ func (h *Handler) startResources(resourceNames []string) *ResourceStatusResult {
 
 func (h *Handler) selectTargetURL(resourceNames []string, resourceTargetURLMap map[string]*url.URL) (*url.URL, error) {
 	h.logger.DebugWith("Selecting target url", "resourceNames", resourceNames)
-	targetURL := resourceTargetURLMap[resourceNames[rand.Intn(len(resourceNames))]]
 
 	// randomly select a target
-	return targetURL, nil
+	return resourceTargetURLMap[resourceNames[rand.Intn(len(resourceNames))]], nil
 }
 
 func (h *Handler) URLBadParse(resourceName string, err error) int {
