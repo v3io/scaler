@@ -2,11 +2,12 @@ package dlx
 
 import (
 	"fmt"
-	"math/rand"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"strings"
+
+	"github.com/v3io/scaler/pkg/common"
 
 	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"
@@ -144,7 +145,7 @@ func (h *Handler) selectTargetURL(resourceNames []string, resourceTargetURLMap m
 	h.logger.DebugWith("Selecting target url", "resourceNames", resourceNames)
 
 	// randomly select a target
-	return resourceTargetURLMap[resourceNames[rand.Intn(len(resourceNames))]], nil
+	return resourceTargetURLMap[resourceNames[common.SeededRand.Intn(len(resourceNames))]], nil
 }
 
 func (h *Handler) URLBadParse(resourceName string, err error) int {
