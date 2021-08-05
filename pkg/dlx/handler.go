@@ -91,12 +91,7 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	targetURL, err := h.selectTargetURL(resourceNames, resourceTargetURLMap)
-	if err != nil {
-		res.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
+	targetURL := h.selectTargetURL(resourceNames, resourceTargetURLMap)
 	h.logger.DebugWith("Creating reverse proxy", "targetURL", targetURL)
 	proxy := httputil.NewSingleHostReverseProxy(targetURL)
 	proxy.ServeHTTP(res, req)
@@ -141,11 +136,17 @@ func (h *Handler) startResources(resourceNames []string) *ResourceStatusResult {
 	return nil
 }
 
-func (h *Handler) selectTargetURL(resourceNames []string, resourceTargetURLMap map[string]*url.URL) (*url.URL, error) {
+func (h *Handler) selectTargetURL(resourceNames []string, resourceTargetURLMap map[string]*url.URL) *url.URL {
 	h.logger.DebugWith("Selecting target url", "resourceNames", resourceNames)
 
-	// randomly select a target
-	return resourceTargetURLMap[resourceNames[common.SeededRand.Intn(len(resourceNames))]], nil
+	// randomly select a resource
+	resourceName := resourceNames[common.SeededRand.Intn(len(resourceNames))]
+	resourceTargetURL := resourceTargetURLMap[resourceName]
+	h.logger.DebugWith("Selected resource",
+		"resourceTargetURL", resourceTargetURL,
+		"resourceName", resourceName)
+
+	return resourceTargetURL
 }
 
 func (h *Handler) URLBadParse(resourceName string, err error) int {
