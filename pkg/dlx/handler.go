@@ -7,6 +7,9 @@ import (
 	"net/url"
 	"strings"
 
+	"sync"
+	"time"
+
 	"github.com/v3io/scaler/pkg/common"
 
 	"github.com/nuclio/errors"
@@ -22,6 +25,8 @@ type Handler struct {
 	targetNameHeader string
 	targetPathHeader string
 	targetPort       int
+	targetURLCache      sync.Map
+	lastProxyErrorTime	time.Time
 }
 
 func NewHandler(parentLogger logger.Logger,
@@ -37,6 +42,8 @@ func NewHandler(parentLogger logger.Logger,
 		targetNameHeader: targetNameHeader,
 		targetPathHeader: targetPathHeader,
 		targetPort:       targetPort,
+		targetURLCache:      sync.Map{},
+		lastProxyErrorTime:  time.Now(),
 	}
 	h.HandleFunc = h.handleRequest
 	return h, nil
@@ -92,8 +99,31 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 	}
 
 	targetURL := h.selectTargetURL(resourceNames, resourceTargetURLMap)
-	h.logger.DebugWith("Creating reverse proxy", "targetURL", targetURL)
+
+	//if in cache, do not log
+	if _, ok := h.targetURLCache.Load(targetURL); !ok {
+		h.logger.DebugWith("Creating reverse proxy", "targetURL", targetURL)
+	}
+
+	// delete cache after one second
+	go time.AfterFunc(1*time.Second, func() {
+		h.targetURLCache.Delete(targetURL)
+	})
+
 	proxy := httputil.NewSingleHostReverseProxy(targetURL)
+	proxy.ErrorHandler = func(rw http.ResponseWriter,req *http.Request, err error) {
+		timeSinceLastCtxErr := time.Now().Sub(h.lastProxyErrorTime).Hours() > 1
+		if strings.Contains(err.Error(), "context canceled") && timeSinceLastCtxErr {
+			h.lastProxyErrorTime = time.Now()
+		}
+		if !strings.Contains(err.Error(), "context canceled") || timeSinceLastCtxErr {
+			proxy.ErrorLog.Printf("http: proxy error: %v", err)
+		}
+		rw.WriteHeader(http.StatusBadGateway)
+	}
+
+	// store in cache
+	h.targetURLCache.LoadOrStore(targetURL, proxy)
 	proxy.ServeHTTP(res, req)
 }
 
