@@ -2,12 +2,12 @@ package dlx
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/cache"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"strings"
 
-	"sync"
 	"time"
 
 	"github.com/v3io/scaler/pkg/common"
@@ -18,15 +18,15 @@ import (
 )
 
 type Handler struct {
-	logger           logger.Logger
-	HandleFunc       func(http.ResponseWriter, *http.Request)
-	resourceStarter  *ResourceStarter
-	resourceScaler   scaler_types.ResourceScaler
-	targetNameHeader string
-	targetPathHeader string
-	targetPort       int
-	targetURLCache      sync.Map
-	lastProxyErrorTime	time.Time
+	logger             logger.Logger
+	HandleFunc         func(http.ResponseWriter, *http.Request)
+	resourceStarter    *ResourceStarter
+	resourceScaler     scaler_types.ResourceScaler
+	targetNameHeader   string
+	targetPathHeader   string
+	targetPort         int
+	targetURLCache      *cache.LRUExpireCache
+	lastProxyErrorTime time.Time
 }
 
 func NewHandler(parentLogger logger.Logger,
@@ -36,14 +36,14 @@ func NewHandler(parentLogger logger.Logger,
 	targetPathHeader string,
 	targetPort int) (Handler, error) {
 	h := Handler{
-		logger:           parentLogger.GetChild("handler"),
-		resourceStarter:  resourceStarter,
-		resourceScaler:   resourceScaler,
-		targetNameHeader: targetNameHeader,
-		targetPathHeader: targetPathHeader,
-		targetPort:       targetPort,
-		targetURLCache:      sync.Map{},
-		lastProxyErrorTime:  time.Now(),
+		logger:             parentLogger.GetChild("handler"),
+		resourceStarter:    resourceStarter,
+		resourceScaler:     resourceScaler,
+		targetNameHeader:   targetNameHeader,
+		targetPathHeader:   targetPathHeader,
+		targetPort:         targetPort,
+		targetURLCache: cache.NewLRUExpireCache(100),
+		lastProxyErrorTime: time.Now(),
 	}
 	h.HandleFunc = h.handleRequest
 	return h, nil
@@ -101,18 +101,13 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 	targetURL := h.selectTargetURL(resourceNames, resourceTargetURLMap)
 
 	//if in cache, do not log
-	if _, ok := h.targetURLCache.Load(targetURL); !ok {
-		h.logger.DebugWith("Creating reverse proxy", "targetURL", targetURL)
+	if _, found := h.targetURLCache.Get("targetURLCache"); !found {
+		h.logger.DebugWith("Creating reverse proxy", "targetURLCache", targetURL)
 	}
 
-	// delete cache after one second
-	go time.AfterFunc(1*time.Second, func() {
-		h.targetURLCache.Delete(targetURL)
-	})
-
 	proxy := httputil.NewSingleHostReverseProxy(targetURL)
-	proxy.ErrorHandler = func(rw http.ResponseWriter,req *http.Request, err error) {
-		timeSinceLastCtxErr := time.Now().Sub(h.lastProxyErrorTime).Hours() > 1
+	proxy.ErrorHandler = func(rw http.ResponseWriter, req *http.Request, err error) {
+		timeSinceLastCtxErr := time.Since(h.lastProxyErrorTime).Hours() > 1
 		if strings.Contains(err.Error(), "context canceled") && timeSinceLastCtxErr {
 			h.lastProxyErrorTime = time.Now()
 		}
@@ -123,7 +118,7 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 	}
 
 	// store in cache
-	h.targetURLCache.LoadOrStore(targetURL, proxy)
+	h.targetURLCache.Add("targetURLCache", true,  time.Second)
 	proxy.ServeHTTP(res, req)
 }
 
