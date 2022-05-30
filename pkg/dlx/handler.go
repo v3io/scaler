@@ -25,7 +25,7 @@ type Handler struct {
 	targetNameHeader   string
 	targetPathHeader   string
 	targetPort         int
-	targetURLCache      *cache.LRUExpireCache
+	targetURLCache     *cache.LRUExpireCache
 	lastProxyErrorTime time.Time
 }
 
@@ -42,7 +42,7 @@ func NewHandler(parentLogger logger.Logger,
 		targetNameHeader:   targetNameHeader,
 		targetPathHeader:   targetPathHeader,
 		targetPort:         targetPort,
-		targetURLCache: cache.NewLRUExpireCache(100),
+		targetURLCache:     cache.NewLRUExpireCache(100),
 		lastProxyErrorTime: time.Now(),
 	}
 	h.HandleFunc = h.handleRequest
@@ -118,7 +118,7 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 	}
 
 	// store in cache
-	h.targetURLCache.Add("targetURLCache", true,  time.Second)
+	h.targetURLCache.Add("targetURLCache", true, time.Second)
 	proxy.ServeHTTP(res, req)
 }
 
