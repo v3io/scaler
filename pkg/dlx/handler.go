@@ -6,7 +6,6 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strings"
-
 	"time"
 
 	"github.com/v3io/scaler/pkg/common"
