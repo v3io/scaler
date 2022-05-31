@@ -2,7 +2,6 @@ package dlx
 
 import (
 	"fmt"
-	"k8s.io/apimachinery/pkg/util/cache"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -15,6 +14,7 @@ import (
 	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"
 	"github.com/v3io/scaler-types"
+	"k8s.io/apimachinery/pkg/util/cache"
 )
 
 type Handler struct {
