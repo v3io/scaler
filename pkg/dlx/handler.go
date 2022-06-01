@@ -13,6 +13,7 @@ import (
 
 	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"
+	"k8s.io/apimachinery/pkg/util/cache"
 )
 
 type Handler struct {
@@ -24,6 +25,8 @@ type Handler struct {
 	targetPathHeader    string
 	targetPort          int
 	multiTargetStrategy scalertypes.MultiTargetStrategy
+	targetURLCache      *cache.LRUExpireCache
+	lastProxyErrorTime  time.Time
 }
 
 func NewHandler(parentLogger logger.Logger,
@@ -41,6 +44,8 @@ func NewHandler(parentLogger logger.Logger,
 		targetPathHeader:    targetPathHeader,
 		targetPort:          targetPort,
 		multiTargetStrategy: multiTargetStrategy,
+		targetURLCache:      cache.NewLRUExpireCache(100),
+		lastProxyErrorTime:  time.Now(),
 	}
 	h.HandleFunc = h.handleRequest
 	return h, nil
@@ -102,8 +107,25 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	h.logger.DebugWith("Creating reverse proxy", "targetURL", targetURL)
+	//if in cache, do not log
+	if _, found := h.targetURLCache.Get("targetURLCache"); !found {
+		h.logger.DebugWith("!!!!!!!!!!!Creating reverse proxy", "targetURLCache", targetURL)
+	}
+
 	proxy := httputil.NewSingleHostReverseProxy(targetURL)
+	proxy.ErrorHandler = func(rw http.ResponseWriter, req *http.Request, err error) {
+		timeSinceLastCtxErr := time.Since(h.lastProxyErrorTime).Hours() > 1
+		if strings.Contains(err.Error(), "context canceled") && timeSinceLastCtxErr {
+			h.lastProxyErrorTime = time.Now()
+		}
+		if !strings.Contains(err.Error(), "context canceled") || timeSinceLastCtxErr {
+			proxy.ErrorLog.Printf("http: proxy error: %v", err)
+		}
+		rw.WriteHeader(http.StatusBadGateway)
+	}
+
+	// store in cache
+	h.targetURLCache.Add("targetURLCache", true, time.Second*5)
 	proxy.ServeHTTP(res, req)
 }
 
