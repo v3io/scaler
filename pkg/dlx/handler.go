@@ -109,14 +109,13 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 		res.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	h.logger.DebugWith("success creating targetURL")
 
-	//if in cache, do not log
 	h.proxyMutex.Lock()
 	targetURLCacheKey := targetURL.String()
 
+	// if in cache, do not log to avoid multiple identical log lines.
 	if _, found := h.targetURLCache.Get(targetURLCacheKey); !found {
-		h.logger.DebugWith("Creating reverse proxy", "targetURLCache", targetURLCacheKey)
+		h.logger.DebugWith("Creating reverse proxy", "targetURLCache", targetURL)
 
 		// store in cache
 		h.targetURLCache.Add(targetURLCacheKey, true, 5*time.Second)
@@ -128,6 +127,8 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 		if err == nil {
 			return
 		}
+		// make the "context canceled" log appear once every hour at most, because it occurs frequently and spams the logs file,
+		// and we didn't want to completely remove it.
 		timeSinceLastCtxErr := time.Since(h.lastProxyErrorTime).Hours() > 1
 		if strings.Contains(err.Error(), "context canceled") && timeSinceLastCtxErr {
 			h.lastProxyErrorTime = time.Now()
