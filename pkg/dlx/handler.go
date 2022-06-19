@@ -7,12 +7,14 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/v3io/scaler/pkg/scalertypes"
 
 	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"
+	"k8s.io/apimachinery/pkg/util/cache"
 )
 
 type Handler struct {
@@ -24,6 +26,9 @@ type Handler struct {
 	targetPathHeader    string
 	targetPort          int
 	multiTargetStrategy scalertypes.MultiTargetStrategy
+	targetURLCache      *cache.LRUExpireCache
+	proxyLock           sync.Locker
+	lastProxyErrorTime  time.Time
 }
 
 func NewHandler(parentLogger logger.Logger,
@@ -41,6 +46,9 @@ func NewHandler(parentLogger logger.Logger,
 		targetPathHeader:    targetPathHeader,
 		targetPort:          targetPort,
 		multiTargetStrategy: multiTargetStrategy,
+		targetURLCache:      cache.NewLRUExpireCache(100),
+		proxyLock:           &sync.Mutex{},
+		lastProxyErrorTime:  time.Now(),
 	}
 	h.HandleFunc = h.handleRequest
 	return h, nil
@@ -102,13 +110,40 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	h.logger.DebugWith("Creating reverse proxy", "targetURL", targetURL)
+	h.proxyLock.Lock()
+	targetURLCacheKey := targetURL.String()
+
+	// if in cache, do not log to avoid multiple identical log lines.
+	if _, found := h.targetURLCache.Get(targetURLCacheKey); !found {
+		h.logger.DebugWith("Creating reverse proxy", "targetURLCache", targetURL)
+
+		// store in cache
+		h.targetURLCache.Add(targetURLCacheKey, true, 5*time.Second)
+	}
+	h.proxyLock.Unlock()
+
 	proxy := httputil.NewSingleHostReverseProxy(targetURL)
+
+	// override the proxy's error handler in order to make the "context canceled" log appear once every hour at most,
+	// because it occurs frequently and spams the logs file, but we didn't want to remove it entirely.
+	proxy.ErrorHandler = func(rw http.ResponseWriter, req *http.Request, err error) {
+		if err == nil {
+			return
+		}
+		timeSinceLastCtxErr := time.Since(h.lastProxyErrorTime).Hours() > 1
+		if strings.Contains(err.Error(), "context canceled") && timeSinceLastCtxErr {
+			h.lastProxyErrorTime = time.Now()
+		}
+		if !strings.Contains(err.Error(), "context canceled") || timeSinceLastCtxErr {
+			h.logger.DebugWith("http: proxy error", "error", err)
+		}
+		rw.WriteHeader(http.StatusBadGateway)
+	}
+
 	proxy.ServeHTTP(res, req)
 }
 
 func (h *Handler) parseTargetURL(resourceName, path string) (*url.URL, int) {
-	h.logger.DebugWith("Resolving service name", "resourceName", resourceName)
 	serviceName, err := h.resourceScaler.ResolveServiceName(scalertypes.Resource{Name: resourceName})
 	if err != nil {
 		h.logger.WarnWith("Failed resolving service name",
