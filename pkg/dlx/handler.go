@@ -27,7 +27,7 @@ type Handler struct {
 	targetPort          int
 	multiTargetStrategy scalertypes.MultiTargetStrategy
 	targetURLCache      *cache.LRUExpireCache
-	proxyMutex          sync.Mutex
+	proxyLock           sync.Locker
 	lastProxyErrorTime  time.Time
 }
 
@@ -47,7 +47,7 @@ func NewHandler(parentLogger logger.Logger,
 		targetPort:          targetPort,
 		multiTargetStrategy: multiTargetStrategy,
 		targetURLCache:      cache.NewLRUExpireCache(100),
-		proxyMutex:          sync.Mutex{},
+		proxyLock:           &sync.Mutex{},
 		lastProxyErrorTime:  time.Now(),
 	}
 	h.HandleFunc = h.handleRequest
@@ -110,7 +110,7 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	h.proxyMutex.Lock()
+	h.proxyLock.Lock()
 	targetURLCacheKey := targetURL.String()
 
 	// if in cache, do not log to avoid multiple identical log lines.
@@ -120,7 +120,7 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 		// store in cache
 		h.targetURLCache.Add(targetURLCacheKey, true, 5*time.Second)
 	}
-	h.proxyMutex.Unlock()
+	h.proxyLock.Unlock()
 
 	proxy := httputil.NewSingleHostReverseProxy(targetURL)
 
