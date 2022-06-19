@@ -7,6 +7,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/v3io/scaler/pkg/scalertypes"
@@ -26,6 +27,7 @@ type Handler struct {
 	targetPort          int
 	multiTargetStrategy scalertypes.MultiTargetStrategy
 	targetURLCache      *cache.LRUExpireCache
+	proxyMutex          sync.Mutex
 	lastProxyErrorTime  time.Time
 }
 
@@ -45,6 +47,7 @@ func NewHandler(parentLogger logger.Logger,
 		targetPort:          targetPort,
 		multiTargetStrategy: multiTargetStrategy,
 		targetURLCache:      cache.NewLRUExpireCache(100),
+		proxyMutex:          sync.Mutex{},
 		lastProxyErrorTime:  time.Now(),
 	}
 	h.HandleFunc = h.handleRequest
@@ -106,31 +109,39 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 		res.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	h.logger.DebugWith("success creating targetURL")
 
 	//if in cache, do not log
-	if _, found := h.targetURLCache.Get("targetURLCache"); !found {
-		h.logger.DebugWith("!!!!!!!!!!!Creating reverse proxy", "targetURLCache", targetURL)
+	h.proxyMutex.Lock()
+	targetURLCacheKey := targetURL.String()
+
+	if _, found := h.targetURLCache.Get(targetURLCacheKey); !found {
+		h.logger.DebugWith("Creating reverse proxy", "targetURLCache", targetURLCacheKey)
+
+		// store in cache
+		h.targetURLCache.Add(targetURLCacheKey, true, 5*time.Second)
 	}
+	h.proxyMutex.Unlock()
 
 	proxy := httputil.NewSingleHostReverseProxy(targetURL)
 	proxy.ErrorHandler = func(rw http.ResponseWriter, req *http.Request, err error) {
+		if err == nil {
+			return
+		}
 		timeSinceLastCtxErr := time.Since(h.lastProxyErrorTime).Hours() > 1
 		if strings.Contains(err.Error(), "context canceled") && timeSinceLastCtxErr {
 			h.lastProxyErrorTime = time.Now()
 		}
 		if !strings.Contains(err.Error(), "context canceled") || timeSinceLastCtxErr {
-			proxy.ErrorLog.Printf("http: proxy error: %v", err)
+			h.logger.DebugWith("http: proxy error", "error", err)
 		}
 		rw.WriteHeader(http.StatusBadGateway)
 	}
 
-	// store in cache
-	h.targetURLCache.Add("targetURLCache", true, time.Second*5)
 	proxy.ServeHTTP(res, req)
 }
 
 func (h *Handler) parseTargetURL(resourceName, path string) (*url.URL, int) {
-	h.logger.DebugWith("Resolving service name", "resourceName", resourceName)
 	serviceName, err := h.resourceScaler.ResolveServiceName(scalertypes.Resource{Name: resourceName})
 	if err != nil {
 		h.logger.WarnWith("Failed resolving service name",
