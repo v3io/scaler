@@ -136,7 +136,7 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 }
 
 func (h *Handler) parseTargetURL(resourceName, path string) (*url.URL, int) {
-	serviceName, err := h.resourceScaler.ResolveServiceName(scalertypes.Resource{Name: resourceName})
+	serviceName, err := h.resourceScaler.ResolveServiceName(scaler_types.Resource{Name: resourceName})
 	if err != nil {
 		h.logger.WarnWith("Failed resolving service name",
 			"err", errors.GetErrorStackString(err, 10))
