@@ -126,7 +126,6 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 			h.lastProxyErrorTime = time.Now()
 		}
 		if !strings.Contains(err.Error(), "context canceled") || timeSinceLastCtxErr {
-			proxy.ErrorLog.Printf("http: proxy error: %v", err)
 			h.logger.DebugWith("http: proxy error", "error", err)
 		}
 		rw.WriteHeader(http.StatusBadGateway)
