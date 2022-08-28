@@ -1,6 +1,7 @@
 package dlx
 
 import (
+	"context"
 	"net/http"
 	"sync"
 	"time"
@@ -56,34 +57,47 @@ func (r *ResourceStarter) getOrCreateResourceSink(originalTarget string,
 	if _, found := r.resourceSinksMap[originalTarget]; found {
 		resourceSinkChannel = r.resourceSinksMap[originalTarget]
 	} else {
+		ctx := context.Background()
 
 		// for the next requests coming in
 		resourceSinkChannel = make(chan responseChannel)
 		r.resourceSinksMap[originalTarget] = resourceSinkChannel
-		r.logger.DebugWith("Created resource sink", "target", originalTarget)
+		r.logger.DebugWithCtx(ctx, "Created resource sink", "target", originalTarget)
 
 		// start the resource and get ready to listen on resource sink channel
-		go r.startResource(resourceSinkChannel, originalTarget)
+		go r.startResource(ctx, resourceSinkChannel, originalTarget)
 	}
 
 	return resourceSinkChannel
 }
 
-func (r *ResourceStarter) startResource(resourceSinkChannel chan responseChannel, target string) {
+func (r *ResourceStarter) startResource(ctx context.Context, resourceSinkChannel chan responseChannel, target string) {
 	var resultStatus ResourceStatusResult
 
 	// simple for now
 	resourceName := target
 
-	r.logger.InfoWith("Starting resource", "resource", resourceName)
+	r.logger.InfoWithCtx(ctx, "Starting resource", "resourceName", resourceName)
+
 	resourceReadyChannel := make(chan error, 1)
+
+	// since defer is LIFO, this will be called last as we want.
+	// reason - we want to close the channel only after we cancel the waitResourceReadiness
+	// to avoid closing a channel that is still being used
 	defer close(resourceReadyChannel)
 
-	go r.waitResourceReadiness(scaler_types.Resource{Name: resourceName}, resourceReadyChannel)
+	waitResourceReadinessCtx, cancelFunc := context.WithCancel(ctx)
+	defer cancelFunc()
+
+	go r.waitResourceReadiness(waitResourceReadinessCtx,
+		scaler_types.Resource{Name: resourceName},
+		resourceReadyChannel)
 
 	select {
 	case <-time.After(r.resourceReadinessTimeout):
-		r.logger.WarnWith("Timed out waiting for resource to be ready", "resource", resourceName)
+		r.logger.WarnWithCtx(ctx,
+			"Timed out waiting for resource to be ready",
+			"resourceName", resourceName)
 		defer r.deleteResourceSink(resourceName)
 		resultStatus = ResourceStatusResult{
 			Error:        errors.New("Timed out waiting for resource to be ready"),
@@ -91,7 +105,17 @@ func (r *ResourceStarter) startResource(resourceSinkChannel chan responseChannel
 			ResourceName: resourceName,
 		}
 	case err := <-resourceReadyChannel:
-		r.logger.InfoWith("Resource ready", "target", target, "err", errors.GetErrorStackString(err, 10))
+		logArgs := []interface{}{
+			"resourceName", resourceName,
+			"target", target,
+		}
+		if err != nil {
+			logArgs = append(logArgs, "err", errors.GetErrorStackString(err, 10))
+		}
+		r.logger.InfoWithCtx(ctx,
+			"Resource ready",
+			logArgs...,
+		)
 
 		if err == nil {
 			resultStatus = ResourceStatusResult{
@@ -115,15 +139,18 @@ func (r *ResourceStarter) startResource(resourceSinkChannel chan responseChannel
 		case channel := <-resourceSinkChannel:
 			channel <- resultStatus
 		case <-tc:
-			r.logger.Debug("Releasing resource sink")
+			r.logger.DebugWithCtx(ctx, "Releasing resource sink")
 			r.deleteResourceSink(resourceName)
 			return
 		}
 	}
 }
 
-func (r *ResourceStarter) waitResourceReadiness(resource scaler_types.Resource, resourceReadyChannel chan error) {
-	err := r.scaler.SetScale([]scaler_types.Resource{resource}, 1)
+func (r *ResourceStarter) waitResourceReadiness(ctx context.Context,
+	resource scaler_types.Resource,
+	resourceReadyChannel chan error) {
+
+	err := r.scaler.SetScaleCtx(ctx, []scaler_types.Resource{resource}, 1)
 	resourceReadyChannel <- err
 }
 

@@ -19,7 +19,7 @@ require (
 	github.com/spf13/pflag v1.0.3 // indirect
 	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.5.1
-	github.com/v3io/scaler-types v1.7.0
+	github.com/v3io/scaler-types v1.8.0
 	go.uber.org/atomic v1.3.2 // indirect
 	go.uber.org/multierr v1.1.0 // indirect
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9 // indirect
