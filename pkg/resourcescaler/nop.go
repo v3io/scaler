@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+
 	"github.com/v3io/scaler-types"
 )
 
@@ -11,6 +13,10 @@ func New(kubeconfigPath string, namespace string) (scaler_types.ResourceScaler, 
 }
 
 func (r *NopResourceScaler) SetScale(resources []scaler_types.Resource, scale int) error {
+	return nil
+}
+
+func (r *NopResourceScaler) SetScaleCtx(ctx context.Context, resources []scaler_types.Resource, scale int) error {
 	return nil
 }
 
