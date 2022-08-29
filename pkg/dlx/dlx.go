@@ -28,7 +28,7 @@ func NewDLX(parentLogger logger.Logger,
 		return nil, errors.Wrap(err, "Failed to create function starter")
 	}
 
-	handler, err := NewHandler(parentLogger,
+	handler, err := NewHandler(childLogger,
 		resourceStarter,
 		resourceScaler,
 		options.TargetNameHeader,
