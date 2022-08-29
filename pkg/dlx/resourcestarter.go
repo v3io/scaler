@@ -12,13 +12,11 @@ import (
 )
 
 type responseChannel chan ResourceStatusResult
-type resourceSinksMap map[string]chan responseChannel
 
 type ResourceStarter struct {
 	logger                   logger.Logger
 	namespace                string
-	resourceSinksMap         resourceSinksMap
-	resourceSinkMutex        sync.Mutex
+	resourceSinksMap         sync.Map
 	resourceReadinessTimeout time.Duration
 	scaler                   scaler_types.ResourceScaler
 }
@@ -35,7 +33,7 @@ func NewResourceStarter(parentLogger logger.Logger,
 	resourceReadinessTimeout time.Duration) (*ResourceStarter, error) {
 	fs := &ResourceStarter{
 		logger:                   parentLogger.GetChild("resource-starter"),
-		resourceSinksMap:         make(resourceSinksMap),
+		resourceSinksMap:         sync.Map{},
 		namespace:                namespace,
 		resourceReadinessTimeout: resourceReadinessTimeout,
 		scaler:                   scaler,
@@ -44,26 +42,17 @@ func NewResourceStarter(parentLogger logger.Logger,
 }
 
 func (r *ResourceStarter) handleResourceStart(originalTarget string, handlerResponseChannel responseChannel) {
-	resourceSinkChannel := r.getOrCreateResourceSink(originalTarget, handlerResponseChannel)
-	resourceSinkChannel <- handlerResponseChannel
+	r.getOrCreateResourceSink(originalTarget) <- handlerResponseChannel
 }
 
-func (r *ResourceStarter) getOrCreateResourceSink(originalTarget string,
-	handlerResponseChannel responseChannel) chan responseChannel {
-	var resourceSinkChannel chan responseChannel
-	r.resourceSinkMutex.Lock()
-	defer r.resourceSinkMutex.Unlock()
-
-	if _, found := r.resourceSinksMap[originalTarget]; found {
-		resourceSinkChannel = r.resourceSinksMap[originalTarget]
-	} else {
+func (r *ResourceStarter) getOrCreateResourceSink(originalTarget string) chan responseChannel {
+	resourceSink, found := r.resourceSinksMap.LoadOrStore(originalTarget, make(chan responseChannel))
+	resourceSinkChannel := resourceSink.(chan responseChannel)
+	if !found {
 		ctx := context.Background()
+		r.logger.DebugWithCtx(ctx, "Starting resource sink", "target", originalTarget)
 
 		// for the next requests coming in
-		resourceSinkChannel = make(chan responseChannel)
-		r.resourceSinksMap[originalTarget] = resourceSinkChannel
-		r.logger.DebugWithCtx(ctx, "Created resource sink", "target", originalTarget)
-
 		// start the resource and get ready to listen on resource sink channel
 		go r.startResource(ctx, resourceSinkChannel, originalTarget)
 	}
@@ -139,7 +128,6 @@ func (r *ResourceStarter) startResource(ctx context.Context, resourceSinkChannel
 		case channel := <-resourceSinkChannel:
 			channel <- resultStatus
 		case <-tc:
-			r.logger.DebugWithCtx(ctx, "Releasing resource sink")
 			r.deleteResourceSink(resourceName)
 			return
 		}
@@ -155,7 +143,5 @@ func (r *ResourceStarter) waitResourceReadiness(ctx context.Context,
 }
 
 func (r *ResourceStarter) deleteResourceSink(resourceName string) {
-	r.resourceSinkMutex.Lock()
-	delete(r.resourceSinksMap, resourceName)
-	r.resourceSinkMutex.Unlock()
+	r.resourceSinksMap.Delete(resourceName)
 }

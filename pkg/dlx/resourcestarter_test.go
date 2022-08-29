@@ -55,7 +55,7 @@ func (suite *resourceStarterTest) SetupTest() {
 	suite.mocker = &MockResourceScaler{}
 	suite.functionStarter = &ResourceStarter{
 		logger:                   suite.logger,
-		resourceSinksMap:         make(resourceSinksMap),
+		resourceSinksMap:         sync.Map{},
 		namespace:                "default",
 		resourceReadinessTimeout: 1 * time.Second,
 		scaler:                   suite.mocker,
