@@ -173,15 +173,8 @@ func (h *Handler) startResources(resourceNames []string) *ResourceStatusResult {
 }
 
 func (h *Handler) selectTargetURL(resourceNames []string, resourceTargetURLMap map[string]*url.URL) *url.URL {
-	h.logger.DebugWith("Selecting target url", "resourceNames", resourceNames)
-
-	// randomly select a resource
 	resourceName := resourceNames[common.SeededRand.Intn(len(resourceNames))]
 	resourceTargetURL := resourceTargetURLMap[resourceName]
-	h.logger.DebugWith("Selected resource",
-		"resourceTargetURL", resourceTargetURL,
-		"resourceName", resourceName)
-
 	return resourceTargetURL
 }
 
