@@ -107,10 +107,10 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 	// if in cache, do not log to avoid multiple identical log lines.
 	if _, found := h.targetURLCache.Get(targetURLCacheKey); !found {
 		h.logger.DebugWith("Creating reverse proxy", "targetURLCache", targetURL)
-
-		// store in cache
-		h.targetURLCache.Add(targetURLCacheKey, true, 5*time.Second)
 	}
+
+	// store in cache
+	h.targetURLCache.Add(targetURLCacheKey, true, 5*time.Second)
 	h.proxyLock.Unlock()
 
 	proxy := httputil.NewSingleHostReverseProxy(targetURL)
@@ -173,15 +173,8 @@ func (h *Handler) startResources(resourceNames []string) *ResourceStatusResult {
 }
 
 func (h *Handler) selectTargetURL(resourceNames []string, resourceTargetURLMap map[string]*url.URL) *url.URL {
-	h.logger.DebugWith("Selecting target url", "resourceNames", resourceNames)
-
-	// randomly select a resource
 	resourceName := resourceNames[common.SeededRand.Intn(len(resourceNames))]
 	resourceTargetURL := resourceTargetURLMap[resourceName]
-	h.logger.DebugWith("Selected resource",
-		"resourceTargetURL", resourceTargetURL,
-		"resourceName", resourceName)
-
 	return resourceTargetURL
 }
 
