@@ -142,7 +142,8 @@ func (r *ResourceStarter) waitResourceReadiness(ctx context.Context,
 
 	// callee decided to cancel, the resourceReadyChannel is already closed,
 	// so we can just return without sending anything
-	if ctx.Err() == context.Canceled {
+	if errors.RootCause(ctx.Err()) == context.Canceled || ctx.Err() == context.Canceled {
+		r.logger.WarnWithCtx(ctx, "Wait resource readiness canceled")
 		return
 	}
 	resourceReadyChannel <- err
