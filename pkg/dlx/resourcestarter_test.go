@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/v3io/scaler/pkg/scalertypes"
+	mockresourcescaler "github.com/v3io/scaler/pkg/resourcescaler/mock"
 
 	"github.com/nuclio/logger"
 	"github.com/nuclio/zap"
@@ -38,32 +38,14 @@ type resourceStarterTest struct {
 	suite.Suite
 	logger          logger.Logger
 	functionStarter *ResourceStarter
-	mocker          *mocker
-}
-
-type mocker struct {
-	mock.Mock
-	scalertypes.ResourceScaler
-}
-
-func (m *mocker) SetScale(resourceName []scalertypes.Resource, scale int) error {
-	m.Called(resourceName)
-	return nil
-}
-
-func (m *mocker) GetResources() ([]scalertypes.Resource, error) {
-	return []scalertypes.Resource{}, nil
-}
-
-func (m *mocker) GetConfig() (*scalertypes.ResourceScalerConfig, error) {
-	return nil, nil
+	mocker          *mockresourcescaler.ResourceScaler
 }
 
 func (suite *resourceStarterTest) SetupTest() {
-	suite.mocker = &mocker{}
+	suite.mocker = &mockresourcescaler.ResourceScaler{}
 	suite.functionStarter = &ResourceStarter{
 		logger:                   suite.logger,
-		resourceSinksMap:         make(resourceSinksMap),
+		resourceSinksMap:         sync.Map{},
 		namespace:                "default",
 		resourceReadinessTimeout: 1 * time.Second,
 		scaler:                   suite.mocker,
@@ -76,16 +58,18 @@ func (suite *resourceStarterTest) SetupSuite() {
 
 func (suite *resourceStarterTest) TestDlxMultipleRequests() {
 	wg := sync.WaitGroup{}
-	suite.mocker.On("SetScale", mock.Anything).Return()
+	suite.mocker.
+		On("SetScaleCtx", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil)
 
 	for i := 0; i < 200; i++ {
 		wg.Add(1)
 		go func(testIndex int) {
+			defer wg.Done()
 			ch := make(responseChannel)
 			suite.functionStarter.handleResourceStart(fmt.Sprintf("test%d", testIndex), ch)
 			r := <-ch
 			suite.logger.DebugWith("Got response", "r", r)
-			wg.Done()
 			suite.Require().Equal(http.StatusOK, r.Status)
 		}(i)
 	}
@@ -94,7 +78,9 @@ func (suite *resourceStarterTest) TestDlxMultipleRequests() {
 
 func (suite *resourceStarterTest) TestDlxMultipleRequestsSameTarget() {
 	wg := sync.WaitGroup{}
-	suite.mocker.On("SetScale", mock.Anything).Return()
+	suite.mocker.
+		On("SetScaleCtx", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil)
 
 	for i := 0; i < 4; i++ {
 		wg.Add(1)
@@ -109,7 +95,7 @@ func (suite *resourceStarterTest) TestDlxMultipleRequestsSameTarget() {
 	}
 
 	wg.Wait()
-	suite.Require().True(suite.mocker.AssertNumberOfCalls(suite.T(), "SetScale", 1))
+	suite.Require().True(suite.mocker.AssertNumberOfCalls(suite.T(), "SetScaleCtx", 1))
 }
 
 func TestResourceStarter(t *testing.T) {

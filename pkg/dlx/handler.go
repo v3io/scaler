@@ -17,6 +17,7 @@ illegal under applicable law, and the grant of the foregoing license
 under the Apache 2.0 license is conditioned upon your compliance with
 such restriction.
 */
+
 package dlx
 
 import (
@@ -135,10 +136,10 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 	// if in cache, do not log to avoid multiple identical log lines.
 	if _, found := h.targetURLCache.Get(targetURLCacheKey); !found {
 		h.logger.DebugWith("Creating reverse proxy", "targetURLCache", targetURL)
-
-		// store in cache
-		h.targetURLCache.Add(targetURLCacheKey, true, 5*time.Second)
 	}
+
+	// store in cache
+	h.targetURLCache.Add(targetURLCacheKey, true, 5*time.Second)
 	h.proxyLock.Unlock()
 
 	proxy := httputil.NewSingleHostReverseProxy(targetURL)

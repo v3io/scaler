@@ -17,9 +17,11 @@ illegal under applicable law, and the grant of the foregoing license
 under the Apache 2.0 license is conditioned upon your compliance with
 such restriction.
 */
+
 package dlx
 
 import (
+	"context"
 	"net/http"
 	"sync"
 	"time"
@@ -31,13 +33,11 @@ import (
 )
 
 type responseChannel chan ResourceStatusResult
-type resourceSinksMap map[string]chan responseChannel
 
 type ResourceStarter struct {
 	logger                   logger.Logger
 	namespace                string
-	resourceSinksMap         resourceSinksMap
-	resourceSinkMutex        sync.Mutex
+	resourceSinksMap         sync.Map
 	resourceReadinessTimeout time.Duration
 	scaler                   scalertypes.ResourceScaler
 }
@@ -54,7 +54,7 @@ func NewResourceStarter(parentLogger logger.Logger,
 	resourceReadinessTimeout time.Duration) (*ResourceStarter, error) {
 	fs := &ResourceStarter{
 		logger:                   parentLogger.GetChild("resource-starter"),
-		resourceSinksMap:         make(resourceSinksMap),
+		resourceSinksMap:         sync.Map{},
 		namespace:                namespace,
 		resourceReadinessTimeout: resourceReadinessTimeout,
 		scaler:                   scaler,
@@ -63,52 +63,54 @@ func NewResourceStarter(parentLogger logger.Logger,
 }
 
 func (r *ResourceStarter) handleResourceStart(originalTarget string, handlerResponseChannel responseChannel) {
-	resourceSinkChannel := r.getOrCreateResourceSink(originalTarget, handlerResponseChannel)
-	resourceSinkChannel <- handlerResponseChannel
+	r.getOrCreateResourceSink(originalTarget) <- handlerResponseChannel
 }
 
-func (r *ResourceStarter) getOrCreateResourceSink(originalTarget string,
-	handlerResponseChannel responseChannel) chan responseChannel {
-	var resourceSinkChannel chan responseChannel
-	r.resourceSinkMutex.Lock()
-	defer r.resourceSinkMutex.Unlock()
-
-	if _, found := r.resourceSinksMap[originalTarget]; found {
-		resourceSinkChannel = r.resourceSinksMap[originalTarget]
-	} else {
+func (r *ResourceStarter) getOrCreateResourceSink(originalTarget string) chan responseChannel {
+	resourceSink, found := r.resourceSinksMap.LoadOrStore(originalTarget, make(chan responseChannel))
+	resourceSinkChannel := resourceSink.(chan responseChannel)
+	if !found {
+		ctx := context.Background()
+		r.logger.DebugWithCtx(ctx, "Starting resource sink", "target", originalTarget)
 
 		// for the next requests coming in
-		resourceSinkChannel = make(chan responseChannel)
-		r.resourceSinksMap[originalTarget] = resourceSinkChannel
-		r.logger.DebugWith("Created resource sink", "target", originalTarget)
-
 		// start the resource and get ready to listen on resource sink channel
-		go r.startResource(resourceSinkChannel, originalTarget)
+		go r.startResource(ctx, resourceSinkChannel, originalTarget)
 	}
 
 	return resourceSinkChannel
 }
 
-func (r *ResourceStarter) startResource(resourceSinkChannel chan responseChannel, target string) {
+func (r *ResourceStarter) startResource(ctx context.Context, resourceSinkChannel chan responseChannel, target string) {
 	var resultStatus ResourceStatusResult
 
 	// simple for now
 	resourceName := target
 
-	r.logger.InfoWith("Starting resource", "resource", resourceName)
+	r.logger.InfoWithCtx(ctx, "Starting resource", "resourceName", resourceName)
+
 	resourceReadyChannel := make(chan error, 1)
+
+	// since defer is LIFO, this will be called last as we want.
+	// reason - we want to close the channel only after we cancel the waitResourceReadiness
+	// to avoid closing a channel that is still being used
 	defer close(resourceReadyChannel)
 
-	go r.waitResourceReadiness(scalertypes.Resource{
-		Name: resourceName,
+	waitResourceReadinessCtx, cancelFunc := context.WithCancel(ctx)
+	defer cancelFunc()
 
-		// TODO: get a argument or it won't know which function on what namespace it should wake up
-		Namespace: r.namespace,
-	}, resourceReadyChannel)
+	go r.waitResourceReadiness(waitResourceReadinessCtx,
+		scalertypes.Resource{Name: resourceName,
+
+			// TODO: get a argument or it won't know which function on what namespace it should wake up
+			Namespace: r.namespace},
+		resourceReadyChannel)
 
 	select {
 	case <-time.After(r.resourceReadinessTimeout):
-		r.logger.WarnWith("Timed out waiting for resource to be ready", "resource", resourceName)
+		r.logger.WarnWithCtx(ctx,
+			"Timed out waiting for resource to be ready",
+			"resourceName", resourceName)
 		defer r.deleteResourceSink(resourceName)
 		resultStatus = ResourceStatusResult{
 			Error:        errors.New("Timed out waiting for resource to be ready"),
@@ -116,9 +118,18 @@ func (r *ResourceStarter) startResource(resourceSinkChannel chan responseChannel
 			ResourceName: resourceName,
 		}
 	case err := <-resourceReadyChannel:
-		r.logger.InfoWith("Resource ready",
+
+		logArgs := []interface{}{
+			"resourceName", resourceName,
 			"target", target,
-			"err", errors.GetErrorStackString(err, 10))
+		}
+		if err != nil {
+			logArgs = append(logArgs, "err", errors.GetErrorStackString(err, 10))
+		}
+		r.logger.InfoWithCtx(ctx,
+			"Resource ready",
+			logArgs...,
+		)
 
 		if err == nil {
 			resultStatus = ResourceStatusResult{
@@ -142,20 +153,29 @@ func (r *ResourceStarter) startResource(resourceSinkChannel chan responseChannel
 		case channel := <-resourceSinkChannel:
 			channel <- resultStatus
 		case <-tc:
-			r.logger.Debug("Releasing resource sink")
 			r.deleteResourceSink(resourceName)
 			return
 		}
 	}
 }
 
-func (r *ResourceStarter) waitResourceReadiness(resource scalertypes.Resource, resourceReadyChannel chan error) {
-	err := r.scaler.SetScale([]scalertypes.Resource{resource}, 1)
+func (r *ResourceStarter) waitResourceReadiness(ctx context.Context,
+	resource scalertypes.Resource,
+	resourceReadyChannel chan error) {
+
+	err := r.scaler.SetScaleCtx(ctx, []scalertypes.Resource{resource}, 1)
+
+	// callee decided to cancel, the resourceReadyChannel is already closed,
+	// so we can just return without sending anything
+	if errors.Is(err, context.Canceled) {
+		r.logger.WarnWithCtx(ctx,
+			"Wait resource readiness canceled",
+			"resourceName", resource.Name)
+		return
+	}
 	resourceReadyChannel <- err
 }
 
 func (r *ResourceStarter) deleteResourceSink(resourceName string) {
-	r.resourceSinkMutex.Lock()
-	delete(r.resourceSinksMap, resourceName)
-	r.resourceSinkMutex.Unlock()
+	r.resourceSinksMap.Delete(resourceName)
 }

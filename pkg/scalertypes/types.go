@@ -17,9 +17,11 @@ illegal under applicable law, and the grant of the foregoing license
 under the Apache 2.0 license is conditioned upon your compliance with
 such restriction.
 */
+
 package scalertypes
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -63,6 +65,7 @@ type DLXOptions struct {
 
 type ResourceScaler interface {
 	SetScale([]Resource, int) error
+	SetScaleCtx(context.Context, []Resource, int) error
 	GetResources() ([]Resource, error)
 	GetConfig() (*ResourceScalerConfig, error)
 	ResolveServiceName(Resource) (string, error)
@@ -125,7 +128,7 @@ func ParseScaleEvent(scaleEventStr string) (ScaleEvent, error) {
 	case string(ScaleToZeroCompletedScaleEvent):
 		return ScaleToZeroCompletedScaleEvent, nil
 	default:
-		return "", errors.New(fmt.Sprintf("Unknown scale event: %s", scaleEventStr))
+		return "", errors.Errorf("Unknown scale event: %s", scaleEventStr)
 	}
 }
 

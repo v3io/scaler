@@ -18,10 +18,9 @@ linters:
     - deadcode
     - goconst
     - gofmt
-    - golint
+    - revive
     - gosimple
     - ineffassign
-    - interfacer
     - misspell
     - staticcheck
     - unconvert
@@ -30,8 +29,8 @@ linters:
     - vetshadow
     - errcheck
     - govet
-    - structcheck
     - typecheck
+    - gocritic
 
 run:
 
@@ -45,10 +44,3 @@ issues:
     - "comment on"
     - "error should be the last"
     - "should have comment"
-
-  exclude-rules:
-
-    # list of excluded linters applied on test files
-    - path: _test\.go
-      linters:
-        - goconst
