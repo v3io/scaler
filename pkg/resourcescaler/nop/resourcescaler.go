@@ -22,6 +22,7 @@ package nop
 
 import (
 	"context"
+
 	"github.com/v3io/scaler/pkg/scalertypes"
 )
 

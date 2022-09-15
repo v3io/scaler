@@ -127,7 +127,7 @@ func ParseScaleEvent(scaleEventStr string) (ScaleEvent, error) {
 	case string(ScaleToZeroCompletedScaleEvent):
 		return ScaleToZeroCompletedScaleEvent, nil
 	default:
-		return "", errors.New(fmt.Sprintf("Unknown scale event: %s", scaleEventStr))
+		return "", errors.Errorf("Unknown scale event: %s", scaleEventStr)
 	}
 }
 
