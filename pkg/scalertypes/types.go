@@ -20,6 +20,7 @@ such restriction.
 package scalertypes
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -63,6 +64,7 @@ type DLXOptions struct {
 
 type ResourceScaler interface {
 	SetScale([]Resource, int) error
+	SetScaleCtx(context.Context, []Resource, int) error
 	GetResources() ([]Resource, error)
 	GetConfig() (*ResourceScalerConfig, error)
 	ResolveServiceName(Resource) (string, error)

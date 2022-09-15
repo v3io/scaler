@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-FROM golang:1.14.3-alpine3.11 AS builder
+
+FROM gcr.io/iguazio/golang:1.17-alpine3.15 AS builder
 
 RUN apk --update --no-cache add \
     git \
@@ -29,6 +30,6 @@ COPY . .
 
 RUN GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-s -w" -o dlx cmd/dlx/main.go
 
-FROM alpine:3.11
+FROM gcr.io/iguazio/alpine:3.16
 
 COPY --from=builder /dlx/dlx /home/v3io/bin/dlx

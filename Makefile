@@ -81,7 +81,7 @@ lint: modules
 			| tr -d \" \
 			| wget -O $(GOPATH)/bin/impi -qi -
 	@test -e $(GOPATH)/bin/golangci-lint || \
-	  	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOPATH)/bin v1.24.0
+    	  	(curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOPATH)/bin v1.41.1)
 
 	@echo Verifying imports...
 	chmod +x $(GOPATH)/bin/impi && $(GOPATH)/bin/impi \
@@ -101,7 +101,7 @@ fmt:
 
 .PHONY: test-undockerized
 test-undockerized: modules
-	go test -v ./pkg/... -p 1
+	go test -race -v ./pkg/... -p 1
 
 .PHONY: test
 test:

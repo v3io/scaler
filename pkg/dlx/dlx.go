@@ -17,6 +17,7 @@ illegal under applicable law, and the grant of the foregoing license
 under the Apache 2.0 license is conditioned upon your compliance with
 such restriction.
 */
+
 package dlx
 
 import (
@@ -39,7 +40,8 @@ func NewDLX(parentLogger logger.Logger,
 	resourceScaler scalertypes.ResourceScaler,
 	options scalertypes.DLXOptions) (*DLX, error) {
 	childLogger := parentLogger.GetChild("dlx")
-	childLogger.InfoWith("Creating DLX", "options", options)
+	childLogger.InfoWith("Creating DLX",
+		"options", options)
 	resourceStarter, err := NewResourceStarter(childLogger,
 		resourceScaler,
 		options.Namespace,

@@ -17,9 +17,12 @@ illegal under applicable law, and the grant of the foregoing license
 under the Apache 2.0 license is conditioned upon your compliance with
 such restriction.
 */
+
 package mock
 
 import (
+	"context"
+
 	"github.com/v3io/scaler/pkg/scalertypes"
 
 	"github.com/stretchr/testify/mock"
@@ -35,6 +38,11 @@ func New(kubeconfigPath string, namespace string) (scalertypes.ResourceScaler, e
 
 func (r *ResourceScaler) SetScale(resources []scalertypes.Resource, scale int) error {
 	args := r.Called(resources, scale)
+	return args.Error(0)
+}
+
+func (r *ResourceScaler) SetScaleCtx(ctx context.Context, resources []scalertypes.Resource, scale int) error {
+	args := r.Called(ctx, resources, scale)
 	return args.Error(0)
 }
 
