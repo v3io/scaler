@@ -13,7 +13,7 @@
 # limitations under the License.
 #
 
-FROM gcr.io/iguazio/golang:1.17
+FROM gcr.io/iguazio/golang:1.19
 
 ARG DOCKER_CLI_VERSION="18.09.6"
 
