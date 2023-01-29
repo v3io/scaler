@@ -25,16 +25,8 @@ jobs:
 
       - uses: actions/setup-go@v3
         with:
-          go-version: "1.17"
-
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
+          cache: true
+          go-version-file: "go.mod"
 
       - name: Lint
         run: make lint
@@ -47,16 +39,8 @@ jobs:
 
       - uses: actions/setup-go@v3
         with:
-          go-version: "1.17"
-
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
+          cache: true
+          go-version-file: "go.mod"
 
       - name: Run test
         run: make test
@@ -69,16 +53,8 @@ jobs:
 
       - uses: actions/setup-go@v3
         with:
-          go-version: "1.17"
-
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
+          cache: true
+          go-version-file: "go.mod"
 
       - name: Build docker images
         run: make docker-images

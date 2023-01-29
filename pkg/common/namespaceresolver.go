@@ -21,7 +21,6 @@ such restriction.
 package common
 
 import (
-	"io/ioutil"
 	"os"
 )
 
@@ -38,7 +37,7 @@ func GetNamespace(namespaceArgument string) string {
 	}
 
 	// get namespace from within the pod. if found, return that
-	if namespacePod, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
+	if namespacePod, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
 		return string(namespacePod)
 	}
 
