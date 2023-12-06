@@ -32,7 +32,7 @@ type ResourceScaler struct {
 	mock.Mock
 }
 
-func New(kubeconfigPath string, namespace string) (scalertypes.ResourceScaler, error) { // nolint: deadcode
+func New(_ string, _ string) (scalertypes.ResourceScaler, error) { // nolint: deadcode
 	return &ResourceScaler{}, nil
 }
 
