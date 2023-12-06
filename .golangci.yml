@@ -31,11 +31,23 @@ linters:
     - govet
     - typecheck
     - gocritic
+    - gci
 
 run:
 
   # timeout for analysis
   timeout: 5m
+
+linters-settings:
+  gci:
+    sections:
+      - standard
+      - prefix(github.com/v3io/scaler)
+      - default
+      - blank
+      - dot
+
+    custom-order: true
 
 issues:
 

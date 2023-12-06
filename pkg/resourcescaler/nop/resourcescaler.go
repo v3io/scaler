@@ -28,15 +28,15 @@ import (
 
 type ResourceScaler struct{}
 
-func New(kubeconfigPath string, namespace string) (scalertypes.ResourceScaler, error) { // nolint: deadcode
+func New(_ string, _ string) (scalertypes.ResourceScaler, error) { // nolint: deadcode
 	return &ResourceScaler{}, nil
 }
 
-func (r *ResourceScaler) SetScale(resources []scalertypes.Resource, scale int) error {
+func (r *ResourceScaler) SetScale(_ []scalertypes.Resource, _ int) error {
 	return nil
 }
 
-func (r *ResourceScaler) SetScaleCtx(ctx context.Context, resources []scalertypes.Resource, scale int) error {
+func (r *ResourceScaler) SetScaleCtx(_ context.Context, _ []scalertypes.Resource, _ int) error {
 	return nil
 }
 

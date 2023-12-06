@@ -73,31 +73,17 @@ GO_BUILD_TOOL_WORKDIR = /scaler
 
 .PHONY: lint
 lint: modules
-	@echo Installing linters...
-	@test -e $(GOPATH)/bin/impi || \
-		curl -s https://api.github.com/repos/pavius/impi/releases/latest \
-			| grep -i "browser_download_url.*impi.*$(OS_NAME)" \
-			| cut -d : -f 2,3 \
-			| tr -d \" \
-			| wget -O $(GOPATH)/bin/impi -qi -
-	@test -e $(GOPATH)/bin/golangci-lint || \
-    	  	(curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOPATH)/bin v1.50.1)
-
-	@echo Verifying imports...
-	chmod +x $(GOPATH)/bin/impi && $(GOPATH)/bin/impi \
-		--local github.com/v3io/scaler/ \
-		--scheme stdLocalThirdParty \
-		--skip pkg/platform/kube/apis \
-		--skip pkg/platform/kube/client \
-		./cmd/... ./pkg/...
+	@test -e .bin/golangci-lint || \
+    	  	(curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b .bin v1.55.1)
 
 	@echo Linting...
-	$(GOPATH)/bin/golangci-lint run -v
+	.bin/golangci-lint run -v
 	@echo Done.
 
 .PHONY: fmt
 fmt:
 	gofmt -s -w .
+	.bin/golangci-lint run --fix ./...
 
 .PHONY: test-undockerized
 test-undockerized: modules
@@ -116,13 +102,8 @@ test:
 	$(SCALER_DOCKER_TEST_TAG) \
 	/bin/bash -c "make test-undockerized"
 
-.PHONY: ensure-gopath
-ensure-gopath:
-ifndef GOPATH
-	$(error GOPATH must be set)
-endif
 
 .PHONY: modules
-modules: ensure-gopath
+modules:
 	@echo Getting go modules
 	@go mod download
