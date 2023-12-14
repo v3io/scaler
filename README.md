@@ -39,7 +39,7 @@ The Autoscaler makes decisions based on data queried from Kubernetes
 There are several possible tools that implement it, we internally use
 [Prometheus](https://prometheus.io/) with the [Prometheus-Adapter](https://github.com/DirectXMan12/k8s-prometheus-adapter)
 but you can use which ever you want! You can find some recommended implementations 
-[here](https://github.com/kubernetes/metrics/blob/release-1.14/IMPLEMENTATIONS.md)
+[here](https://github.com/kubernetes/metrics/blob/release-1.14/IMPLEMENTATIONS.md#custom-metrics-api)
 
 ## Getting Started
 The infrastructure is designed to be generic, flexible and extendable, so as to serve any resource we'd wish to scale 
