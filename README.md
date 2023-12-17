@@ -35,11 +35,11 @@ service selector).
 **Custom metrics API implementation:**
 
 The Autoscaler makes decisions based on data queried from Kubernetes 
-[custom metrics API.](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/instrumentation/custom-metrics-api.md)
+[custom metrics API.](https://github.com/kubernetes/design-proposals-archive/blob/main/instrumentation/custom-metrics-api.md)
 There are several possible tools that implement it, we internally use
 [Prometheus](https://prometheus.io/) with the [Prometheus-Adapter](https://github.com/DirectXMan12/k8s-prometheus-adapter)
 but you can use which ever you want! You can find some recommended implementations 
-[here](https://github.com/kubernetes/metrics/blob/master/IMPLEMENTATIONS.md#custom-metrics-api)
+[here](https://github.com/kubernetes/metrics/blob/release-1.14/IMPLEMENTATIONS.md#custom-metrics-api)
 
 ## Getting Started
 The infrastructure is designed to be generic, flexible and extendable, so as to serve any resource we'd wish to scale 
@@ -52,7 +52,7 @@ therefore it's suggested to put your resource-scaler in its own repo
 
 Examples:
 * [Nuclio functions resource-scaler](https://github.com/nuclio/nuclio/blob/master/pkg/platform/kube/resourcescaler/resourcescaler.go)
-* [Iguazio's app service resource-scaler](https://github.com/v3io/app-resource-scaler/blob/development/resourcescaler.go)  
+* [Iguazio's app service resource-scaler](https://github.com/v3io/app-resource-scaler/blob/development/pkg/resourcescaler/resourcescaler.go)  
 
 ## Installing
 [Go plugins](https://appliedgo.net/plugins/) is the magic that glues the resource-scaler and this infrastructure 
@@ -66,8 +66,8 @@ move the binary artifact of the build command (the `plugin.so` file) to the `plu
 It is much easier to do everything using Dockerfiles, here are some great examples: 
 * [Nuclio function Autoscaler dockerfile](https://github.com/nuclio/nuclio/blob/master/cmd/autoscaler/Dockerfile)  
 * [Nuclio function DLX dockerfile](https://github.com/nuclio/nuclio/blob/master/cmd/dlx/Dockerfile)
-* [Iguazio's app service Autoscaler dockerfile](https://github.com/v3io/app-resource-scaler/blob/development/autoscaler/Dockerfile)  
-* [Iguazio's app service DLX dockerfile](https://github.com/v3io/app-resource-scaler/blob/development/dlx/Dockerfile)
+* [Iguazio's app service Autoscaler dockerfile](https://github.com/v3io/app-resource-scaler/blob/development/cmd/autoscaler/Dockerfile)  
+* [Iguazio's app service DLX dockerfile](https://github.com/v3io/app-resource-scaler/blob/development/cmd/dlx/Dockerfile)
 
 You can install the components using the [scaler helm chart](https://github.com/v3io/helm-charts/tree/development/stable/scaler)<br>
 `$ helm install --name my-release v3io-stable/scaler`
