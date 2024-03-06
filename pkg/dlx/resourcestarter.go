@@ -96,8 +96,8 @@ func (r *ResourceStarter) startResource(ctx context.Context, resourceSinkChannel
 	// to avoid closing a channel that is still being used
 	defer close(resourceReadyChannel)
 
-	waitResourceReadinessCtx, cancelFunc := context.WithCancel(ctx)
-	defer cancelFunc()
+	waitResourceReadinessCtx, cancelFuncTimeout := context.WithTimeout(ctx, 15*time.Minute)
+	defer cancelFuncTimeout()
 
 	go r.waitResourceReadiness(waitResourceReadinessCtx,
 		scalertypes.Resource{Name: resourceName,
@@ -167,10 +167,11 @@ func (r *ResourceStarter) waitResourceReadiness(ctx context.Context,
 
 	// callee decided to cancel, the resourceReadyChannel is already closed,
 	// so we can just return without sending anything
-	if errors.Is(err, context.Canceled) {
+	if ctx.Err() != nil {
 		r.logger.WarnWithCtx(ctx,
 			"Wait resource readiness canceled",
-			"resourceName", resource.Name)
+			"resourceName", resource.Name,
+			"err", ctx.Err())
 		return
 	}
 	resourceReadyChannel <- err
