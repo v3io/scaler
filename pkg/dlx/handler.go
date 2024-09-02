@@ -212,7 +212,6 @@ func (h *Handler) selectTargetURL(resourceNames []string, resourceTargetURLMap m
 
 	switch h.multiTargetStrategy {
 	case scalertypes.MultiTargetStrategyRandom:
-		rand.Seed(time.Now().Unix())
 		return resourceTargetURLMap[resourceNames[rand.Intn(len(resourceNames))]], nil
 	case scalertypes.MultiTargetStrategyPrimary:
 		return resourceTargetURLMap[resourceNames[0]], nil
