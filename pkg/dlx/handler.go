@@ -146,7 +146,7 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 
 	// override the proxy's error handler in order to make the "context canceled" log appear once every hour at most,
 	// because it occurs frequently and spams the logs file, but we didn't want to remove it entirely.
-	proxy.ErrorHandler = func(rw http.ResponseWriter, req *http.Request, err error) {
+	proxy.ErrorHandler = func(rw http.ResponseWriter, _ *http.Request, err error) {
 		if err == nil {
 			return
 		}

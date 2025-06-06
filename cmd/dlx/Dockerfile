@@ -13,7 +13,7 @@
 # limitations under the License.
 #
 
-FROM gcr.io/iguazio/golang:1.23.8-alpine3.18 AS builder
+FROM gcr.io/iguazio/golang:1.23.8-alpine AS builder
 
 RUN apk --update --no-cache add \
     git \
