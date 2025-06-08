@@ -15,7 +15,6 @@
 linters:
   disable-all: true
   enable:
-    - deadcode
     - goconst
     - gofmt
     - revive
@@ -24,11 +23,9 @@ linters:
     - misspell
     - staticcheck
     - unconvert
-    - varcheck
-    - vet
-    - vetshadow
-    - errcheck
     - govet
+    - unused
+    - errcheck
     - typecheck
     - gocritic
     - gci

@@ -70,11 +70,12 @@ push-docker-images:
 
 # tools get built with the specified OS/arch and inject version
 GO_BUILD_TOOL_WORKDIR = /scaler
+GOLANGCI_LINT_VERSION := v1.64.6
 
 .PHONY: lint
 lint: modules
 	@test -e .bin/golangci-lint || \
-    	  	(curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b .bin v1.55.1)
+    	  	(curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b .bin $(GOLANGCI_LINT_VERSION))
 
 	@echo Linting...
 	.bin/golangci-lint run -v
