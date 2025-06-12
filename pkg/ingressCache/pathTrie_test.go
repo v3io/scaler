@@ -45,7 +45,7 @@ func (suite *pathTreeTest) SetupSubTest(pathTreeState []pathTreeFunctionArgs) {
 	suite.pathTree = newPathTree()
 
 	for _, args := range pathTreeState {
-		err := suite.pathTree.set(args.path, args.function)
+		err := suite.pathTree.SetPath(args.path, args.function)
 		suite.Require().NoError(err)
 	}
 }
@@ -193,7 +193,7 @@ func (suite *pathTreeTest) TestPathTreeSet() {
 		suite.Run(testCase.name, func() {
 			suite.SetupSubTest(nil)
 			for _, setArgs := range testCase.args {
-				err := suite.pathTree.set(setArgs.path, setArgs.function)
+				err := suite.pathTree.SetPath(setArgs.path, setArgs.function)
 				if testCase.shouldFail {
 					suite.Require().Error(err)
 					suite.Require().Equal(err.Error(), testCase.errorMessage)
@@ -274,7 +274,7 @@ func (suite *pathTreeTest) TestPathTreeGet() {
 			{testPathWithMultipleFunctions, testFunctionName2},
 		})
 		suite.Run(testCase.name, func() {
-			result, err := suite.pathTree.get(testCase.arg)
+			result, err := suite.pathTree.GetPath(testCase.arg)
 			if testCase.shouldFail {
 				suite.Require().Error(err)
 				suite.Require().Contains(err.Error(), testCase.errorMessage)
@@ -388,7 +388,7 @@ func (suite *pathTreeTest) TestPathTreeDelete() {
 		suite.Run(testCase.name, func() {
 			suite.SetupSubTest(testCase.initialState)
 
-			err := suite.pathTree.delete(testCase.deleteArgs.path, testCase.deleteArgs.function)
+			err := suite.pathTree.DeletePath(testCase.deleteArgs.path, testCase.deleteArgs.function)
 			if testCase.shouldFail {
 				suite.Require().Error(err)
 				suite.Require().Contains(err.Error(), testCase.errorMessage)
@@ -398,7 +398,7 @@ func (suite *pathTreeTest) TestPathTreeDelete() {
 
 			// After delete, check that the expected paths and functions are still there
 			for _, getAfterDeleteArgs := range testCase.getFunctionAfterDeleteArgs {
-				result, err := suite.pathTree.get(getAfterDeleteArgs.path)
+				result, err := suite.pathTree.GetPath(getAfterDeleteArgs.path)
 				if getAfterDeleteArgs.shouldFail {
 					suite.Require().Error(err)
 					suite.Require().Contains(err.Error(), getAfterDeleteArgs.errorMessage)

@@ -19,10 +19,10 @@ func newPathTree() *pathTree {
 
 type pathTree struct {
 	trie.PathTrie
-	// TODO - think about injecting a logger here
 }
 
-func (p *pathTree) set(path string, function string) error {
+// SetPath sets a function for a given path. If the path does not exist, it creates it
+func (p *pathTree) SetPath(path string, function string) error {
 	if path == "" {
 		return fmt.Errorf(emptyPathError)
 	}
@@ -44,7 +44,6 @@ func (p *pathTree) set(path string, function string) error {
 	}
 
 	if existsInSlice(pathFunctionNames, function) {
-		// TODO - add log that function already exists
 		return nil
 	}
 
@@ -54,8 +53,8 @@ func (p *pathTree) set(path string, function string) error {
 	return nil
 }
 
-// delete removes a function from a path and also deletes the path if the function is the only one associated with that path
-func (p *pathTree) delete(path string, function string) error {
+// DeletePath removes a function from a path and also deletes the path if the function is the only one associated with that path
+func (p *pathTree) DeletePath(path string, function string) error {
 	pathValue := p.Get(path)
 
 	pathFunctionNames, ok := pathValue.([]string)
@@ -69,7 +68,6 @@ func (p *pathTree) delete(path string, function string) error {
 			p.Delete(path)
 			return nil
 		}
-		// TODO - add log that function does not exist in the path
 		return fmt.Errorf("%s,  function:%s, path:%s", functionNotExistsError, function, path)
 	}
 
@@ -78,8 +76,8 @@ func (p *pathTree) delete(path string, function string) error {
 	return nil
 }
 
-// get retrieve the closest prefix matching the path and returns the associated functions
-func (p *pathTree) get(path string) ([]string, error) {
+// GetPath retrieve the closest prefix matching the path and returns the associated functions
+func (p *pathTree) GetPath(path string) ([]string, error) {
 	var walkPathResult interface{}
 	err := p.WalkPath(path, func(path string, value interface{}) error {
 		if value != nil {
