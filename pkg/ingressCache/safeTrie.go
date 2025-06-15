@@ -1,11 +1,10 @@
 package ingresscache
 
 import (
-	"fmt"
-	"github.com/dghubble/trie"
 	"slices"
 	"sync"
 
+	"github.com/dghubble/trie"
 	"github.com/nuclio/errors"
 )
 
@@ -44,7 +43,7 @@ func (st *SafeTrie) SetFunctionName(path string, function string) error {
 
 	pathFunctionNames, ok := pathValue.([]string)
 	if !ok {
-		return errors.New(fmt.Sprintf("value is not a []string, got: %T", pathValue))
+		return errors.Errorf("value is not a []string, got: %T", pathValue)
 	}
 
 	if slices.Contains(pathFunctionNames, function) {
@@ -71,7 +70,7 @@ func (st *SafeTrie) DeleteFunctionName(path string, function string) error {
 
 	pathFunctionNames, ok := pathValue.([]string)
 	if !ok {
-		return errors.New(fmt.Sprintf("path value should be []string, got %T", pathValue))
+		return errors.Errorf("path value should be []string, got %T", pathValue)
 	}
 
 	// If the function is the only value, delete the path
@@ -80,7 +79,7 @@ func (st *SafeTrie) DeleteFunctionName(path string, function string) error {
 			st.t.Delete(path)
 			return nil
 		}
-		return errors.New(fmt.Sprintf("the function-name doesn't exists in path, skipping delete. function-name: %s, path: %s", function, path))
+		return errors.Errorf("the function-name doesn't exists in path, skipping delete. function-name: %s, path: %s", function, path)
 	}
 
 	// TODO - will be removed once moving into efficient pathFunctionNames implementation (i.e. not using slices)
@@ -106,12 +105,12 @@ func (st *SafeTrie) GetFunctionName(path string) ([]string, error) {
 
 		return nil
 	}); err != nil {
-		return nil, errors.New(fmt.Sprintf("no value found for path: %s", path))
+		return nil, errors.Errorf("no value found for path: %s", path)
 	}
 
 	output, ok := walkPathResult.([]string)
 	if !ok {
-		return nil, errors.New(fmt.Sprintf("value is not a []string, value: %v", walkPathResult))
+		return nil, errors.Errorf("value is not a []string, value: %v", walkPathResult)
 	}
 
 	return output, nil

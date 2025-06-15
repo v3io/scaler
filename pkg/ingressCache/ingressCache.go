@@ -1,7 +1,6 @@
 package ingresscache
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/nuclio/errors"
@@ -45,7 +44,7 @@ func (c *IngressCache) Set(host, path, function string) error {
 		if !exists {
 			c.m.Delete(host)
 		}
-		return errors.New(fmt.Sprintf("cache set failed: invalid path tree value: got: %t", urlTree))
+		return errors.Errorf("cache set failed: invalid path tree value: got: %t", urlTree)
 	}
 
 	if err := ingressHostsTree.SetFunctionName(path, function); err != nil {
@@ -67,14 +66,14 @@ func (c *IngressCache) Delete(host, path, function string) error {
 
 	ingressHostsTree, ok := urlTree.(IngressHostsTree)
 	if !ok {
-		return errors.New(fmt.Sprintf("cache delete failed: invalid path tree value: got: %t", urlTree))
+		return errors.Errorf("cache delete failed: invalid path tree value: got: %t", urlTree)
 	}
 
 	if err := ingressHostsTree.DeleteFunctionName(path, function); err != nil {
 		return errors.Wrap(err, "cache delete failed")
 	}
 
-	//todo - need to think bout how to know if the host should be Deleted from teh syncMap
+	//todo - need to think bout how to know if the host should be Deleted from the syncMap
 	// should extend the IngressHostsTree interface with IsEmpty method
 	return nil
 }
@@ -87,7 +86,7 @@ func (c *IngressCache) Get(host, path string) ([]string, error) {
 
 	ingressHostsTree, ok := urlTree.(IngressHostsTree)
 	if !ok {
-		return nil, errors.New(fmt.Sprintf("cache get failed: invalid path tree value: got: %t", urlTree))
+		return nil, errors.Errorf("cache get failed: invalid path tree value: got: %t", urlTree)
 	}
 
 	result, err := ingressHostsTree.GetFunctionName(path)

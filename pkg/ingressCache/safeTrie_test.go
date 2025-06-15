@@ -21,8 +21,9 @@ package ingresscache
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/suite"
 	"testing"
+
+	"github.com/stretchr/testify/suite"
 )
 
 type SafeTrieTest struct {
@@ -58,7 +59,7 @@ func (suite *SafeTrieTest) TestPathTreeSet() {
 	testFunctionPathWithDots := "/path/./to/./function/"
 	testFunctionPathUpperCase := "/PATH/TO/function"
 	testFunctionNameUpperCase := "test-FUNCTION"
-	testApiPath := "/api/v1/user-data/123"
+	testAPIPath := "/api/v1/user-data/123"
 	for _, testCase := range []struct {
 		name           string
 		args           []safeTrieFunctionArgs
@@ -184,9 +185,9 @@ func (suite *SafeTrieTest) TestPathTreeSet() {
 		}, {
 			name: "path with numbers and hyphens",
 			args: []safeTrieFunctionArgs{
-				{path: testApiPath, function: testFunctionName},
+				{path: testAPIPath, function: testFunctionName},
 			},
-			expectedResult: map[string][]string{testApiPath: {testFunctionName}},
+			expectedResult: map[string][]string{testAPIPath: {testFunctionName}},
 		},
 	} {
 		suite.Run(testCase.name, func() {
@@ -291,7 +292,7 @@ func (suite *SafeTrieTest) TestPathTreeDelete() {
 	testFunctionName2 := "test-function2"
 	testPathWithMultipleFunctions := "/path/to/multiple/functions"
 
-	type getFunctionAfterDeleteArgs struct { //this struct enables multiple get tests after delete
+	type getFunctionAfterDeleteArgs struct { // this struct enables multiple get tests after delete
 		path           string
 		expectedResult []string
 		shouldFail     bool
