@@ -25,31 +25,31 @@ import (
 	"testing"
 )
 
-type PathTreeTest struct {
+type SafeTrieTest struct {
 	suite.Suite
-	pathTree *PathTree
+	safeTrie *SafeTrie
 }
 
-type pathTreeFunctionArgs struct {
+type safeTrieFunctionArgs struct {
 	path     string
 	function string
 }
 
-func (suite *PathTreeTest) SetupTest() {
-	suite.pathTree = NewPathTree()
+func (suite *SafeTrieTest) SetupTest() {
+	suite.safeTrie = NewSafeTrie()
 }
 
-func (suite *PathTreeTest) SetupSubTest(pathTreeState []pathTreeFunctionArgs) {
-	suite.pathTree = NewPathTree()
+func (suite *SafeTrieTest) SetupSubTest(safeTrieState []safeTrieFunctionArgs) {
+	suite.safeTrie = NewSafeTrie()
 
 	// set path tree with the provided required state
-	for _, args := range pathTreeState {
-		err := suite.pathTree.SetFunctionName(args.path, args.function)
+	for _, args := range safeTrieState {
+		err := suite.safeTrie.SetFunctionName(args.path, args.function)
 		suite.Require().NoError(err)
 	}
 }
 
-func (suite *PathTreeTest) TestPathTreeSet() {
+func (suite *SafeTrieTest) TestPathTreeSet() {
 	testFunctionName := "test-function"
 	testFunctionName2 := "test-function-2"
 	testFunctionPath := "/path/to/function"
@@ -61,14 +61,14 @@ func (suite *PathTreeTest) TestPathTreeSet() {
 	testApiPath := "/api/v1/user-data/123"
 	for _, testCase := range []struct {
 		name           string
-		args           []pathTreeFunctionArgs
+		args           []safeTrieFunctionArgs
 		expectedResult map[string][]string
 		shouldFail     bool
 		errorMessage   string
 	}{
 		{
 			name: "simple set",
-			args: []pathTreeFunctionArgs{
+			args: []safeTrieFunctionArgs{
 				{
 					path:     testFunctionPath,
 					function: testFunctionName,
@@ -77,7 +77,7 @@ func (suite *PathTreeTest) TestPathTreeSet() {
 			expectedResult: map[string][]string{testFunctionPath: {testFunctionName}},
 		}, {
 			name: "idempotent test",
-			args: []pathTreeFunctionArgs{
+			args: []safeTrieFunctionArgs{
 				{
 					path:     testFunctionPath,
 					function: testFunctionName,
@@ -89,7 +89,7 @@ func (suite *PathTreeTest) TestPathTreeSet() {
 			expectedResult: map[string][]string{testFunctionPath: {testFunctionName}},
 		}, {
 			name: "set twice the same path with a different function",
-			args: []pathTreeFunctionArgs{
+			args: []safeTrieFunctionArgs{
 				{
 					path:     testFunctionPath,
 					function: testFunctionName,
@@ -101,7 +101,7 @@ func (suite *PathTreeTest) TestPathTreeSet() {
 			expectedResult: map[string][]string{testFunctionPath: {testFunctionName, testFunctionName2}},
 		}, {
 			name: "set different paths and functions",
-			args: []pathTreeFunctionArgs{
+			args: []safeTrieFunctionArgs{
 				{
 					path:     testFunctionPath,
 					function: testFunctionName,
@@ -116,7 +116,7 @@ func (suite *PathTreeTest) TestPathTreeSet() {
 			},
 		}, {
 			name: "empty function name",
-			args: []pathTreeFunctionArgs{
+			args: []safeTrieFunctionArgs{
 				{
 					path:     testFunctionPath,
 					function: "",
@@ -127,7 +127,7 @@ func (suite *PathTreeTest) TestPathTreeSet() {
 			errorMessage:   "function is empty",
 		}, {
 			name: "empty path",
-			args: []pathTreeFunctionArgs{
+			args: []safeTrieFunctionArgs{
 				{
 					path:     "",
 					function: testFunctionName,
@@ -138,7 +138,7 @@ func (suite *PathTreeTest) TestPathTreeSet() {
 			errorMessage:   "path is empty",
 		}, {
 			name: "double slash in path",
-			args: []pathTreeFunctionArgs{
+			args: []safeTrieFunctionArgs{
 				{
 					path:     "//" + testFunctionPath,
 					function: testFunctionName,
@@ -149,7 +149,7 @@ func (suite *PathTreeTest) TestPathTreeSet() {
 			},
 		}, {
 			name: "path starts without slash",
-			args: []pathTreeFunctionArgs{
+			args: []safeTrieFunctionArgs{
 				{
 					path:     "path/to/function",
 					function: testFunctionName,
@@ -164,26 +164,26 @@ func (suite *PathTreeTest) TestPathTreeSet() {
 			expectedResult: suite.generateExpectedResultMap(200),
 		}, {
 			name:           "path ends with slash",
-			args:           []pathTreeFunctionArgs{{path: testFunctionPathEndsWithSlash, function: testFunctionName}},
+			args:           []safeTrieFunctionArgs{{path: testFunctionPathEndsWithSlash, function: testFunctionName}},
 			expectedResult: map[string][]string{testFunctionPathEndsWithSlash: {testFunctionName}},
 		}, {
 			name:           "path with dots",
-			args:           []pathTreeFunctionArgs{{path: testFunctionPathWithDots, function: testFunctionName}},
+			args:           []safeTrieFunctionArgs{{path: testFunctionPathWithDots, function: testFunctionName}},
 			expectedResult: map[string][]string{testFunctionPathWithDots: {testFunctionName}},
 		}, {
 			name:           "upper case path",
-			args:           []pathTreeFunctionArgs{{path: testFunctionPathUpperCase, function: testFunctionName}},
+			args:           []safeTrieFunctionArgs{{path: testFunctionPathUpperCase, function: testFunctionName}},
 			expectedResult: map[string][]string{testFunctionPathUpperCase: {testFunctionName}},
 		}, {
 			name: "upper case function name",
-			args: []pathTreeFunctionArgs{
+			args: []safeTrieFunctionArgs{
 				{path: testFunctionPath, function: testFunctionName},
 				{path: testFunctionPath, function: testFunctionNameUpperCase},
 			},
 			expectedResult: map[string][]string{testFunctionPath: {testFunctionName, testFunctionNameUpperCase}},
 		}, {
 			name: "path with numbers and hyphens",
-			args: []pathTreeFunctionArgs{
+			args: []safeTrieFunctionArgs{
 				{path: testApiPath, function: testFunctionName},
 			},
 			expectedResult: map[string][]string{testApiPath: {testFunctionName}},
@@ -192,7 +192,7 @@ func (suite *PathTreeTest) TestPathTreeSet() {
 		suite.Run(testCase.name, func() {
 			suite.SetupSubTest(nil)
 			for _, setArgs := range testCase.args {
-				err := suite.pathTree.SetFunctionName(setArgs.path, setArgs.function)
+				err := suite.safeTrie.SetFunctionName(setArgs.path, setArgs.function)
 				if testCase.shouldFail {
 					suite.Require().Error(err)
 					suite.Require().Equal(err.Error(), testCase.errorMessage)
@@ -200,13 +200,13 @@ func (suite *PathTreeTest) TestPathTreeSet() {
 					suite.Require().NoError(err)
 				}
 			}
-			suitePathTree, err := suite.pathTreeToMap(suite.pathTree)
+			suitePathTree, err := suite.pathTreeToMap(suite.safeTrie)
 			suite.Require().NoError(err)
 			suite.Require().Equal(testCase.expectedResult, suitePathTree)
 		})
 	}
 }
-func (suite *PathTreeTest) TestPathTreeGet() {
+func (suite *SafeTrieTest) TestPathTreeGet() {
 	testPathRoot := "/"
 	testPath1 := "/path/to/function1"
 	testPath2 := testPath1 + "/nested"
@@ -263,7 +263,7 @@ func (suite *PathTreeTest) TestPathTreeGet() {
 			expectedResult: []string{testFunctionName1, testFunctionName2},
 		},
 	} {
-		suite.SetupSubTest([]pathTreeFunctionArgs{
+		suite.SetupSubTest([]safeTrieFunctionArgs{
 			{testPathRoot, testFunctionName},
 			{testPath1, testFunctionName1},
 			{testPath2, testFunctionName2},
@@ -273,7 +273,7 @@ func (suite *PathTreeTest) TestPathTreeGet() {
 			{testPathWithMultipleFunctions, testFunctionName2},
 		})
 		suite.Run(testCase.name, func() {
-			result, err := suite.pathTree.GetFunctionName(testCase.arg)
+			result, err := suite.safeTrie.GetFunctionName(testCase.arg)
 			if testCase.shouldFail {
 				suite.Require().Error(err)
 				suite.Require().Contains(err.Error(), testCase.errorMessage)
@@ -284,7 +284,7 @@ func (suite *PathTreeTest) TestPathTreeGet() {
 		})
 	}
 }
-func (suite *PathTreeTest) TestPathTreeDelete() {
+func (suite *SafeTrieTest) TestPathTreeDelete() {
 	testPath1 := "/path/to/function1"
 	testPath2 := testPath1 + "/nested"
 	testFunctionName1 := "test-function1"
@@ -299,20 +299,20 @@ func (suite *PathTreeTest) TestPathTreeDelete() {
 	}
 
 	for _, testCase := range []struct {
-		initialState               []pathTreeFunctionArgs // initial state of the path tree before delete
+		initialState               []safeTrieFunctionArgs // initial state of the path tree before delete
 		name                       string
-		deleteArgs                 pathTreeFunctionArgs
+		deleteArgs                 safeTrieFunctionArgs
 		getFunctionAfterDeleteArgs []getFunctionAfterDeleteArgs
 		shouldFail                 bool
 		errorMessage               string
 	}{
 		{
 			name: "delete a path and validate that nested path is still there",
-			initialState: []pathTreeFunctionArgs{
+			initialState: []safeTrieFunctionArgs{
 				{testPath1, testFunctionName1},
 				{testPath2, testFunctionName2},
 			},
-			deleteArgs: pathTreeFunctionArgs{testPath1, testFunctionName1},
+			deleteArgs: safeTrieFunctionArgs{testPath1, testFunctionName1},
 			getFunctionAfterDeleteArgs: []getFunctionAfterDeleteArgs{
 				{
 					path:           testPath2,
@@ -325,11 +325,11 @@ func (suite *PathTreeTest) TestPathTreeDelete() {
 			},
 		}, {
 			name: "delete a function from multiple values and validate that the other function is still there",
-			initialState: []pathTreeFunctionArgs{
+			initialState: []safeTrieFunctionArgs{
 				{testPathWithMultipleFunctions, testFunctionName1},
 				{testPathWithMultipleFunctions, testFunctionName2},
 			},
-			deleteArgs: pathTreeFunctionArgs{testPathWithMultipleFunctions, testFunctionName1},
+			deleteArgs: safeTrieFunctionArgs{testPathWithMultipleFunctions, testFunctionName1},
 			getFunctionAfterDeleteArgs: []getFunctionAfterDeleteArgs{
 				{
 					path:           testPathWithMultipleFunctions,
@@ -338,10 +338,10 @@ func (suite *PathTreeTest) TestPathTreeDelete() {
 			},
 		}, {
 			name: "delete function that does not exist in the path",
-			initialState: []pathTreeFunctionArgs{
+			initialState: []safeTrieFunctionArgs{
 				{testPath1, testFunctionName1},
 			},
-			deleteArgs: pathTreeFunctionArgs{testPath1, testFunctionName2},
+			deleteArgs: safeTrieFunctionArgs{testPath1, testFunctionName2},
 			getFunctionAfterDeleteArgs: []getFunctionAfterDeleteArgs{
 				{
 					path:           testPath1,
@@ -352,10 +352,10 @@ func (suite *PathTreeTest) TestPathTreeDelete() {
 			errorMessage: "",
 		}, {
 			name: "delete not exist path",
-			initialState: []pathTreeFunctionArgs{
+			initialState: []safeTrieFunctionArgs{
 				{testPath1, testFunctionName1},
 			},
-			deleteArgs: pathTreeFunctionArgs{testPath2, testFunctionName2},
+			deleteArgs: safeTrieFunctionArgs{testPath2, testFunctionName2},
 			getFunctionAfterDeleteArgs: []getFunctionAfterDeleteArgs{
 				{
 					path:           testPath1,
@@ -364,11 +364,11 @@ func (suite *PathTreeTest) TestPathTreeDelete() {
 			},
 		}, {
 			name: "delete path with suffix that does not exist",
-			initialState: []pathTreeFunctionArgs{
+			initialState: []safeTrieFunctionArgs{
 				{testPath1, testFunctionName1},
 				{testPath2, testFunctionName2},
 			},
-			deleteArgs: pathTreeFunctionArgs{testPath1 + "/path/suffix", testFunctionName1},
+			deleteArgs: safeTrieFunctionArgs{testPath1 + "/path/suffix", testFunctionName1},
 			getFunctionAfterDeleteArgs: []getFunctionAfterDeleteArgs{
 				{
 					path:           testPath1,
@@ -383,7 +383,7 @@ func (suite *PathTreeTest) TestPathTreeDelete() {
 		suite.Run(testCase.name, func() {
 			suite.SetupSubTest(testCase.initialState)
 
-			err := suite.pathTree.DeleteFunctionName(testCase.deleteArgs.path, testCase.deleteArgs.function)
+			err := suite.safeTrie.DeleteFunctionName(testCase.deleteArgs.path, testCase.deleteArgs.function)
 			if testCase.shouldFail {
 				suite.Require().Error(err)
 				suite.Require().Contains(err.Error(), testCase.errorMessage)
@@ -393,7 +393,7 @@ func (suite *PathTreeTest) TestPathTreeDelete() {
 
 			// After delete, check that the expected paths and functions are still there
 			for _, getAfterDeleteArgs := range testCase.getFunctionAfterDeleteArgs {
-				result, err := suite.pathTree.GetFunctionName(getAfterDeleteArgs.path)
+				result, err := suite.safeTrie.GetFunctionName(getAfterDeleteArgs.path)
 				if getAfterDeleteArgs.shouldFail {
 					suite.Require().Error(err)
 					suite.Require().Contains(err.Error(), getAfterDeleteArgs.errorMessage)
@@ -406,12 +406,12 @@ func (suite *PathTreeTest) TestPathTreeDelete() {
 	}
 }
 
-// --- PathTreeTest suite methods ---
+// --- SafeTrieTest suite methods ---
 
 // pathTreeToMap converts a PathTrie into a map[string][]string
-func (suite *PathTreeTest) pathTreeToMap(pt *PathTree) (map[string][]string, error) {
+func (suite *SafeTrieTest) pathTreeToMap(st *SafeTrie) (map[string][]string, error) {
 	resultMap := make(map[string][]string)
-	err := pt.t.Walk(func(key string, value interface{}) error {
+	err := st.t.Walk(func(key string, value interface{}) error {
 		// The Walk function iterates over all nodes.
 		// Only store key-value pairs where a non-nil value has been explicitly 'Put'.
 		// If a node exists as an internal prefix (e.g., "/a" for "/a/b"), its 'value' will be nil.
@@ -431,17 +431,17 @@ func (suite *PathTreeTest) pathTreeToMap(pt *PathTree) (map[string][]string, err
 	return resultMap, nil
 }
 
-func (suite *PathTreeTest) generateLotsOfPathsAndFunctions(num int) []pathTreeFunctionArgs {
-	args := make([]pathTreeFunctionArgs, num)
+func (suite *SafeTrieTest) generateLotsOfPathsAndFunctions(num int) []safeTrieFunctionArgs {
+	args := make([]safeTrieFunctionArgs, num)
 	for i := 0; i < num; i++ {
 		path := fmt.Sprintf("/path/to/function/%d", i)
 		function := fmt.Sprintf("function-%d", i)
-		args[i] = pathTreeFunctionArgs{path: path, function: function}
+		args[i] = safeTrieFunctionArgs{path: path, function: function}
 	}
 	return args
 }
 
-func (suite *PathTreeTest) generateExpectedResultMap(num int) map[string][]string {
+func (suite *SafeTrieTest) generateExpectedResultMap(num int) map[string][]string {
 	expectedResult := make(map[string][]string)
 	args := suite.generateLotsOfPathsAndFunctions(num)
 	for i := 0; i < num; i++ {
@@ -450,6 +450,6 @@ func (suite *PathTreeTest) generateExpectedResultMap(num int) map[string][]strin
 	return expectedResult
 }
 
-func TestPathTree(t *testing.T) {
-	suite.Run(t, new(PathTreeTest))
+func TestSafeTrie(t *testing.T) {
+	suite.Run(t, new(SafeTrieTest))
 }

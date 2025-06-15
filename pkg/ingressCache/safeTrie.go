@@ -4,21 +4,26 @@ import (
 	"fmt"
 	"github.com/dghubble/trie"
 	"slices"
+	"sync"
 
 	"github.com/nuclio/errors"
 )
 
-type PathTree struct {
-	t *trie.PathTrie
+type SafeTrie struct {
+	t       *trie.PathTrie
+	rwMutex sync.RWMutex
 }
 
-// NewPathTree creates a new PathTree instance
-func NewPathTree() *PathTree {
-	return &PathTree{trie.NewPathTrie()}
+// NewSafeTrie creates a new SafeTrie instance
+func NewSafeTrie() *SafeTrie {
+	return &SafeTrie{
+		t:       trie.NewPathTrie(),
+		rwMutex: sync.RWMutex{},
+	}
 }
 
 // SetFunctionName sets a function for a given path. If the path does not exist, it creates it
-func (p *PathTree) SetFunctionName(path string, function string) error {
+func (st *SafeTrie) SetFunctionName(path string, function string) error {
 	if path == "" {
 		return errors.New("path is empty")
 	}
@@ -27,10 +32,13 @@ func (p *PathTree) SetFunctionName(path string, function string) error {
 		return errors.New("function is empty")
 	}
 
+	st.rwMutex.Lock()
+	defer st.rwMutex.Unlock()
+
 	// get the exact path value in order to avoid creating a new path if it already exists
-	pathValue := p.t.Get(path)
+	pathValue := st.t.Get(path)
 	if pathValue == nil {
-		p.t.Put(path, []string{function})
+		st.t.Put(path, []string{function})
 		return nil
 	}
 
@@ -40,18 +48,22 @@ func (p *PathTree) SetFunctionName(path string, function string) error {
 	}
 
 	if slices.Contains(pathFunctionNames, function) {
+		// If the function already exists at this path, skip adding it to prevent duplicates
 		return nil
 	}
 
 	pathFunctionNames = append(pathFunctionNames, function)
-	p.t.Put(path, pathFunctionNames)
+	st.t.Put(path, pathFunctionNames)
 
 	return nil
 }
 
 // DeleteFunctionName removes a function from a path and also deletes the path if the function is the only one associated with that path
-func (p *PathTree) DeleteFunctionName(path string, function string) error {
-	pathValue := p.t.Get(path)
+func (st *SafeTrie) DeleteFunctionName(path string, function string) error {
+	st.rwMutex.Lock()
+	defer st.rwMutex.Unlock()
+
+	pathValue := st.t.Get(path)
 	if pathValue == nil {
 		// If pathValue is nil, the path does not exist, so nothing to delete
 		return nil
@@ -65,7 +77,7 @@ func (p *PathTree) DeleteFunctionName(path string, function string) error {
 	// If the function is the only value, delete the path
 	if len(pathFunctionNames) == 1 {
 		if pathFunctionNames[0] == function {
-			p.t.Delete(path)
+			st.t.Delete(path)
 			return nil
 		}
 		return errors.New(fmt.Sprintf("the function-name doesn't exists in path, skipping delete. function-name: %s, path: %s", function, path))
@@ -73,18 +85,21 @@ func (p *PathTree) DeleteFunctionName(path string, function string) error {
 
 	// TODO - will be removed once moving into efficient pathFunctionNames implementation (i.e. not using slices)
 	pathFunctionNames = excludeElemFromSlice(pathFunctionNames, function)
-	p.t.Put(path, pathFunctionNames)
+	st.t.Put(path, pathFunctionNames)
 	return nil
 }
 
 // GetFunctionName retrieve the closest prefix matching the path and returns the associated functions
-func (p *PathTree) GetFunctionName(path string) ([]string, error) {
+func (st *SafeTrie) GetFunctionName(path string) ([]string, error) {
 	var walkPathResult interface{}
 	if path == "" {
 		return nil, errors.New("path is empty")
 	}
 
-	if err := p.t.WalkPath(path, func(_ string, value interface{}) error {
+	st.rwMutex.RLock()
+	defer st.rwMutex.RUnlock()
+
+	if err := st.t.WalkPath(path, func(_ string, value interface{}) error {
 		if value != nil {
 			walkPathResult = value
 		}
