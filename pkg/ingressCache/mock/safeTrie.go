@@ -1,0 +1,93 @@
+/*
+Copyright 2019 Iguazio Systems Ltd.
+
+Licensed under the Apache License, Version 2.0 (the "License") with
+an addition restriction as set forth herein. You may not use this
+file except in compliance with the License. You may obtain a copy of
+the License at http://www.apache.org/licenses/LICENSE-2.0.
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+implied. See the License for the specific language governing
+permissions and limitations under the License.
+
+In addition, you may not use the software for any purposes that are
+illegal under applicable law, and the grant of the foregoing license
+under the Apache 2.0 license is conditioned upon your compliance with
+such restriction.
+*/
+
+package mock
+
+import (
+	"github.com/stretchr/testify/mock"
+	"testing"
+)
+
+// MockSafeTrie is a mock type for the IngressHostsTree type
+type MockSafeTrie struct {
+	mock.Mock
+}
+
+// NewMockSafeTrie creates a new instance of MockSafeTrie
+func NewMockSafeTrie(t *testing.T) *MockSafeTrie {
+	m := new(MockSafeTrie)
+
+	t.Cleanup(func() {
+		m.AssertExpectations(t)
+	})
+
+	return m
+}
+
+func (_m *MockSafeTrie) DeleteFunctionName(path string, function string) error {
+	ret := _m.Called(path, function)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string) error); ok {
+		r0 = rf(path, function)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+func (_m *MockSafeTrie) GetFunctionName(path string) ([]string, error) {
+	ret := _m.Called(path)
+
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string) ([]string, error)); ok {
+		return rf(path)
+	}
+	if rf, ok := ret.Get(0).(func(string) []string); ok {
+		r0 = rf(path)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(path)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+func (_m *MockSafeTrie) SetFunctionName(path string, function string) error {
+	ret := _m.Called(path, function)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string) error); ok {
+		r0 = rf(path, function)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
