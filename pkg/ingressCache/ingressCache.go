@@ -21,29 +21,29 @@ type IngressHostCache interface {
 }
 
 type IngressCache struct {
-	m      *sync.Map
-	logger logger.Logger
+	syncMap *sync.Map
+	logger  logger.Logger
 }
 
 func NewIngressCache(logger logger.Logger) *IngressCache {
 	return &IngressCache{
-		m:      &sync.Map{},
-		logger: logger,
+		syncMap: &sync.Map{},
+		logger:  logger,
 	}
 }
 
-func (c *IngressCache) Set(host, path, function string) error {
-	urlTree, exists := c.m.Load(host)
+func (ic *IngressCache) Set(host, path, function string) error {
+	urlTree, exists := ic.syncMap.Load(host)
 	if !exists {
 		urlTree = NewSafeTrie()
-		c.m.Store(host, urlTree)
+		ic.syncMap.Store(host, urlTree)
 	}
 
 	ingressHostsTree, ok := urlTree.(IngressHostsTree)
 	if !ok {
 		// remove the host from the cache when it's a new entry
 		if !exists {
-			c.m.Delete(host)
+			ic.syncMap.Delete(host)
 		}
 		return errors.Errorf("cache set failed: invalid path tree value: got: %t", urlTree)
 	}
@@ -51,17 +51,17 @@ func (c *IngressCache) Set(host, path, function string) error {
 	if err := ingressHostsTree.SetFunctionName(path, function); err != nil {
 		// remove the host from the cache when it's a new entry
 		if !exists {
-			c.m.Delete(host)
+			ic.syncMap.Delete(host)
 		}
 		return errors.Wrap(err, "cache set failed")
 	}
 	return nil
 }
 
-func (c *IngressCache) Delete(host, path, function string) error {
-	urlTree, exists := c.m.Load(host)
+func (ic *IngressCache) Delete(host, path, function string) error {
+	urlTree, exists := ic.syncMap.Load(host)
 	if !exists {
-		c.logger.Debug("cache delete: host not found")
+		ic.logger.Debug("cache delete: host not found")
 		return nil
 	}
 
@@ -76,16 +76,16 @@ func (c *IngressCache) Delete(host, path, function string) error {
 
 	if ingressHostsTree.IsEmpty() {
 		// If the ingressHostsTree is empty after deletion, remove the host from the cache
-		c.logger.DebugWith("cache delete: host removed as it is empty",
+		ic.logger.DebugWith("cache delete: host removed as it is empty",
 			"host", host)
-		c.m.Delete(host)
+		ic.syncMap.Delete(host)
 	}
 
 	return nil
 }
 
-func (c *IngressCache) Get(host, path string) ([]string, error) {
-	urlTree, exists := c.m.Load(host)
+func (ic *IngressCache) Get(host, path string) ([]string, error) {
+	urlTree, exists := ic.syncMap.Load(host)
 	if !exists {
 		return nil, errors.New("cache get failed: host does not exist")
 	}

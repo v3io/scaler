@@ -433,7 +433,7 @@ func (suite *SafeTrieTest) TestPathTreeIsEmpty() {
 // pathTreeToMap converts a PathTrie into a map[string][]string
 func (suite *SafeTrieTest) pathTreeToMap(st *SafeTrie) (map[string][]string, error) {
 	resultMap := make(map[string][]string)
-	err := st.t.Walk(func(key string, value interface{}) error {
+	err := st.pathTrie.Walk(func(key string, value interface{}) error {
 		// The Walk function iterates over all nodes.
 		// Only store key-value pairs where a non-nil value has been explicitly 'Put'.
 		// If a node exists as an internal prefix (e.g., "/a" for "/a/b"), its 'value' will be nil.

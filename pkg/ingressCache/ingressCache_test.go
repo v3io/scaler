@@ -46,7 +46,7 @@ func (suite *IngressCacheTest) SetupSubTest(testHost string, testMocks mockFunct
 
 	if m := testMocks(); m != nil {
 		// mock==nil is used to check for non-existing host
-		suite.ingressCache.m.Store(testHost, m)
+		suite.ingressCache.syncMap.Store(testHost, m)
 	}
 }
 

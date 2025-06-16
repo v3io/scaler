@@ -9,15 +9,15 @@ import (
 )
 
 type SafeTrie struct {
-	t       *trie.PathTrie
-	rwMutex sync.RWMutex
+	pathTrie *trie.PathTrie
+	rwMutex  sync.RWMutex
 }
 
 // NewSafeTrie creates a new SafeTrie instance
 func NewSafeTrie() *SafeTrie {
 	return &SafeTrie{
-		t:       trie.NewPathTrie(),
-		rwMutex: sync.RWMutex{},
+		pathTrie: trie.NewPathTrie(),
+		rwMutex:  sync.RWMutex{},
 	}
 }
 
@@ -35,9 +35,9 @@ func (st *SafeTrie) SetFunctionName(path string, function string) error {
 	defer st.rwMutex.Unlock()
 
 	// get the exact path value in order to avoid creating a new path if it already exists
-	pathValue := st.t.Get(path)
+	pathValue := st.pathTrie.Get(path)
 	if pathValue == nil {
-		st.t.Put(path, []string{function})
+		st.pathTrie.Put(path, []string{function})
 		return nil
 	}
 
@@ -52,7 +52,7 @@ func (st *SafeTrie) SetFunctionName(path string, function string) error {
 	}
 
 	pathFunctionNames = append(pathFunctionNames, function)
-	st.t.Put(path, pathFunctionNames)
+	st.pathTrie.Put(path, pathFunctionNames)
 
 	return nil
 }
@@ -62,7 +62,7 @@ func (st *SafeTrie) DeleteFunctionName(path string, function string) error {
 	st.rwMutex.Lock()
 	defer st.rwMutex.Unlock()
 
-	pathValue := st.t.Get(path)
+	pathValue := st.pathTrie.Get(path)
 	if pathValue == nil {
 		// If pathValue is nil, the path does not exist, so nothing to delete
 		return nil
@@ -76,14 +76,14 @@ func (st *SafeTrie) DeleteFunctionName(path string, function string) error {
 	// If the function to delete matches the current function name and it's the only value, delete the path
 	if len(pathFunctionNames) == 1 {
 		if pathFunctionNames[0] == function {
-			st.t.Delete(path)
+			st.pathTrie.Delete(path)
 		}
 		return nil
 	}
 
 	// TODO - will be removed once moving into efficient pathFunctionNames implementation (i.e. not using slices)
 	pathFunctionNames = excludeElemFromSlice(pathFunctionNames, function)
-	st.t.Put(path, pathFunctionNames)
+	st.pathTrie.Put(path, pathFunctionNames)
 	return nil
 }
 
@@ -97,7 +97,7 @@ func (st *SafeTrie) GetFunctionName(path string) ([]string, error) {
 	st.rwMutex.RLock()
 	defer st.rwMutex.RUnlock()
 
-	if err := st.t.WalkPath(path, func(_ string, value interface{}) error {
+	if err := st.pathTrie.WalkPath(path, func(_ string, value interface{}) error {
 		if value != nil {
 			walkPathResult = value
 		}
@@ -107,17 +107,17 @@ func (st *SafeTrie) GetFunctionName(path string) ([]string, error) {
 		return nil, errors.Errorf("no value found for path: %s", path)
 	}
 
-	output, ok := walkPathResult.([]string)
+	functionNames, ok := walkPathResult.([]string)
 	if !ok {
 		return nil, errors.Errorf("value is not a []string, value: %v", walkPathResult)
 	}
 
-	return output, nil
+	return functionNames, nil
 }
 
 // IsEmpty return true if the SafeTrie is empty
 func (st *SafeTrie) IsEmpty() bool {
-	walkResult := st.t.Walk(func(_ string, value interface{}) error {
+	walkResult := st.pathTrie.Walk(func(_ string, value interface{}) error {
 		if value != nil {
 			return errors.New("trie is not empty")
 		}
