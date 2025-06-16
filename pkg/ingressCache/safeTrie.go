@@ -116,6 +116,17 @@ func (st *SafeTrie) GetFunctionName(path string) ([]string, error) {
 	return output, nil
 }
 
+// IsEmpty return true if the SafeTrie is empty
+func (st *SafeTrie) IsEmpty() bool {
+	walkResult := st.t.Walk(func(_ string, value interface{}) error {
+		if value != nil {
+			return errors.New("trie is not empty")
+		}
+		return nil
+	})
+	return walkResult == nil
+}
+
 // TODO - will be removed once moving into efficient pathFunctionNames implementation (i.e. not using slices)
 func excludeElemFromSlice(slice []string, elem string) []string {
 	// 'j' is the "write" index. It tracks where the next element to keep should be placed.

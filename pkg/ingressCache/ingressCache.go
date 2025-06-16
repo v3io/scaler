@@ -11,6 +11,7 @@ type IngressHostsTree interface {
 	SetFunctionName(path string, function string) error // will overwrite existing values if exists
 	DeleteFunctionName(path string, function string) error
 	GetFunctionName(path string) ([]string, error)
+	IsEmpty() bool
 }
 
 type IngressHostCache interface {
@@ -73,8 +74,13 @@ func (c *IngressCache) Delete(host, path, function string) error {
 		return errors.Wrap(err, "cache delete failed")
 	}
 
-	//todo - need to think bout how to know if the host should be Deleted from the syncMap
-	// should extend the IngressHostsTree interface with IsEmpty method
+	if ingressHostsTree.IsEmpty() {
+		// If the ingressHostsTree is empty after deletion, remove the host from the cache
+		c.logger.DebugWith("cache delete: host removed as it is empty",
+			"host", host)
+		c.m.Delete(host)
+	}
+
 	return nil
 }
 
