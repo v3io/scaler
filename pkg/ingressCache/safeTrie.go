@@ -73,13 +73,12 @@ func (st *SafeTrie) DeleteFunctionName(path string, function string) error {
 		return errors.Errorf("path value should be []string, got %T", pathValue)
 	}
 
-	// If the function is the only value, delete the path
+	// If the function to delete matches the current function name and it's the only value, delete the path
 	if len(pathFunctionNames) == 1 {
 		if pathFunctionNames[0] == function {
 			st.t.Delete(path)
-			return nil
 		}
-		return errors.Errorf("the function-name doesn't exists in path, skipping delete. function-name: %s, path: %s", function, path)
+		return nil
 	}
 
 	// TODO - will be removed once moving into efficient pathFunctionNames implementation (i.e. not using slices)

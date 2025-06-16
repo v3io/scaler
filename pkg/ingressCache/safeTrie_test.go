@@ -288,8 +288,6 @@ func (suite *SafeTrieTest) TestPathTreeGet() {
 func (suite *SafeTrieTest) TestPathTreeDelete() {
 	testPath1 := "/path/to/function1"
 	testPath2 := testPath1 + "/nested"
-	testFunctionName1 := "test-function1"
-	testFunctionName2 := "test-function2"
 	testPathWithMultipleFunctions := "/path/to/multiple/functions"
 
 	type getFunctionAfterDeleteArgs struct { // this struct enables multiple get tests after delete
@@ -349,8 +347,6 @@ func (suite *SafeTrieTest) TestPathTreeDelete() {
 					expectedResult: []string{testFunctionName1},
 				},
 			},
-			shouldFail:   true,
-			errorMessage: "",
 		}, {
 			name: "delete not exist path",
 			initialState: []safeTrieFunctionArgs{
