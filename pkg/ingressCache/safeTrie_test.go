@@ -406,6 +406,31 @@ func (suite *SafeTrieTest) TestPathTreeDelete() {
 		})
 	}
 }
+func (suite *SafeTrieTest) TestPathTreeIsEmpty() {
+	for _, testCase := range []struct {
+		initialState   []safeTrieFunctionArgs // initial state of the path tree before delete
+		name           string
+		expectedResult bool
+	}{
+		{
+			name:           "is empty with empty trie",
+			expectedResult: true,
+		}, {
+			name:           "is empty with not empty trie",
+			expectedResult: false,
+			initialState: []safeTrieFunctionArgs{
+				{testPath, testFunctionName1},
+			},
+		},
+	} {
+		suite.Run(testCase.name, func() {
+			suite.SetupSubTest(testCase.initialState)
+
+			result := suite.safeTrie.IsEmpty()
+			suite.Require().Equal(testCase.expectedResult, result)
+		})
+	}
+}
 
 // --- SafeTrieTest suite methods ---
 

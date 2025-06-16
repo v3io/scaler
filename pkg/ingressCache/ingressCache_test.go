@@ -5,6 +5,7 @@ import (
 
 	"github.com/v3io/scaler/pkg/ingressCache/mock"
 
+	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"
 	nucliozap "github.com/nuclio/zap"
 	"github.com/stretchr/testify/suite"
@@ -151,12 +152,20 @@ func (suite *IngressCacheTest) TestSet() {
 }
 
 func (suite *IngressCacheTest) TestDelete() {
+	type getFunctionAfterDeleteArgs struct { // this struct enables multiple get tests after delete
+		args           testIngressCacheArgs
+		expectedResult []string
+		shouldFail     bool
+		errorMessage   string
+	}
+
 	for _, testCase := range []struct {
-		name         string
-		args         testIngressCacheArgs
-		shouldFail   bool
-		errorMessage string
-		testMocks    mockFunction
+		name               string
+		args               testIngressCacheArgs
+		shouldFail         bool
+		errorMessage       string
+		testMocks          mockFunction
+		getAfterDeleteArgs []getFunctionAfterDeleteArgs
 	}{
 		{
 			name: "Delete not existed host",
@@ -165,12 +174,54 @@ func (suite *IngressCacheTest) TestDelete() {
 				return nil
 			}, // nil is used to check for non-existing host
 		}, {
-			name: "Delete existed host and path",
+			name: "Delete last function in host, validate host deletion",
 			args: testIngressCacheArgs{testHost, testPath, testFunctionName2},
 			testMocks: func() *mock.SafeTrie {
 				m := &mock.SafeTrie{}
 				m.On("DeleteFunctionName", testPath, testFunctionName2).Return(nil).Once()
+				m.On("IsEmpty").Return(true).Once()
 				return m
+			},
+			getAfterDeleteArgs: []getFunctionAfterDeleteArgs{
+				{
+					args:           testIngressCacheArgs{testHost, testPath, testFunctionName1},
+					expectedResult: nil,
+					shouldFail:     true,
+					errorMessage:   "host does not exist",
+				},
+			},
+		}, {
+			name: "Fail to delete and validate host wasn't deleted",
+			args: testIngressCacheArgs{testHost, testPath, testFunctionName2},
+			testMocks: func() *mock.SafeTrie {
+				m := &mock.SafeTrie{}
+				m.On("DeleteFunctionName", testPath, testFunctionName2).Return(errors.New("mock error")).Once()
+				m.On("GetFunctionName", testPath).Return([]string{testFunctionName2}, nil).Once()
+				return m
+			},
+			getAfterDeleteArgs: []getFunctionAfterDeleteArgs{
+				{
+					args:           testIngressCacheArgs{testHost, testPath, testFunctionName2},
+					expectedResult: []string{testFunctionName2},
+				},
+			},
+			shouldFail:   true,
+			errorMessage: "cache delete failed",
+		}, {
+			name: "Delete not last function in path and validate host wasn't deleted",
+			args: testIngressCacheArgs{testHost, testPath, testFunctionName2},
+			testMocks: func() *mock.SafeTrie {
+				m := &mock.SafeTrie{}
+				m.On("DeleteFunctionName", testPath, testFunctionName2).Return(nil).Once()
+				m.On("IsEmpty").Return(false).Once()
+				m.On("GetFunctionName", testPath).Return([]string{testFunctionName1}, nil).Once()
+				return m
+			},
+			getAfterDeleteArgs: []getFunctionAfterDeleteArgs{
+				{
+					args:           testIngressCacheArgs{testHost, testPath, testFunctionName1},
+					expectedResult: []string{testFunctionName1},
+				},
 			},
 		},
 	} {
@@ -183,6 +234,18 @@ func (suite *IngressCacheTest) TestDelete() {
 				suite.Require().Contains(err.Error(), testCase.errorMessage)
 			} else {
 				suite.Require().NoError(err)
+			}
+
+			// After delete, check that the expected paths and functions are still there
+			for _, getAfterDeleteArgs := range testCase.getAfterDeleteArgs {
+				result, err := suite.ingressCache.Get(getAfterDeleteArgs.args.host, getAfterDeleteArgs.args.path)
+				if getAfterDeleteArgs.shouldFail {
+					suite.Require().Error(err)
+					suite.Require().Contains(err.Error(), getAfterDeleteArgs.errorMessage)
+				} else {
+					suite.Require().NoError(err)
+					suite.Require().Equal(getAfterDeleteArgs.expectedResult, result)
+				}
 			}
 		})
 	}
