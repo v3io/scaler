@@ -27,19 +27,6 @@ import (
 	"github.com/nuclio/logger"
 )
 
-type IngressHostsTree interface {
-	SetFunctionName(path string, function string) error // will overwrite existing values if exists
-	DeleteFunctionName(path string, function string) error
-	GetFunctionName(path string) ([]string, error)
-	IsEmpty() bool
-}
-
-type IngressHostCache interface {
-	Set(host string, path string, function string) error // will overwrite existing values if exists
-	Delete(host string, path string, function string) error
-	Get(host string, path string) ([]string, error)
-}
-
 type IngressCache struct {
 	syncMap *sync.Map
 	logger  logger.Logger
@@ -115,7 +102,7 @@ func (ic *IngressCache) Get(host, path string) ([]string, error) {
 		return nil, errors.Errorf("cache get failed: invalid path tree value: got: %t", urlTree)
 	}
 
-	result, err := ingressHostsTree.GetFunctionName(path)
+	result, err := ingressHostsTree.GetFunctionNames(path)
 	if err != nil {
 		return nil, errors.Wrap(err, "cache get failed")
 	}

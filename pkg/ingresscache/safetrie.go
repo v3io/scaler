@@ -107,8 +107,8 @@ func (st *SafeTrie) DeleteFunctionName(path string, function string) error {
 	return nil
 }
 
-// GetFunctionName retrieve the closest prefix matching the path and returns the associated functions
-func (st *SafeTrie) GetFunctionName(path string) ([]string, error) {
+// GetFunctionNames retrieve the closest prefix matching the path and returns the associated functions
+func (st *SafeTrie) GetFunctionNames(path string) ([]string, error) {
 	var walkPathResult interface{}
 	if path == "" {
 		return nil, errors.New("path is empty")

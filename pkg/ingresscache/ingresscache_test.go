@@ -23,7 +23,7 @@ package ingresscache
 import (
 	"testing"
 
-	"github.com/v3io/scaler/pkg/ingressCache/mock"
+	"github.com/v3io/scaler/pkg/ingresscache/mock"
 
 	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"
@@ -85,7 +85,7 @@ func (suite *IngressCacheTest) TestGet() {
 			expectedResult: []string{testFunctionName1, testFunctionName2},
 			testMocks: func() *mock.SafeTrie {
 				m := &mock.SafeTrie{}
-				m.On("GetFunctionName", testPath).Return([]string{testFunctionName1, testFunctionName2}, nil)
+				m.On("GetFunctionNames", testPath).Return([]string{testFunctionName1, testFunctionName2}, nil)
 				return m
 			},
 		}, {
@@ -94,7 +94,7 @@ func (suite *IngressCacheTest) TestGet() {
 			expectedResult: []string{testFunctionName1},
 			testMocks: func() *mock.SafeTrie {
 				m := &mock.SafeTrie{}
-				m.On("GetFunctionName", testPath).Return([]string{testFunctionName1}, nil)
+				m.On("GetFunctionNames", testPath).Return([]string{testFunctionName1}, nil)
 				return m
 			},
 		}, {
@@ -143,7 +143,7 @@ func (suite *IngressCacheTest) TestSet() {
 			args: testIngressCacheArgs{testHost, testPath, testFunctionName2},
 			testMocks: func() *mock.SafeTrie {
 				m := &mock.SafeTrie{}
-				m.On("GetFunctionName", testPath).Return([]string{testFunctionName1}, nil).Once()
+				m.On("GetFunctionNames", testPath).Return([]string{testFunctionName1}, nil).Once()
 				m.On("SetFunctionName", testPath, testFunctionName2).Return(nil).Once()
 				return m
 			},
@@ -216,7 +216,7 @@ func (suite *IngressCacheTest) TestDelete() {
 			testMocks: func() *mock.SafeTrie {
 				m := &mock.SafeTrie{}
 				m.On("DeleteFunctionName", testPath, testFunctionName2).Return(errors.New("mock error")).Once()
-				m.On("GetFunctionName", testPath).Return([]string{testFunctionName2}, nil).Once()
+				m.On("GetFunctionNames", testPath).Return([]string{testFunctionName2}, nil).Once()
 				return m
 			},
 			getAfterDeleteArgs: []getFunctionAfterDeleteArgs{
@@ -234,7 +234,7 @@ func (suite *IngressCacheTest) TestDelete() {
 				m := &mock.SafeTrie{}
 				m.On("DeleteFunctionName", testPath, testFunctionName2).Return(nil).Once()
 				m.On("IsEmpty").Return(false).Once()
-				m.On("GetFunctionName", testPath).Return([]string{testFunctionName1}, nil).Once()
+				m.On("GetFunctionNames", testPath).Return([]string{testFunctionName1}, nil).Once()
 				return m
 			},
 			getAfterDeleteArgs: []getFunctionAfterDeleteArgs{

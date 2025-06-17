@@ -274,7 +274,7 @@ func (suite *SafeTrieTest) TestPathTreeGet() {
 			{testPathWithMultipleFunctions, testFunctionName2},
 		})
 		suite.Run(testCase.name, func() {
-			result, err := suite.safeTrie.GetFunctionName(testCase.arg)
+			result, err := suite.safeTrie.GetFunctionNames(testCase.arg)
 			if testCase.shouldFail {
 				suite.Require().Error(err)
 				suite.Require().Contains(err.Error(), testCase.errorMessage)
@@ -390,7 +390,7 @@ func (suite *SafeTrieTest) TestPathTreeDelete() {
 
 			// After delete, check that the expected paths and functions are still there
 			for _, getAfterDeleteArgs := range testCase.getFunctionAfterDeleteArgs {
-				result, err := suite.safeTrie.GetFunctionName(getAfterDeleteArgs.path)
+				result, err := suite.safeTrie.GetFunctionNames(getAfterDeleteArgs.path)
 				if getAfterDeleteArgs.shouldFail {
 					suite.Require().Error(err)
 					suite.Require().Contains(err.Error(), getAfterDeleteArgs.errorMessage)
