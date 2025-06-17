@@ -43,24 +43,19 @@ func (ic *IngressCache) Set(host, path, function string) error {
 	urlTree, exists := ic.syncMap.Load(host)
 	if !exists {
 		urlTree = NewSafeTrie()
-		ic.syncMap.Store(host, urlTree)
 	}
 
 	ingressHostsTree, ok := urlTree.(IngressHostsTree)
 	if !ok {
-		// remove the host from the cache when it's a new entry
-		if !exists {
-			ic.syncMap.Delete(host)
-		}
 		return errors.Errorf("cache set failed: invalid path tree value: got: %t", urlTree)
 	}
 
 	if err := ingressHostsTree.SetFunctionName(path, function); err != nil {
-		// remove the host from the cache when it's a new entry
-		if !exists {
-			ic.syncMap.Delete(host)
-		}
 		return errors.Wrap(err, "cache set failed")
+	}
+
+	if !exists {
+		ic.syncMap.Store(host, urlTree)
 	}
 	return nil
 }

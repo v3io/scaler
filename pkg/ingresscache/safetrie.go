@@ -148,21 +148,23 @@ func (st *SafeTrie) IsEmpty() bool {
 
 // TODO - will be removed once moving into efficient pathFunctionNames implementation (i.e. not using slices)
 func excludeElemFromSlice(slice []string, elem string) []string {
-	// 'j' is the "write" index. It tracks where the next element to keep should be placed.
-	j := 0
-
-	// Iterate through the original slice using 'i' as the "read" index.
-	for i := 0; i < len(slice); i++ {
-		// If the current element (s[i]) is NOT the one we want to remove,
-		// copy it to the current "write" position (s[j]).
-		if slice[i] != elem {
-			slice[j] = slice[i]
-			j++ // Increment the write index, preparing for the next element to keep.
+	// Assuming len(slice) <= 2 based on the ingress validations of: https://github.com/nuclio/nuclio/pkg/platform/kube/platform.go
+	switch len(slice) {
+	case 1:
+		if slice[0] == elem {
+			return []string{}
 		}
+		return slice
+	case 2:
+		if slice[0] == elem {
+			return []string{slice[1]}
+		}
+		if slice[1] == elem {
+			return []string{slice[0]}
+		}
+		// elem not found, return original slice
+		return slice
+	default:
+		return slice
 	}
-
-	slice[j] = "" // This helps the garbage collector reclaim memory for the string data
-
-	// Return a re-sliced version of 's' up to the new length 'j'.
-	return slice[:j]
 }
