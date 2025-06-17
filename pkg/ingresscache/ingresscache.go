@@ -51,7 +51,7 @@ func (ic *IngressCache) Set(host, path, function string) error {
 	}
 
 	if err := ingressHostsTree.SetFunctionName(path, function); err != nil {
-		return errors.Wrap(err, "cache set failed")
+		return errors.Wrap(err, "failed to set function name in the ingress host tree")
 	}
 
 	if !exists {
@@ -73,14 +73,14 @@ func (ic *IngressCache) Delete(host, path, function string) error {
 	}
 
 	if err := ingressHostsTree.DeleteFunctionName(path, function); err != nil {
-		return errors.Wrap(err, "cache delete failed")
+		return errors.Wrap(err, "failed to delete function name from the ingress host tree")
 	}
 
 	if ingressHostsTree.IsEmpty() {
 		// If the ingressHostsTree is empty after deletion, remove the host from the cache
+		ic.syncMap.Delete(host)
 		ic.logger.DebugWith("cache delete: host removed as it is empty",
 			"host", host)
-		ic.syncMap.Delete(host)
 	}
 
 	return nil
@@ -99,7 +99,7 @@ func (ic *IngressCache) Get(host, path string) ([]string, error) {
 
 	result, err := ingressHostsTree.GetFunctionNames(path)
 	if err != nil {
-		return nil, errors.Wrap(err, "cache get failed")
+		return nil, errors.Wrap(err, "failed to get the function name from the ingress host tree")
 	}
 
 	return result, nil

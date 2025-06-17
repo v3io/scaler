@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type SafeTrieTest struct {
+type SafeTrieTestSuite struct {
 	suite.Suite
 	safeTrie *SafeTrie
 }
@@ -36,11 +36,11 @@ type safeTrieFunctionArgs struct {
 	function string
 }
 
-func (suite *SafeTrieTest) SetupTest() {
+func (suite *SafeTrieTestSuite) SetupTest() {
 	suite.safeTrie = NewSafeTrie()
 }
 
-func (suite *SafeTrieTest) SetupSubTest(safeTrieState []safeTrieFunctionArgs) {
+func (suite *SafeTrieTestSuite) SetupSubTest(safeTrieState []safeTrieFunctionArgs) {
 	suite.safeTrie = NewSafeTrie()
 
 	// set path tree with the provided required state
@@ -50,7 +50,7 @@ func (suite *SafeTrieTest) SetupSubTest(safeTrieState []safeTrieFunctionArgs) {
 	}
 }
 
-func (suite *SafeTrieTest) TestPathTreeSet() {
+func (suite *SafeTrieTestSuite) TestPathTreeSet() {
 	testFunctionName := "test-function"
 	testFunctionName2 := "test-function-2"
 	testFunctionPath := "/path/to/function"
@@ -207,7 +207,7 @@ func (suite *SafeTrieTest) TestPathTreeSet() {
 		})
 	}
 }
-func (suite *SafeTrieTest) TestPathTreeGet() {
+func (suite *SafeTrieTestSuite) TestPathTreeGet() {
 	testPathRoot := "/"
 	testPath1 := "/path/to/function1"
 	testPath2 := testPath1 + "/nested"
@@ -285,7 +285,7 @@ func (suite *SafeTrieTest) TestPathTreeGet() {
 		})
 	}
 }
-func (suite *SafeTrieTest) TestPathTreeDelete() {
+func (suite *SafeTrieTestSuite) TestPathTreeDelete() {
 	testPath1 := "/path/to/function1"
 	testPath2 := testPath1 + "/nested"
 	testPathWithMultipleFunctions := "/path/to/multiple/functions"
@@ -402,7 +402,7 @@ func (suite *SafeTrieTest) TestPathTreeDelete() {
 		})
 	}
 }
-func (suite *SafeTrieTest) TestPathTreeIsEmpty() {
+func (suite *SafeTrieTestSuite) TestPathTreeIsEmpty() {
 	for _, testCase := range []struct {
 		initialState   []safeTrieFunctionArgs // initial state of the path tree before delete
 		name           string
@@ -428,10 +428,10 @@ func (suite *SafeTrieTest) TestPathTreeIsEmpty() {
 	}
 }
 
-// --- SafeTrieTest suite methods ---
+// --- SafeTrieTestSuite suite methods ---
 
 // pathTreeToMap converts a PathTrie into a map[string][]string
-func (suite *SafeTrieTest) pathTreeToMap(st *SafeTrie) (map[string][]string, error) {
+func (suite *SafeTrieTestSuite) pathTreeToMap(st *SafeTrie) (map[string][]string, error) {
 	resultMap := make(map[string][]string)
 	err := st.pathTrie.Walk(func(key string, value interface{}) error {
 		// The Walk function iterates over all nodes.
@@ -453,7 +453,7 @@ func (suite *SafeTrieTest) pathTreeToMap(st *SafeTrie) (map[string][]string, err
 	return resultMap, nil
 }
 
-func (suite *SafeTrieTest) generateLotsOfPathsAndFunctions(num int) []safeTrieFunctionArgs {
+func (suite *SafeTrieTestSuite) generateLotsOfPathsAndFunctions(num int) []safeTrieFunctionArgs {
 	args := make([]safeTrieFunctionArgs, num)
 	for i := 0; i < num; i++ {
 		path := fmt.Sprintf("/path/to/function/%d", i)
@@ -463,7 +463,7 @@ func (suite *SafeTrieTest) generateLotsOfPathsAndFunctions(num int) []safeTrieFu
 	return args
 }
 
-func (suite *SafeTrieTest) generateExpectedResultMap(num int) map[string][]string {
+func (suite *SafeTrieTestSuite) generateExpectedResultMap(num int) map[string][]string {
 	expectedResult := make(map[string][]string)
 	args := suite.generateLotsOfPathsAndFunctions(num)
 	for i := 0; i < num; i++ {
@@ -473,5 +473,5 @@ func (suite *SafeTrieTest) generateExpectedResultMap(num int) map[string][]strin
 }
 
 func TestSafeTrie(t *testing.T) {
-	suite.Run(t, new(SafeTrieTest))
+	suite.Run(t, new(SafeTrieTestSuite))
 }

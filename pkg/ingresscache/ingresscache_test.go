@@ -31,7 +31,7 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type IngressCacheTest struct {
+type IngressCacheTestSuite struct {
 	suite.Suite
 	logger       logger.Logger
 	ingressCache *IngressCache
@@ -53,7 +53,7 @@ const (
 	testFunctionName2 = "testFunction2"
 )
 
-func (suite *IngressCacheTest) SetupTest() {
+func (suite *IngressCacheTestSuite) SetupTest() {
 	var err error
 
 	suite.logger, err = nucliozap.NewNuclioZapTest("test")
@@ -61,7 +61,7 @@ func (suite *IngressCacheTest) SetupTest() {
 	suite.ingressCache = NewIngressCache(suite.logger)
 }
 
-func (suite *IngressCacheTest) SetupSubTest(testHost string, testMocks mockFunction) {
+func (suite *IngressCacheTestSuite) SetupSubTest(testHost string, testMocks mockFunction) {
 	suite.ingressCache = NewIngressCache(suite.logger)
 
 	if m := testMocks(); m != nil {
@@ -70,7 +70,7 @@ func (suite *IngressCacheTest) SetupSubTest(testHost string, testMocks mockFunct
 	}
 }
 
-func (suite *IngressCacheTest) TestGet() {
+func (suite *IngressCacheTestSuite) TestGet() {
 	for _, testCase := range []struct {
 		name           string
 		args           testIngressCacheArgs
@@ -124,7 +124,7 @@ func (suite *IngressCacheTest) TestGet() {
 	}
 }
 
-func (suite *IngressCacheTest) TestSet() {
+func (suite *IngressCacheTestSuite) TestSet() {
 	for _, testCase := range []struct {
 		name         string
 		args         testIngressCacheArgs
@@ -171,7 +171,7 @@ func (suite *IngressCacheTest) TestSet() {
 	}
 }
 
-func (suite *IngressCacheTest) TestDelete() {
+func (suite *IngressCacheTestSuite) TestDelete() {
 	type getFunctionAfterDeleteArgs struct { // this struct enables multiple get tests after delete
 		args           testIngressCacheArgs
 		expectedResult []string
@@ -226,7 +226,7 @@ func (suite *IngressCacheTest) TestDelete() {
 				},
 			},
 			shouldFail:   true,
-			errorMessage: "cache delete failed",
+			errorMessage: "failed to delete function name from the ingress host tree",
 		}, {
 			name: "Delete not last function in path and validate host wasn't deleted",
 			args: testIngressCacheArgs{testHost, testPath, testFunctionName2},
@@ -272,5 +272,5 @@ func (suite *IngressCacheTest) TestDelete() {
 }
 
 func TestIngressCache(t *testing.T) {
-	suite.Run(t, new(IngressCacheTest))
+	suite.Run(t, new(IngressCacheTestSuite))
 }
