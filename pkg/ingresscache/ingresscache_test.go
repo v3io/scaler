@@ -23,18 +23,12 @@ package ingresscache
 import (
 	"testing"
 
-	"github.com/v3io/scaler/pkg/ingresscache/mock"
-
-	"github.com/nuclio/errors"
-	"github.com/nuclio/logger"
 	nucliozap "github.com/nuclio/zap"
 	"github.com/stretchr/testify/suite"
 )
 
 type IngressCacheTestSuite struct {
 	suite.Suite
-	logger       logger.Logger
-	ingressCache *IngressCache
 }
 
 type testIngressCacheArgs struct {
@@ -43,78 +37,74 @@ type testIngressCacheArgs struct {
 	function string
 }
 
-// used to mock the IngressHostsTree interface per test
-type mockFunction func() *mock.SafeTrie
-
-const (
-	testPath          = "/test/path"
-	testHost          = "example.com"
-	testFunctionName1 = "testFunction1"
-	testFunctionName2 = "testFunction2"
-)
-
-func (suite *IngressCacheTestSuite) SetupTest() {
-	var err error
-
-	suite.logger, err = nucliozap.NewNuclioZapTest("test")
-	suite.Require().NoError(err)
-	suite.ingressCache = NewIngressCache(suite.logger)
-}
-
-func (suite *IngressCacheTestSuite) SetupSubTest(testHost string, testMocks mockFunction) {
-	suite.ingressCache = NewIngressCache(suite.logger)
-
-	if m := testMocks(); m != nil {
-		// mock==nil is used to check for non-existing host
-		suite.ingressCache.syncMap.Store(testHost, m)
-	}
-}
+type ingressCacheTestInitialState testIngressCacheArgs
 
 func (suite *IngressCacheTestSuite) TestGet() {
+	suite.T().Parallel()
 	for _, testCase := range []struct {
 		name           string
+		initialState   []ingressCacheTestInitialState
 		args           testIngressCacheArgs
 		expectedResult []string
 		shouldFail     bool
 		errorMessage   string
-		testMocks      mockFunction
 	}{
 		{
 			name:           "Get two functionName",
-			args:           testIngressCacheArgs{testHost, testPath, ""},
-			expectedResult: []string{testFunctionName1, testFunctionName2},
-			testMocks: func() *mock.SafeTrie {
-				m := &mock.SafeTrie{}
-				m.On("GetFunctionNames", testPath).Return([]string{testFunctionName1, testFunctionName2}, nil)
-				return m
+			args:           testIngressCacheArgs{"example.com", "/test/path", ""},
+			expectedResult: []string{"test-function-name-1", "test-function-name-2"},
+			initialState: []ingressCacheTestInitialState{
+				{"example.com", "/test/path", "test-function-name-1"},
+				{"example.com", "/test/path", "test-function-name-2"},
 			},
 		}, {
 			name:           "Get single functionName",
-			args:           testIngressCacheArgs{testHost, testPath, ""},
-			expectedResult: []string{testFunctionName1},
-			testMocks: func() *mock.SafeTrie {
-				m := &mock.SafeTrie{}
-				m.On("GetFunctionNames", testPath).Return([]string{testFunctionName1}, nil)
-				return m
+			args:           testIngressCacheArgs{"example.com", "/test/path", ""},
+			expectedResult: []string{"test-function-name-1"},
+			initialState: []ingressCacheTestInitialState{
+				{"example.com", "/test/path", "test-function-name-1"},
 			},
 		}, {
-			name:           "Get with not existing host",
-			args:           testIngressCacheArgs{"not.exist", testPath, ""},
-			expectedResult: nil,
-			testMocks: func() *mock.SafeTrie {
-				return nil
+			name:           "Get multiple functionName",
+			args:           testIngressCacheArgs{"example.com", "/test/path", ""},
+			expectedResult: []string{"test-function-name-1", "test-function-name-2"},
+			initialState: []ingressCacheTestInitialState{
+				{"example.com", "/test/path", "test-function-name-1"},
+				{"example.com", "/test/path", "test-function-name-2"},
 			},
-			shouldFail:   true,
-			errorMessage: "host does not exist",
+		}, {
+			name:           "Get with empty cache",
+			args:           testIngressCacheArgs{"not.exist", "/test/path", ""},
+			expectedResult: nil,
+			shouldFail:     true,
+			errorMessage:   "host does not exist",
+		}, {
+			name:           "Get with not existing host",
+			args:           testIngressCacheArgs{"not.exist", "/test/path", ""},
+			expectedResult: nil,
+			shouldFail:     true,
+			errorMessage:   "host does not exist",
+			initialState: []ingressCacheTestInitialState{
+				{"example.com", "/test/path", "test-function-name-1"},
+			},
+		}, {
+			name:           "Get with not existing path",
+			args:           testIngressCacheArgs{"example.com", "/not/exists/test/path", ""},
+			expectedResult: nil,
+			shouldFail:     true,
+			errorMessage:   "failed to get the function name from the ingress host tree",
+			initialState: []ingressCacheTestInitialState{
+				{"example.com", "/test/path", "test-function-name-1"},
+			},
 		},
 	} {
 		suite.Run(testCase.name, func() {
-			suite.SetupSubTest(testCase.args.host, testCase.testMocks)
+			testIngressCache := suite.getTestIngressCache(testCase.initialState)
 
-			resultFunctionNames, err := suite.ingressCache.Get(testCase.args.host, testCase.args.path)
+			resultFunctionNames, err := testIngressCache.Get(testCase.args.host, testCase.args.path)
 			if testCase.shouldFail {
-				suite.Require().NotNil(err)
-				suite.Require().Contains(err.Error(), testCase.errorMessage)
+				suite.Require().Error(err)
+				suite.Require().ErrorContains(err, testCase.errorMessage)
 				suite.Require().Nil(resultFunctionNames)
 			} else {
 				suite.Require().NoError(err)
@@ -125,150 +115,173 @@ func (suite *IngressCacheTestSuite) TestGet() {
 }
 
 func (suite *IngressCacheTestSuite) TestSet() {
+	suite.T().Parallel()
 	for _, testCase := range []struct {
-		name         string
-		args         testIngressCacheArgs
-		shouldFail   bool
-		errorMessage string
-		testMocks    mockFunction
+		name           string
+		initialState   []ingressCacheTestInitialState
+		args           testIngressCacheArgs
+		shouldFail     bool
+		errorMessage   string
+		expectedResult map[string]map[string][]string
 	}{
 		{
 			name: "Set new host",
-			args: testIngressCacheArgs{testHost, testPath, testFunctionName1},
-			testMocks: func() *mock.SafeTrie {
-				return nil
-			}, // nil is used to check for non-existing host
+			args: testIngressCacheArgs{"example.com", "/test/path", "test-function-name-1"},
+			expectedResult: map[string]map[string][]string{
+				"example.com": {"/test/path": {"test-function-name-1"}},
+			},
 		}, {
 			name: "Set another functionName for existing host",
-			args: testIngressCacheArgs{testHost, testPath, testFunctionName2},
-			testMocks: func() *mock.SafeTrie {
-				m := &mock.SafeTrie{}
-				m.On("GetFunctionNames", testPath).Return([]string{testFunctionName1}, nil).Once()
-				m.On("SetFunctionName", testPath, testFunctionName2).Return(nil).Once()
-				return m
+			args: testIngressCacheArgs{"example.com", "/test/path", "test-function-name-2"},
+			initialState: []ingressCacheTestInitialState{
+				{"example.com", "/test/path", "test-function-name-1"},
+			},
+			expectedResult: map[string]map[string][]string{
+				"example.com": {"/test/path": {"test-function-name-1", "test-function-name-2"}},
 			},
 		}, {
 			name: "Set existing functionName for existing host and path",
-			args: testIngressCacheArgs{testHost, testPath, testFunctionName1},
-			testMocks: func() *mock.SafeTrie {
-				m := &mock.SafeTrie{}
-				m.On("SetFunctionName", testPath, testFunctionName1).Return(nil).Once()
-				return m
+			args: testIngressCacheArgs{"example.com", "/test/path", "test-function-name-1"},
+			initialState: []ingressCacheTestInitialState{
+				{"example.com", "/test/path", "test-function-name-1"},
+			},
+			expectedResult: map[string]map[string][]string{
+				"example.com": {"/test/path": {"test-function-name-1"}},
+			},
+		}, {
+			name: "Set another host and path",
+			args: testIngressCacheArgs{"google.com", "/test/path", "test-function-name-1"},
+			initialState: []ingressCacheTestInitialState{
+				{"example.com", "/test/path", "test-function-name-1"},
+			},
+			expectedResult: map[string]map[string][]string{
+				"google.com":  {"/test/path": {"test-function-name-1"}},
+				"example.com": {"/test/path": {"test-function-name-1"}},
 			},
 		},
 	} {
 		suite.Run(testCase.name, func() {
-			suite.SetupSubTest(testCase.args.host, testCase.testMocks)
+			testIngressCache := suite.getTestIngressCache(testCase.initialState)
 
-			err := suite.ingressCache.Set(testCase.args.host, testCase.args.path, testCase.args.function)
+			err := testIngressCache.Set(testCase.args.host, testCase.args.path, testCase.args.function)
 			if testCase.shouldFail {
-				suite.Require().NotNil(err)
-				suite.Require().Contains(err.Error(), testCase.errorMessage)
+				suite.Require().Error(err)
+				suite.Require().ErrorContains(err, testCase.errorMessage)
 			} else {
 				suite.Require().NoError(err)
 			}
+
+			// After delete, check that the expected result matches the IngressCache state
+			testResult := suite.flattenIngressCache(testIngressCache)
+			suite.Require().NoError(err)
+			suite.Require().Equal(testCase.expectedResult, testResult)
 		})
 	}
 }
 
 func (suite *IngressCacheTestSuite) TestDelete() {
-	type getFunctionAfterDeleteArgs struct { // this struct enables multiple get tests after delete
+	suite.T().Parallel()
+	for _, testCase := range []struct {
+		name           string
 		args           testIngressCacheArgs
-		expectedResult []string
 		shouldFail     bool
 		errorMessage   string
-	}
-
-	for _, testCase := range []struct {
-		name               string
-		args               testIngressCacheArgs
-		shouldFail         bool
-		errorMessage       string
-		testMocks          mockFunction
-		getAfterDeleteArgs []getFunctionAfterDeleteArgs
+		initialState   []ingressCacheTestInitialState
+		expectedResult map[string]map[string][]string
 	}{
 		{
+			name:           "Delete when cache is empty",
+			args:           testIngressCacheArgs{"example.com", "/test/path", "test-function-name-1"},
+			expectedResult: map[string]map[string][]string{},
+		}, {
 			name: "Delete not existed host",
-			args: testIngressCacheArgs{testHost, testPath, testFunctionName1},
-			testMocks: func() *mock.SafeTrie {
-				return nil
-			}, // nil is used to check for non-existing host
+			args: testIngressCacheArgs{"google.com", "/test/path", "test-function-name-1"},
+			initialState: []ingressCacheTestInitialState{
+				{"example.com", "/test/path", "test-function-name-1"},
+			},
+			expectedResult: map[string]map[string][]string{
+				"example.com": {"/test/path": {"test-function-name-1"}},
+			},
 		}, {
 			name: "Delete last function in host, validate host deletion",
-			args: testIngressCacheArgs{testHost, testPath, testFunctionName2},
-			testMocks: func() *mock.SafeTrie {
-				m := &mock.SafeTrie{}
-				m.On("DeleteFunctionName", testPath, testFunctionName2).Return(nil).Once()
-				m.On("IsEmpty").Return(true).Once()
-				return m
+			args: testIngressCacheArgs{"example.com", "/test/path", "test-function-name-1"},
+			initialState: []ingressCacheTestInitialState{
+				{"example.com", "/test/path", "test-function-name-1"},
+				{"google.com", "/test/path", "test-function-name-1"},
 			},
-			getAfterDeleteArgs: []getFunctionAfterDeleteArgs{
-				{
-					args:           testIngressCacheArgs{testHost, testPath, testFunctionName1},
-					expectedResult: nil,
-					shouldFail:     true,
-					errorMessage:   "host does not exist",
-				},
+			expectedResult: map[string]map[string][]string{
+				"google.com": {"/test/path": {"test-function-name-1"}},
 			},
 		}, {
-			name: "Fail to delete and validate host wasn't deleted",
-			args: testIngressCacheArgs{testHost, testPath, testFunctionName2},
-			testMocks: func() *mock.SafeTrie {
-				m := &mock.SafeTrie{}
-				m.On("DeleteFunctionName", testPath, testFunctionName2).Return(errors.New("mock error")).Once()
-				m.On("GetFunctionNames", testPath).Return([]string{testFunctionName2}, nil).Once()
-				return m
+			name: "Delete not existing url and validate host wasn't deleted",
+			args: testIngressCacheArgs{"example.com", "/not/exists/test/path", "test-function-name-2"},
+			initialState: []ingressCacheTestInitialState{
+				{"example.com", "/test/path", "test-function-name-1"},
 			},
-			getAfterDeleteArgs: []getFunctionAfterDeleteArgs{
-				{
-					args:           testIngressCacheArgs{testHost, testPath, testFunctionName2},
-					expectedResult: []string{testFunctionName2},
-				},
+			expectedResult: map[string]map[string][]string{
+				"example.com": {"/test/path": {"test-function-name-1"}},
 			},
-			shouldFail:   true,
-			errorMessage: "failed to delete function name from the ingress host tree",
 		}, {
 			name: "Delete not last function in path and validate host wasn't deleted",
-			args: testIngressCacheArgs{testHost, testPath, testFunctionName2},
-			testMocks: func() *mock.SafeTrie {
-				m := &mock.SafeTrie{}
-				m.On("DeleteFunctionName", testPath, testFunctionName2).Return(nil).Once()
-				m.On("IsEmpty").Return(false).Once()
-				m.On("GetFunctionNames", testPath).Return([]string{testFunctionName1}, nil).Once()
-				return m
+			args: testIngressCacheArgs{"example.com", "/test/path", "test-function-name-2"},
+			initialState: []ingressCacheTestInitialState{
+				{"example.com", "/test/path", "test-function-name-1"},
+				{"example.com", "/test/path", "test-function-name-2"},
 			},
-			getAfterDeleteArgs: []getFunctionAfterDeleteArgs{
-				{
-					args:           testIngressCacheArgs{testHost, testPath, testFunctionName1},
-					expectedResult: []string{testFunctionName1},
-				},
+			expectedResult: map[string]map[string][]string{
+				"example.com": {"/test/path": {"test-function-name-1"}},
 			},
 		},
 	} {
 		suite.Run(testCase.name, func() {
-			suite.SetupSubTest(testCase.args.host, testCase.testMocks)
+			testIngressCache := suite.getTestIngressCache(testCase.initialState)
 
-			err := suite.ingressCache.Delete(testCase.args.host, testCase.args.path, testCase.args.function)
+			err := testIngressCache.Delete(testCase.args.host, testCase.args.path, testCase.args.function)
 			if testCase.shouldFail {
-				suite.Require().NotNil(err)
-				suite.Require().Contains(err.Error(), testCase.errorMessage)
+				suite.Require().Error(err)
+				suite.Require().ErrorContains(err, testCase.errorMessage)
 			} else {
 				suite.Require().NoError(err)
 			}
 
-			// After delete, check that the expected paths and functions are still there
-			for _, getAfterDeleteArgs := range testCase.getAfterDeleteArgs {
-				result, err := suite.ingressCache.Get(getAfterDeleteArgs.args.host, getAfterDeleteArgs.args.path)
-				if getAfterDeleteArgs.shouldFail {
-					suite.Require().Error(err)
-					suite.Require().Contains(err.Error(), getAfterDeleteArgs.errorMessage)
-				} else {
-					suite.Require().NoError(err)
-					suite.Require().Equal(getAfterDeleteArgs.expectedResult, result)
-				}
-			}
+			// After delete, check that the expected result matches the IngressCache state
+			testResult := suite.flattenIngressCache(testIngressCache)
+			suite.Require().NoError(err)
+			suite.Require().Equal(testCase.expectedResult, testResult)
 		})
 	}
+}
+
+// --- IngressCacheTestSuite suite methods ---
+
+// getTestIngressCache creates a IngressCache instance and sets the provided initial state
+func (suite *IngressCacheTestSuite) getTestIngressCache(initialState []ingressCacheTestInitialState) *IngressCache {
+	testLogger, err := nucliozap.NewNuclioZapTest("test")
+	suite.Require().NoError(err)
+	ingressCache := NewIngressCache(testLogger)
+
+	// Set the initial state in the IngressCache
+	for _, args := range initialState {
+		err = ingressCache.Set(args.host, args.path, args.function)
+		suite.Require().NoError(err)
+	}
+
+	return ingressCache
+}
+
+// flattenIngressCache flattens the IngressCache's syncMap into a map for easier comparison in tests
+func (suite *IngressCacheTestSuite) flattenIngressCache(testIngressCache *IngressCache) map[string]map[string][]string {
+	output := make(map[string]map[string][]string)
+	testIngressCache.syncMap.Range(func(key, value interface{}) bool {
+		safeTrie, ok := value.(*SafeTrie)
+		suite.Require().True(ok)
+		flatSafeTrie, err := flattenSafeTrie(safeTrie)
+		suite.Require().NoError(err)
+		output[key.(string)] = flatSafeTrie
+		return true
+	})
+
+	return output
 }
 
 func TestIngressCache(t *testing.T) {
