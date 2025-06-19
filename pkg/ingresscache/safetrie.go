@@ -63,7 +63,7 @@ func (st *SafeTrie) SetFunctionName(path string, function string) error {
 
 	pathFunctionNames, ok := pathValue.([]string)
 	if !ok {
-		return errors.Errorf("value is not a []string, got: %T", pathValue)
+		return errors.Errorf("path value should be []string, got %T", pathValue)
 	}
 
 	if slices.Contains(pathFunctionNames, function) {
@@ -129,7 +129,7 @@ func (st *SafeTrie) GetFunctionNames(path string) ([]string, error) {
 
 	functionNames, ok := walkPathResult.([]string)
 	if !ok {
-		return nil, errors.Errorf("value is not a []string, value: %v", walkPathResult)
+		return nil, errors.Errorf("walkPathResult value should be []string, got %v", walkPathResult)
 	}
 
 	return functionNames, nil

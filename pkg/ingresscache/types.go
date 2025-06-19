@@ -23,8 +23,10 @@ package ingresscache
 type IngressHostCache interface {
 	// Set adds a new item to the cache for the given host, path and function name. Will overwrite existing values if any
 	Set(host string, path string, function string) error
+
 	// Delete removes the specified function from the cache for the given host and path. Will do nothing if host, path or function do not exist
 	Delete(host string, path string, function string) error
+
 	// Get retrieves all function names for the given host and path
 	Get(host string, path string) ([]string, error)
 }
@@ -32,10 +34,13 @@ type IngressHostCache interface {
 type IngressHostsTree interface {
 	// SetFunctionName sets a function for a given path. Will overwrite existing values if the path already exists
 	SetFunctionName(path string, function string) error
+
 	// DeleteFunctionName removes the function from the given path and deletes the deepest suffix used only by that function; does nothing if the path or function doesn't exist.
 	DeleteFunctionName(path string, function string) error
+
 	// GetFunctionNames retrieves the best matching function names for a given path based on longest prefix match
 	GetFunctionNames(path string) ([]string, error)
+
 	// IsEmpty checks if the tree is empty
 	IsEmpty() bool
 }

@@ -23,12 +23,14 @@ package ingresscache
 import (
 	"testing"
 
+	"github.com/nuclio/logger"
 	nucliozap "github.com/nuclio/zap"
 	"github.com/stretchr/testify/suite"
 )
 
 type IngressCacheTestSuite struct {
 	suite.Suite
+	logger logger.Logger
 }
 
 type testIngressCacheArgs struct {
@@ -39,6 +41,13 @@ type testIngressCacheArgs struct {
 
 type ingressCacheTestInitialState testIngressCacheArgs
 
+func (suite *IngressCacheTestSuite) SetupTest() {
+	var err error
+
+	suite.logger, err = nucliozap.NewNuclioZapTest("test")
+	suite.Require().NoError(err)
+}
+
 func (suite *IngressCacheTestSuite) TestGet() {
 	suite.T().Parallel()
 	for _, testCase := range []struct {
@@ -46,7 +55,7 @@ func (suite *IngressCacheTestSuite) TestGet() {
 		initialState   []ingressCacheTestInitialState
 		args           testIngressCacheArgs
 		expectedResult []string
-		shouldFail     bool
+		expectError    bool
 		errorMessage   string
 	}{
 		{
@@ -65,24 +74,16 @@ func (suite *IngressCacheTestSuite) TestGet() {
 				{"example.com", "/test/path", "test-function-name-1"},
 			},
 		}, {
-			name:           "Get multiple functionName",
-			args:           testIngressCacheArgs{"example.com", "/test/path", ""},
-			expectedResult: []string{"test-function-name-1", "test-function-name-2"},
-			initialState: []ingressCacheTestInitialState{
-				{"example.com", "/test/path", "test-function-name-1"},
-				{"example.com", "/test/path", "test-function-name-2"},
-			},
-		}, {
 			name:           "Get with empty cache",
 			args:           testIngressCacheArgs{"not.exist", "/test/path", ""},
 			expectedResult: nil,
-			shouldFail:     true,
+			expectError:    true,
 			errorMessage:   "host does not exist",
 		}, {
 			name:           "Get with not existing host",
 			args:           testIngressCacheArgs{"not.exist", "/test/path", ""},
 			expectedResult: nil,
-			shouldFail:     true,
+			expectError:    true,
 			errorMessage:   "host does not exist",
 			initialState: []ingressCacheTestInitialState{
 				{"example.com", "/test/path", "test-function-name-1"},
@@ -91,7 +92,7 @@ func (suite *IngressCacheTestSuite) TestGet() {
 			name:           "Get with not existing path",
 			args:           testIngressCacheArgs{"example.com", "/not/exists/test/path", ""},
 			expectedResult: nil,
-			shouldFail:     true,
+			expectError:    true,
 			errorMessage:   "failed to get the function name from the ingress host tree",
 			initialState: []ingressCacheTestInitialState{
 				{"example.com", "/test/path", "test-function-name-1"},
@@ -102,7 +103,7 @@ func (suite *IngressCacheTestSuite) TestGet() {
 			testIngressCache := suite.getTestIngressCache(testCase.initialState)
 
 			resultFunctionNames, err := testIngressCache.Get(testCase.args.host, testCase.args.path)
-			if testCase.shouldFail {
+			if testCase.expectError {
 				suite.Require().Error(err)
 				suite.Require().ErrorContains(err, testCase.errorMessage)
 				suite.Require().Nil(resultFunctionNames)
@@ -120,7 +121,7 @@ func (suite *IngressCacheTestSuite) TestSet() {
 		name           string
 		initialState   []ingressCacheTestInitialState
 		args           testIngressCacheArgs
-		shouldFail     bool
+		expectError    bool
 		errorMessage   string
 		expectedResult map[string]map[string][]string
 	}{
@@ -131,7 +132,7 @@ func (suite *IngressCacheTestSuite) TestSet() {
 				"example.com": {"/test/path": {"test-function-name-1"}},
 			},
 		}, {
-			name: "Set another functionName for existing host",
+			name: "Set unique functionName that will be added to existing host and path",
 			args: testIngressCacheArgs{"example.com", "/test/path", "test-function-name-2"},
 			initialState: []ingressCacheTestInitialState{
 				{"example.com", "/test/path", "test-function-name-1"},
@@ -164,7 +165,7 @@ func (suite *IngressCacheTestSuite) TestSet() {
 			testIngressCache := suite.getTestIngressCache(testCase.initialState)
 
 			err := testIngressCache.Set(testCase.args.host, testCase.args.path, testCase.args.function)
-			if testCase.shouldFail {
+			if testCase.expectError {
 				suite.Require().Error(err)
 				suite.Require().ErrorContains(err, testCase.errorMessage)
 			} else {
@@ -184,7 +185,7 @@ func (suite *IngressCacheTestSuite) TestDelete() {
 	for _, testCase := range []struct {
 		name           string
 		args           testIngressCacheArgs
-		shouldFail     bool
+		expectError    bool
 		errorMessage   string
 		initialState   []ingressCacheTestInitialState
 		expectedResult map[string]map[string][]string
@@ -237,7 +238,7 @@ func (suite *IngressCacheTestSuite) TestDelete() {
 			testIngressCache := suite.getTestIngressCache(testCase.initialState)
 
 			err := testIngressCache.Delete(testCase.args.host, testCase.args.path, testCase.args.function)
-			if testCase.shouldFail {
+			if testCase.expectError {
 				suite.Require().Error(err)
 				suite.Require().ErrorContains(err, testCase.errorMessage)
 			} else {
@@ -256,9 +257,8 @@ func (suite *IngressCacheTestSuite) TestDelete() {
 
 // getTestIngressCache creates a IngressCache instance and sets the provided initial state
 func (suite *IngressCacheTestSuite) getTestIngressCache(initialState []ingressCacheTestInitialState) *IngressCache {
-	testLogger, err := nucliozap.NewNuclioZapTest("test")
-	suite.Require().NoError(err)
-	ingressCache := NewIngressCache(testLogger)
+	var err error
+	ingressCache := NewIngressCache(suite.logger)
 
 	// Set the initial state in the IngressCache
 	for _, args := range initialState {

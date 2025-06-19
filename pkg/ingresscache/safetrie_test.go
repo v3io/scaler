@@ -41,7 +41,7 @@ func (suite *SafeTrieTestSuite) TestPathTreeSet() {
 		name           string
 		args           []safeTrieFunctionArgs
 		expectedResult map[string][]string
-		shouldFail     bool
+		expectError    bool
 		errorMessage   string
 	}{
 		{
@@ -116,7 +116,7 @@ func (suite *SafeTrieTestSuite) TestPathTreeSet() {
 				},
 			},
 			expectedResult: map[string][]string{},
-			shouldFail:     true,
+			expectError:    true,
 			errorMessage:   "function is empty",
 		}, {
 			name: "empty path",
@@ -127,7 +127,7 @@ func (suite *SafeTrieTestSuite) TestPathTreeSet() {
 				},
 			},
 			expectedResult: map[string][]string{},
-			shouldFail:     true,
+			expectError:    true,
 			errorMessage:   "path is empty",
 		}, {
 			name: "double slash in path",
@@ -186,7 +186,7 @@ func (suite *SafeTrieTestSuite) TestPathTreeSet() {
 			testSafeTrie := suite.generateSafeTrieForTest([]safeTrieFunctionArgs{})
 			for _, setArgs := range testCase.args {
 				err := testSafeTrie.SetFunctionName(setArgs.path, setArgs.function)
-				if testCase.shouldFail {
+				if testCase.expectError {
 					suite.Require().Error(err)
 					suite.Require().ErrorContains(err, testCase.errorMessage)
 				} else {
@@ -214,7 +214,7 @@ func (suite *SafeTrieTestSuite) TestPathTreeGet() {
 		name           string
 		arg            string
 		expectedResult []string
-		shouldFail     bool
+		expectError    bool
 		errorMessage   string
 	}{
 		{
@@ -236,7 +236,7 @@ func (suite *SafeTrieTestSuite) TestPathTreeGet() {
 		}, {
 			name:         "get empty path",
 			arg:          "",
-			shouldFail:   true,
+			expectError:  true,
 			errorMessage: "path is empty",
 		}, {
 			name:           "get closest match with different suffix",
@@ -259,7 +259,7 @@ func (suite *SafeTrieTestSuite) TestPathTreeGet() {
 		suite.Run(testCase.name, func() {
 			testSafeTrie := suite.generateSafeTrieForTest(initialStateGetTest)
 			result, err := testSafeTrie.GetFunctionNames(testCase.arg)
-			if testCase.shouldFail {
+			if testCase.expectError {
 				suite.Require().Error(err)
 				suite.Require().ErrorContains(err, testCase.errorMessage)
 			} else {
@@ -276,7 +276,7 @@ func (suite *SafeTrieTestSuite) TestPathTreeDelete() {
 		name           string
 		deleteArgs     safeTrieFunctionArgs
 		expectedResult map[string][]string
-		shouldFail     bool
+		expectError    bool
 		errorMessage   string
 	}{
 		{
@@ -344,7 +344,7 @@ func (suite *SafeTrieTestSuite) TestPathTreeDelete() {
 			testSafeTrie := suite.generateSafeTrieForTest(testCase.initialState)
 
 			err := testSafeTrie.DeleteFunctionName(testCase.deleteArgs.path, testCase.deleteArgs.function)
-			if testCase.shouldFail {
+			if testCase.expectError {
 				suite.Require().Error(err)
 				suite.Require().ErrorContains(err, testCase.errorMessage)
 			} else {
@@ -399,7 +399,7 @@ func flattenSafeTrie(st *SafeTrie) (map[string][]string, error) {
 		if value != nil {
 			convertedValue, ok := value.([]string)
 			if !ok {
-				return fmt.Errorf("value is not a []string")
+				return fmt.Errorf("path value should be []string")
 			}
 			resultMap[key] = convertedValue
 		}
