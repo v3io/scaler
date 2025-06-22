@@ -40,8 +40,8 @@ func NewSafeTrie() *SafeTrie {
 	}
 }
 
-// SetFunctionName sets a function for a given path. If the path does not exist, it creates it
-func (st *SafeTrie) SetFunctionName(path string, function string) error {
+// Set adds a function for a given path. If the path does not exist, it creates it
+func (st *SafeTrie) Set(path string, function string) error {
 	if path == "" {
 		return errors.New("path is empty")
 	}
@@ -79,8 +79,8 @@ func (st *SafeTrie) SetFunctionName(path string, function string) error {
 	return nil
 }
 
-// DeleteFunctionName removes a function from a path and also deletes the path if the function is the only one associated with that path
-func (st *SafeTrie) DeleteFunctionName(path string, function string) error {
+// Delete removes a function from a path and also deletes the path if the function is the only one associated with that path
+func (st *SafeTrie) Delete(path string, function string) error {
 	st.rwMutex.Lock()
 	defer st.rwMutex.Unlock()
 
@@ -112,8 +112,8 @@ func (st *SafeTrie) DeleteFunctionName(path string, function string) error {
 	return nil
 }
 
-// GetFunctionNames retrieve the closest prefix matching the path and returns the associated functions
-func (st *SafeTrie) GetFunctionNames(path string) ([]string, error) {
+// Get retrieve the closest prefix matching the path and returns the associated functions
+func (st *SafeTrie) Get(path string) (FunctionTarget, error) {
 	var walkPathResult interface{}
 	if path == "" {
 		return nil, errors.New("path is empty")
@@ -137,7 +137,7 @@ func (st *SafeTrie) GetFunctionNames(path string) ([]string, error) {
 		return nil, errors.Errorf("walkPathResult value should be FunctionTarget, got %v", walkPathResult)
 	}
 
-	return functionNames.ToSliceString(), nil
+	return functionNames, nil
 }
 
 // IsEmpty return true if the SafeTrie is empty

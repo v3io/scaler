@@ -185,7 +185,7 @@ func (suite *SafeTrieTestSuite) TestPathTreeSet() {
 		suite.Run(testCase.name, func() {
 			testSafeTrie := suite.generateSafeTrieForTest([]safeTrieFunctionArgs{})
 			for _, setArgs := range testCase.args {
-				err := testSafeTrie.SetFunctionName(setArgs.path, setArgs.function)
+				err := testSafeTrie.Set(setArgs.path, setArgs.function)
 				if testCase.expectError {
 					suite.Require().Error(err)
 					suite.Require().ErrorContains(err, testCase.errorMessage)
@@ -212,53 +212,53 @@ func (suite *SafeTrieTestSuite) TestPathTreeGet() {
 	}
 	for _, testCase := range []struct {
 		name           string
-		arg            string
-		expectedResult []string
+		path           string
+		expectedResult FunctionTarget
 		expectError    bool
 		errorMessage   string
 	}{
 		{
 			name:           "get root path",
-			arg:            "/",
-			expectedResult: []string{"test-function"},
+			path:           "/",
+			expectedResult: &SingleTarget{"test-function"},
 		}, {
 			name:           "get regular path",
-			arg:            "/path/to/function1",
-			expectedResult: []string{"test-function1"},
+			path:           "/path/to/function1",
+			expectedResult: &SingleTarget{"test-function1"},
 		}, {
 			name:           "get nested path",
-			arg:            "/path/to/function1/nested",
-			expectedResult: []string{"test-function2"},
+			path:           "/path/to/function1/nested",
+			expectedResult: &SingleTarget{"test-function2"},
 		}, {
 			name:           "get closest match",
-			arg:            "/path/to/function1/nested/extra",
-			expectedResult: []string{"test-function2"},
+			path:           "/path/to/function1/nested/extra",
+			expectedResult: &SingleTarget{"test-function2"},
 		}, {
 			name:         "get empty path",
-			arg:          "",
+			path:         "",
 			expectError:  true,
 			errorMessage: "path is empty",
 		}, {
 			name:           "get closest match with different suffix",
-			arg:            "/path/to/function1/something/else",
-			expectedResult: []string{"test-function1"},
+			path:           "/path/to/function1/something/else",
+			expectedResult: &SingleTarget{"test-function1"},
 		}, {
 			name:           "get path with dots",
-			arg:            "/path/./to/./function/",
-			expectedResult: []string{"test-function1"},
+			path:           "/path/./to/./function/",
+			expectedResult: &SingleTarget{"test-function1"},
 		}, {
 			name:           "get path with slash",
-			arg:            "path//to//function/",
-			expectedResult: []string{"test-function1"},
+			path:           "path//to//function/",
+			expectedResult: &SingleTarget{"test-function1"},
 		}, {
 			name:           "get multiple functions for the same path",
-			arg:            "/path/to/multiple/functions",
-			expectedResult: []string{"test-function1", "test-function2"},
+			path:           "/path/to/multiple/functions",
+			expectedResult: &CanaryTarget{[2]string{"test-function1", "test-function2"}},
 		},
 	} {
 		suite.Run(testCase.name, func() {
 			testSafeTrie := suite.generateSafeTrieForTest(initialStateGetTest)
-			result, err := testSafeTrie.GetFunctionNames(testCase.arg)
+			result, err := testSafeTrie.Get(testCase.path)
 			if testCase.expectError {
 				suite.Require().Error(err)
 				suite.Require().ErrorContains(err, testCase.errorMessage)
@@ -343,7 +343,7 @@ func (suite *SafeTrieTestSuite) TestPathTreeDelete() {
 		suite.Run(testCase.name, func() {
 			testSafeTrie := suite.generateSafeTrieForTest(testCase.initialState)
 
-			err := testSafeTrie.DeleteFunctionName(testCase.deleteArgs.path, testCase.deleteArgs.function)
+			err := testSafeTrie.Delete(testCase.deleteArgs.path, testCase.deleteArgs.function)
 			if testCase.expectError {
 				suite.Require().Error(err)
 				suite.Require().ErrorContains(err, testCase.errorMessage)
@@ -437,7 +437,7 @@ func (suite *SafeTrieTestSuite) generateSafeTrieForTest(initialSafeTrieState []s
 
 	// set path tree with the provided required state
 	for _, args := range initialSafeTrieState {
-		err = safeTrie.SetFunctionName(args.path, args.function)
+		err = safeTrie.Set(args.path, args.function)
 		suite.Require().NoError(err)
 	}
 
