@@ -168,3 +168,78 @@ func excludeElemFromSlice(slice []string, elem string) []string {
 		return slice
 	}
 }
+
+// ----- implementations for FunctionTarget interface -----
+
+type SingleTarget struct {
+	functionName string
+}
+
+func (s *SingleTarget) Contains(functionName string) bool {
+	return s.functionName == functionName
+}
+
+func (s *SingleTarget) Delete(functionName string) (FunctionTarget, error) {
+	if !s.Contains(functionName) {
+		// if the function name is not found, return the original SingleTarget
+		return s, nil
+	}
+
+	// this should never be called for SingleTarget
+	return nil, errors.New("cannot remove function name from SingleTarget, it only contains one function name")
+}
+
+func (s *SingleTarget) Add(functionName string) (FunctionTarget, error) {
+	if s.Contains(functionName) {
+		return s, nil
+	}
+
+	return &CanaryTarget{functionNames: [2]string{s.functionName, functionName}}, nil
+}
+
+func (s *SingleTarget) ToSliceString() []string {
+	return []string{s.functionName}
+}
+
+func (s *SingleTarget) IsSingle() bool {
+	return true
+}
+
+type CanaryTarget struct {
+	functionNames [2]string
+}
+
+func (c *CanaryTarget) Contains(functionName string) bool {
+	return c.functionNames[0] == functionName || c.functionNames[1] == functionName
+}
+
+func (c *CanaryTarget) Delete(functionName string) (FunctionTarget, error) {
+	if c.functionNames[0] == functionName {
+		return &SingleTarget{functionName: c.functionNames[1]}, nil
+	}
+
+	if c.functionNames[1] == functionName {
+		return &SingleTarget{functionName: c.functionNames[0]}, nil
+	}
+
+	// if reached here, it means CanaryTarget does not contain the function name
+	return c, nil
+}
+
+func (c *CanaryTarget) Add(functionName string) (FunctionTarget, error) {
+	if c.Contains(functionName) {
+		// If the function already exists, return the original CanaryTarget
+		return c, nil
+	}
+
+	// This should never be called for CanaryTarget since it should always contain exactly two function names
+	return c, errors.New("cannot add function name to CanaryTarget, it already contains two function names")
+}
+
+func (c *CanaryTarget) ToSliceString() []string {
+	return []string{c.functionNames[0], c.functionNames[1]}
+}
+
+func (c *CanaryTarget) IsSingle() bool {
+	return false
+}

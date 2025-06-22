@@ -44,3 +44,21 @@ type IngressHostsTree interface {
 	// IsEmpty checks if the tree is empty
 	IsEmpty() bool
 }
+
+// FunctionTarget defines the trie.PathTrie value
+type FunctionTarget interface {
+	// Contains checks if the function name is present
+	Contains(functionName string) bool
+
+	// Delete returns an updated FunctionTarget after removing the function name
+	Delete(functionName string) (FunctionTarget, error)
+
+	// Add returns an updated FunctionTarget after adding the function name
+	Add(functionName string) (FunctionTarget, error)
+
+	// ToSliceString returns a slice of function names
+	ToSliceString() []string
+
+	// IsSingle returns true if the struct type is SingleTarget
+	IsSingle() bool
+}
