@@ -66,7 +66,8 @@ func (st *SafeTrie) Set(path string, function string) error {
 	}
 
 	if pathFunctionNames.Contains(function) {
-		// If the function already exists at this path, skip adding it to prevent duplicates
+		// Although Add() checks if the function exists and returns the same value, it still performs a trie walk that ends with no changes when values are identical.
+		// This validation avoids that unnecessary walk
 		return nil
 	}
 
@@ -74,12 +75,12 @@ func (st *SafeTrie) Set(path string, function string) error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to set function name to path. path: %s, function: %s", path, function)
 	}
-	st.pathTrie.Put(path, functionNames)
 
+	st.pathTrie.Put(path, functionNames)
 	return nil
 }
 
-// Delete removes a function from a path and also deletes the path if the function is the only one associated with that path
+// Delete removes a function from a path and cleans up the longest suffix of the path only used by that function
 func (st *SafeTrie) Delete(path string, function string) error {
 	st.rwMutex.Lock()
 	defer st.rwMutex.Unlock()
