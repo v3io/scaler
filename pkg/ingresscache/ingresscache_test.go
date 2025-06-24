@@ -129,7 +129,7 @@ func (suite *IngressCacheTestSuite) TestSet() {
 			name: "Set new host",
 			args: testIngressCacheArgs{"example.com", "/test/path", "test-function-name-1"},
 			expectedResult: map[string]map[string]FunctionTarget{
-				"example.com": {"/test/path": &SingleTarget{"test-function-name-1"}},
+				"example.com": {"/test/path": SingleTarget("test-function-name-1")},
 			},
 		}, {
 			name: "Set unique functionName that will be added to existing host and path",
@@ -147,7 +147,7 @@ func (suite *IngressCacheTestSuite) TestSet() {
 				{"example.com", "/test/path", "test-function-name-1"},
 			},
 			expectedResult: map[string]map[string]FunctionTarget{
-				"example.com": {"/test/path": &SingleTarget{"test-function-name-1"}},
+				"example.com": {"/test/path": SingleTarget("test-function-name-1")},
 			},
 		}, {
 			name: "Set another host and path",
@@ -156,8 +156,8 @@ func (suite *IngressCacheTestSuite) TestSet() {
 				{"example.com", "/test/path", "test-function-name-1"},
 			},
 			expectedResult: map[string]map[string]FunctionTarget{
-				"google.com":  {"/test/path": &SingleTarget{"test-function-name-1"}},
-				"example.com": {"/test/path": &SingleTarget{"test-function-name-1"}},
+				"google.com":  {"/test/path": SingleTarget("test-function-name-1")},
+				"example.com": {"/test/path": SingleTarget("test-function-name-1")},
 			},
 		},
 	} {
@@ -201,7 +201,7 @@ func (suite *IngressCacheTestSuite) TestDelete() {
 				{"example.com", "/test/path", "test-function-name-1"},
 			},
 			expectedResult: map[string]map[string]FunctionTarget{
-				"example.com": {"/test/path": &SingleTarget{"test-function-name-1"}},
+				"example.com": {"/test/path": SingleTarget("test-function-name-1")},
 			},
 		}, {
 			name: "Delete last function in host, validate host deletion",
@@ -211,7 +211,7 @@ func (suite *IngressCacheTestSuite) TestDelete() {
 				{"google.com", "/test/path", "test-function-name-1"},
 			},
 			expectedResult: map[string]map[string]FunctionTarget{
-				"google.com": {"/test/path": &SingleTarget{"test-function-name-1"}},
+				"google.com": {"/test/path": SingleTarget("test-function-name-1")},
 			},
 		}, {
 			name: "Delete not existing url and validate host wasn't deleted",
@@ -220,7 +220,7 @@ func (suite *IngressCacheTestSuite) TestDelete() {
 				{"example.com", "/test/path", "test-function-name-1"},
 			},
 			expectedResult: map[string]map[string]FunctionTarget{
-				"example.com": {"/test/path": &SingleTarget{"test-function-name-1"}},
+				"example.com": {"/test/path": SingleTarget("test-function-name-1")},
 			},
 		}, {
 			name: "Delete not last function in path and validate host wasn't deleted",
@@ -230,7 +230,7 @@ func (suite *IngressCacheTestSuite) TestDelete() {
 				{"example.com", "/test/path", "test-function-name-2"},
 			},
 			expectedResult: map[string]map[string]FunctionTarget{
-				"example.com": {"/test/path": &SingleTarget{"test-function-name-1"}},
+				"example.com": {"/test/path": SingleTarget("test-function-name-1")},
 			},
 		},
 	} {

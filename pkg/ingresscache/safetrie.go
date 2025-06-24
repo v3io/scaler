@@ -56,7 +56,7 @@ func (st *SafeTrie) Set(path string, function string) error {
 	// get the exact path value in order to avoid creating a new path if it already exists
 	pathValue := st.pathTrie.Get(path)
 	if pathValue == nil {
-		st.pathTrie.Put(path, &SingleTarget{function})
+		st.pathTrie.Put(path, SingleTarget(function))
 		return nil
 	}
 
@@ -154,15 +154,13 @@ func (st *SafeTrie) IsEmpty() bool {
 
 // ----- implementations for FunctionTarget interface -----
 
-type SingleTarget struct {
-	functionName string
+type SingleTarget string
+
+func (s SingleTarget) Contains(functionName string) bool {
+	return string(s) == functionName
 }
 
-func (s *SingleTarget) Contains(functionName string) bool {
-	return s.functionName == functionName
-}
-
-func (s *SingleTarget) Delete(functionName string) (FunctionTarget, error) {
+func (s SingleTarget) Delete(functionName string) (FunctionTarget, error) {
 	if !s.Contains(functionName) {
 		// if the function name is not found, return the original SingleTarget
 		return s, nil
@@ -172,19 +170,19 @@ func (s *SingleTarget) Delete(functionName string) (FunctionTarget, error) {
 	return nil, errors.New("cannot remove function name from SingleTarget, it only contains one function name")
 }
 
-func (s *SingleTarget) Add(functionName string) (FunctionTarget, error) {
+func (s SingleTarget) Add(functionName string) (FunctionTarget, error) {
 	if s.Contains(functionName) {
 		return s, nil
 	}
 
-	return &CanaryTarget{functionNames: [2]string{s.functionName, functionName}}, nil
+	return &CanaryTarget{functionNames: [2]string{string(s), functionName}}, nil
 }
 
-func (s *SingleTarget) ToSliceString() []string {
-	return []string{s.functionName}
+func (s SingleTarget) ToSliceString() []string {
+	return []string{string(s)}
 }
 
-func (s *SingleTarget) IsSingle() bool {
+func (s SingleTarget) IsSingle() bool {
 	return true
 }
 
@@ -198,11 +196,11 @@ func (c *CanaryTarget) Contains(functionName string) bool {
 
 func (c *CanaryTarget) Delete(functionName string) (FunctionTarget, error) {
 	if c.functionNames[0] == functionName {
-		return &SingleTarget{functionName: c.functionNames[1]}, nil
+		return SingleTarget(c.functionNames[1]), nil
 	}
 
 	if c.functionNames[1] == functionName {
-		return &SingleTarget{functionName: c.functionNames[0]}, nil
+		return SingleTarget(c.functionNames[0]), nil
 	}
 
 	// if reached here, it means CanaryTarget does not contain the function name
