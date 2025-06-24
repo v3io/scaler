@@ -123,13 +123,13 @@ func (suite *IngressCacheTestSuite) TestSet() {
 		args           testIngressCacheArgs
 		expectError    bool
 		errorMessage   string
-		expectedResult map[string]map[string][]string
+		expectedResult map[string]map[string]FunctionTarget
 	}{
 		{
 			name: "Set new host",
 			args: testIngressCacheArgs{"example.com", "/test/path", "test-function-name-1"},
-			expectedResult: map[string]map[string][]string{
-				"example.com": {"/test/path": {"test-function-name-1"}},
+			expectedResult: map[string]map[string]FunctionTarget{
+				"example.com": {"/test/path": SingleTarget("test-function-name-1")},
 			},
 		}, {
 			name: "Set unique functionName that will be added to existing host and path",
@@ -137,8 +137,8 @@ func (suite *IngressCacheTestSuite) TestSet() {
 			initialState: []ingressCacheTestInitialState{
 				{"example.com", "/test/path", "test-function-name-1"},
 			},
-			expectedResult: map[string]map[string][]string{
-				"example.com": {"/test/path": {"test-function-name-1", "test-function-name-2"}},
+			expectedResult: map[string]map[string]FunctionTarget{
+				"example.com": {"/test/path": &CanaryTarget{[2]string{"test-function-name-1", "test-function-name-2"}}},
 			},
 		}, {
 			name: "Set existing functionName for existing host and path",
@@ -146,8 +146,8 @@ func (suite *IngressCacheTestSuite) TestSet() {
 			initialState: []ingressCacheTestInitialState{
 				{"example.com", "/test/path", "test-function-name-1"},
 			},
-			expectedResult: map[string]map[string][]string{
-				"example.com": {"/test/path": {"test-function-name-1"}},
+			expectedResult: map[string]map[string]FunctionTarget{
+				"example.com": {"/test/path": SingleTarget("test-function-name-1")},
 			},
 		}, {
 			name: "Set another host and path",
@@ -155,9 +155,9 @@ func (suite *IngressCacheTestSuite) TestSet() {
 			initialState: []ingressCacheTestInitialState{
 				{"example.com", "/test/path", "test-function-name-1"},
 			},
-			expectedResult: map[string]map[string][]string{
-				"google.com":  {"/test/path": {"test-function-name-1"}},
-				"example.com": {"/test/path": {"test-function-name-1"}},
+			expectedResult: map[string]map[string]FunctionTarget{
+				"google.com":  {"/test/path": SingleTarget("test-function-name-1")},
+				"example.com": {"/test/path": SingleTarget("test-function-name-1")},
 			},
 		},
 	} {
@@ -188,20 +188,20 @@ func (suite *IngressCacheTestSuite) TestDelete() {
 		expectError    bool
 		errorMessage   string
 		initialState   []ingressCacheTestInitialState
-		expectedResult map[string]map[string][]string
+		expectedResult map[string]map[string]FunctionTarget
 	}{
 		{
 			name:           "Delete when cache is empty",
 			args:           testIngressCacheArgs{"example.com", "/test/path", "test-function-name-1"},
-			expectedResult: map[string]map[string][]string{},
+			expectedResult: map[string]map[string]FunctionTarget{},
 		}, {
 			name: "Delete not existed host",
 			args: testIngressCacheArgs{"google.com", "/test/path", "test-function-name-1"},
 			initialState: []ingressCacheTestInitialState{
 				{"example.com", "/test/path", "test-function-name-1"},
 			},
-			expectedResult: map[string]map[string][]string{
-				"example.com": {"/test/path": {"test-function-name-1"}},
+			expectedResult: map[string]map[string]FunctionTarget{
+				"example.com": {"/test/path": SingleTarget("test-function-name-1")},
 			},
 		}, {
 			name: "Delete last function in host, validate host deletion",
@@ -210,8 +210,8 @@ func (suite *IngressCacheTestSuite) TestDelete() {
 				{"example.com", "/test/path", "test-function-name-1"},
 				{"google.com", "/test/path", "test-function-name-1"},
 			},
-			expectedResult: map[string]map[string][]string{
-				"google.com": {"/test/path": {"test-function-name-1"}},
+			expectedResult: map[string]map[string]FunctionTarget{
+				"google.com": {"/test/path": SingleTarget("test-function-name-1")},
 			},
 		}, {
 			name: "Delete not existing url and validate host wasn't deleted",
@@ -219,8 +219,8 @@ func (suite *IngressCacheTestSuite) TestDelete() {
 			initialState: []ingressCacheTestInitialState{
 				{"example.com", "/test/path", "test-function-name-1"},
 			},
-			expectedResult: map[string]map[string][]string{
-				"example.com": {"/test/path": {"test-function-name-1"}},
+			expectedResult: map[string]map[string]FunctionTarget{
+				"example.com": {"/test/path": SingleTarget("test-function-name-1")},
 			},
 		}, {
 			name: "Delete not last function in path and validate host wasn't deleted",
@@ -229,8 +229,8 @@ func (suite *IngressCacheTestSuite) TestDelete() {
 				{"example.com", "/test/path", "test-function-name-1"},
 				{"example.com", "/test/path", "test-function-name-2"},
 			},
-			expectedResult: map[string]map[string][]string{
-				"example.com": {"/test/path": {"test-function-name-1"}},
+			expectedResult: map[string]map[string]FunctionTarget{
+				"example.com": {"/test/path": SingleTarget("test-function-name-1")},
 			},
 		},
 	} {
@@ -270,8 +270,8 @@ func (suite *IngressCacheTestSuite) getTestIngressCache(initialState []ingressCa
 }
 
 // flattenIngressCache flattens the IngressCache's syncMap into a map for easier comparison in tests
-func (suite *IngressCacheTestSuite) flattenIngressCache(testIngressCache *IngressCache) map[string]map[string][]string {
-	output := make(map[string]map[string][]string)
+func (suite *IngressCacheTestSuite) flattenIngressCache(testIngressCache *IngressCache) map[string]map[string]FunctionTarget {
+	output := make(map[string]map[string]FunctionTarget)
 	testIngressCache.syncMap.Range(func(key, value interface{}) bool {
 		safeTrie, ok := value.(*SafeTrie)
 		suite.Require().True(ok)

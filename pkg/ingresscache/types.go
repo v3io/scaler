@@ -32,15 +32,33 @@ type IngressHostCache interface {
 }
 
 type IngressHostsTree interface {
-	// SetFunctionName sets a function for a given path. Will overwrite existing values if the path already exists
-	SetFunctionName(path string, function string) error
+	// Set sets a function for a given path. Will overwrite existing values if the path already exists
+	Set(path string, function string) error
 
-	// DeleteFunctionName removes the function from the given path and deletes the deepest suffix used only by that function; does nothing if the path or function doesn't exist.
-	DeleteFunctionName(path string, function string) error
+	// Delete removes the function from the given path and deletes the deepest suffix used only by that function; does nothing if the path or function doesn't exist.
+	Delete(path string, function string) error
 
-	// GetFunctionNames retrieves the best matching function names for a given path based on longest prefix match
-	GetFunctionNames(path string) ([]string, error)
+	// Get retrieves the best matching function names for a given path based on longest prefix match
+	Get(path string) (FunctionTarget, error)
 
 	// IsEmpty checks if the tree is empty
 	IsEmpty() bool
+}
+
+// FunctionTarget defines the trie.PathTrie value
+type FunctionTarget interface {
+	// Contains checks if the function name is present
+	Contains(functionName string) bool
+
+	// Delete returns an updated FunctionTarget after removing the function name
+	Delete(functionName string) (FunctionTarget, error)
+
+	// Add returns an updated FunctionTarget after adding the function name
+	Add(functionName string) (FunctionTarget, error)
+
+	// ToSliceString returns a slice of function names
+	ToSliceString() []string
+
+	// IsSingle returns true if the struct type is SingleTarget
+	IsSingle() bool
 }

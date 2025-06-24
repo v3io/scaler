@@ -21,7 +21,6 @@ such restriction.
 package ingresscache
 
 import (
-	"slices"
 	"sync"
 
 	"github.com/dghubble/trie"
@@ -41,8 +40,8 @@ func NewSafeTrie() *SafeTrie {
 	}
 }
 
-// SetFunctionName sets a function for a given path. If the path does not exist, it creates it
-func (st *SafeTrie) SetFunctionName(path string, function string) error {
+// Set adds a function for a given path. If the path does not exist, it creates it
+func (st *SafeTrie) Set(path string, function string) error {
 	if path == "" {
 		return errors.New("path is empty")
 	}
@@ -57,28 +56,32 @@ func (st *SafeTrie) SetFunctionName(path string, function string) error {
 	// get the exact path value in order to avoid creating a new path if it already exists
 	pathValue := st.pathTrie.Get(path)
 	if pathValue == nil {
-		st.pathTrie.Put(path, []string{function})
+		st.pathTrie.Put(path, SingleTarget(function))
 		return nil
 	}
 
-	pathFunctionNames, ok := pathValue.([]string)
+	pathFunctionNames, ok := pathValue.(FunctionTarget)
 	if !ok {
-		return errors.Errorf("path value should be []string, got %T", pathValue)
+		return errors.Errorf("path value should be FunctionTarget, got %T", pathValue)
 	}
 
-	if slices.Contains(pathFunctionNames, function) {
-		// If the function already exists at this path, skip adding it to prevent duplicates
+	if pathFunctionNames.Contains(function) {
+		// Although Add() checks if the function exists and returns the same value, it still performs a trie walk that ends with no changes when values are identical.
+		// This validation avoids that unnecessary walk
 		return nil
 	}
 
-	pathFunctionNames = append(pathFunctionNames, function)
-	st.pathTrie.Put(path, pathFunctionNames)
+	functionNames, err := pathFunctionNames.Add(function)
+	if err != nil {
+		return errors.Wrapf(err, "failed to set function name to path. path: %s, function: %s", path, function)
+	}
 
+	st.pathTrie.Put(path, functionNames)
 	return nil
 }
 
-// DeleteFunctionName removes a function from a path and also deletes the path if the function is the only one associated with that path
-func (st *SafeTrie) DeleteFunctionName(path string, function string) error {
+// Delete removes a function from a path and cleans up the longest suffix of the path only used by that function
+func (st *SafeTrie) Delete(path string, function string) error {
 	st.rwMutex.Lock()
 	defer st.rwMutex.Unlock()
 
@@ -88,27 +91,30 @@ func (st *SafeTrie) DeleteFunctionName(path string, function string) error {
 		return nil
 	}
 
-	pathFunctionNames, ok := pathValue.([]string)
+	pathFunctionNames, ok := pathValue.(FunctionTarget)
 	if !ok {
-		return errors.Errorf("path value should be []string, got %T", pathValue)
+		return errors.Errorf("path value should be FunctionTarget, got %T", pathValue)
 	}
 
-	// If the function to delete matches the current function name and it's the only value, delete the path
-	if len(pathFunctionNames) == 1 {
-		if pathFunctionNames[0] == function {
+	// If the function to delete matches the current function name, and it's the only value, delete the path
+	if pathFunctionNames.IsSingle() {
+		if pathFunctionNames.Contains(function) {
 			st.pathTrie.Delete(path)
 		}
 		return nil
 	}
 
-	// TODO - will be removed once moving into efficient pathFunctionNames implementation (i.e. not using slices)
-	pathFunctionNames = excludeElemFromSlice(pathFunctionNames, function)
-	st.pathTrie.Put(path, pathFunctionNames)
+	// update the path with the new function names after deletion
+	functionNames, err := pathFunctionNames.Delete(function)
+	if err != nil {
+		return errors.Wrapf(err, "failed to remove function name from path. function: %s, path: %s", function, path)
+	}
+	st.pathTrie.Put(path, functionNames)
 	return nil
 }
 
-// GetFunctionNames retrieve the closest prefix matching the path and returns the associated functions
-func (st *SafeTrie) GetFunctionNames(path string) ([]string, error) {
+// Get retrieve the closest prefix matching the path and returns the associated functions
+func (st *SafeTrie) Get(path string) (FunctionTarget, error) {
 	var walkPathResult interface{}
 	if path == "" {
 		return nil, errors.New("path is empty")
@@ -127,9 +133,9 @@ func (st *SafeTrie) GetFunctionNames(path string) ([]string, error) {
 		return nil, errors.Errorf("no value found for path: %s", path)
 	}
 
-	functionNames, ok := walkPathResult.([]string)
+	functionNames, ok := walkPathResult.(FunctionTarget)
 	if !ok {
-		return nil, errors.Errorf("walkPathResult value should be []string, got %v", walkPathResult)
+		return nil, errors.Errorf("walkPathResult value should be FunctionTarget, got %v", walkPathResult)
 	}
 
 	return functionNames, nil
@@ -146,25 +152,75 @@ func (st *SafeTrie) IsEmpty() bool {
 	return walkResult == nil
 }
 
-// TODO - will be removed once moving into efficient pathFunctionNames implementation (i.e. not using slices)
-func excludeElemFromSlice(slice []string, elem string) []string {
-	// Assuming len(slice) <= 2 based on the ingress validations of: https://github.com/nuclio/nuclio/pkg/platform/kube/platform.go
-	switch len(slice) {
-	case 1:
-		if slice[0] == elem {
-			return []string{}
-		}
-		return slice
-	case 2:
-		if slice[0] == elem {
-			return []string{slice[1]}
-		}
-		if slice[1] == elem {
-			return []string{slice[0]}
-		}
-		// elem not found, return original slice
-		return slice
-	default:
-		return slice
+// ----- implementations for FunctionTarget interface -----
+
+type SingleTarget string
+
+func (s SingleTarget) Contains(functionName string) bool {
+	return string(s) == functionName
+}
+
+func (s SingleTarget) Delete(functionName string) (FunctionTarget, error) {
+	if !s.Contains(functionName) {
+		// if the function name is not found, return the original SingleTarget
+		return s, nil
 	}
+
+	// this should never be called for SingleTarget
+	return nil, errors.New("cannot remove function name from SingleTarget, it only contains one function name")
+}
+
+func (s SingleTarget) Add(functionName string) (FunctionTarget, error) {
+	if s.Contains(functionName) {
+		return s, nil
+	}
+
+	return &CanaryTarget{functionNames: [2]string{string(s), functionName}}, nil
+}
+
+func (s SingleTarget) ToSliceString() []string {
+	return []string{string(s)}
+}
+
+func (s SingleTarget) IsSingle() bool {
+	return true
+}
+
+type CanaryTarget struct {
+	functionNames [2]string
+}
+
+func (c *CanaryTarget) Contains(functionName string) bool {
+	return c.functionNames[0] == functionName || c.functionNames[1] == functionName
+}
+
+func (c *CanaryTarget) Delete(functionName string) (FunctionTarget, error) {
+	if c.functionNames[0] == functionName {
+		return SingleTarget(c.functionNames[1]), nil
+	}
+
+	if c.functionNames[1] == functionName {
+		return SingleTarget(c.functionNames[0]), nil
+	}
+
+	// if reached here, it means CanaryTarget does not contain the function name
+	return c, nil
+}
+
+func (c *CanaryTarget) Add(functionName string) (FunctionTarget, error) {
+	if c.Contains(functionName) {
+		// If the function already exists, return the original CanaryTarget
+		return c, nil
+	}
+
+	// This should never be called for CanaryTarget since it should always contain exactly two function names
+	return c, errors.New("cannot add function name to CanaryTarget, it already contains two function names")
+}
+
+func (c *CanaryTarget) ToSliceString() []string {
+	return []string{c.functionNames[0], c.functionNames[1]}
+}
+
+func (c *CanaryTarget) IsSingle() bool {
+	return false
 }

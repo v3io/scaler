@@ -50,7 +50,7 @@ func (ic *IngressCache) Set(host, path, function string) error {
 		return errors.Errorf("cache set failed: invalid path tree value: got: %t", urlTree)
 	}
 
-	if err := ingressHostsTree.SetFunctionName(path, function); err != nil {
+	if err := ingressHostsTree.Set(path, function); err != nil {
 		return errors.Wrap(err, "failed to set function name in the ingress host tree")
 	}
 
@@ -72,7 +72,7 @@ func (ic *IngressCache) Delete(host, path, function string) error {
 		return errors.Errorf("cache delete failed: invalid path tree value: got: %t", urlTree)
 	}
 
-	if err := ingressHostsTree.DeleteFunctionName(path, function); err != nil {
+	if err := ingressHostsTree.Delete(path, function); err != nil {
 		return errors.Wrap(err, "failed to delete function name from the ingress host tree")
 	}
 
@@ -97,10 +97,10 @@ func (ic *IngressCache) Get(host, path string) ([]string, error) {
 		return nil, errors.Errorf("cache get failed: invalid path tree value: got: %t", urlTree)
 	}
 
-	result, err := ingressHostsTree.GetFunctionNames(path)
+	result, err := ingressHostsTree.Get(path)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get the function name from the ingress host tree")
 	}
 
-	return result, nil
+	return result.ToSliceString(), nil
 }

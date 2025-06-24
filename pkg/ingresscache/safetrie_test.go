@@ -40,7 +40,7 @@ func (suite *SafeTrieTestSuite) TestPathTreeSet() {
 	for _, testCase := range []struct {
 		name           string
 		args           []safeTrieFunctionArgs
-		expectedResult map[string][]string
+		expectedResult map[string]FunctionTarget
 		expectError    bool
 		errorMessage   string
 	}{
@@ -52,7 +52,7 @@ func (suite *SafeTrieTestSuite) TestPathTreeSet() {
 					function: "test-function",
 				},
 			},
-			expectedResult: map[string][]string{"/path/to/function": {"test-function"}},
+			expectedResult: map[string]FunctionTarget{"/path/to/function": SingleTarget("test-function")},
 		}, {
 			name: "idempotent test",
 			args: []safeTrieFunctionArgs{
@@ -64,7 +64,7 @@ func (suite *SafeTrieTestSuite) TestPathTreeSet() {
 					function: "test-function",
 				},
 			},
-			expectedResult: map[string][]string{"/path/to/function": {"test-function"}},
+			expectedResult: map[string]FunctionTarget{"/path/to/function": SingleTarget("test-function")},
 		}, {
 			name: "set twice the same path with a different function",
 			args: []safeTrieFunctionArgs{
@@ -76,7 +76,7 @@ func (suite *SafeTrieTestSuite) TestPathTreeSet() {
 					function: "test-function2",
 				},
 			},
-			expectedResult: map[string][]string{"/path/to/function": {"test-function", "test-function2"}},
+			expectedResult: map[string]FunctionTarget{"/path/to/function": &CanaryTarget{[2]string{"test-function", "test-function2"}}},
 		}, {
 			name: "set nested paths and different functions",
 			args: []safeTrieFunctionArgs{
@@ -88,9 +88,9 @@ func (suite *SafeTrieTestSuite) TestPathTreeSet() {
 					function: "test-function2",
 				},
 			},
-			expectedResult: map[string][]string{
-				"/path/to/function":        {"test-function"},
-				"/path/to/function/nested": {"test-function2"},
+			expectedResult: map[string]FunctionTarget{
+				"/path/to/function":        SingleTarget("test-function"),
+				"/path/to/function/nested": SingleTarget("test-function2"),
 			},
 		}, {
 			name: "set different paths and different functions",
@@ -103,9 +103,9 @@ func (suite *SafeTrieTestSuite) TestPathTreeSet() {
 					function: "test-function2",
 				},
 			},
-			expectedResult: map[string][]string{
-				"/path/to/function":          {"test-function"},
-				"/another/path/to/function/": {"test-function2"},
+			expectedResult: map[string]FunctionTarget{
+				"/path/to/function":          SingleTarget("test-function"),
+				"/another/path/to/function/": SingleTarget("test-function2"),
 			},
 		}, {
 			name: "empty function name",
@@ -115,7 +115,7 @@ func (suite *SafeTrieTestSuite) TestPathTreeSet() {
 					function: "",
 				},
 			},
-			expectedResult: map[string][]string{},
+			expectedResult: map[string]FunctionTarget{},
 			expectError:    true,
 			errorMessage:   "function is empty",
 		}, {
@@ -126,7 +126,7 @@ func (suite *SafeTrieTestSuite) TestPathTreeSet() {
 					function: "test-function",
 				},
 			},
-			expectedResult: map[string][]string{},
+			expectedResult: map[string]FunctionTarget{},
 			expectError:    true,
 			errorMessage:   "path is empty",
 		}, {
@@ -137,8 +137,8 @@ func (suite *SafeTrieTestSuite) TestPathTreeSet() {
 					function: "test-function",
 				},
 			},
-			expectedResult: map[string][]string{
-				"///path/to/function": {"test-function"},
+			expectedResult: map[string]FunctionTarget{
+				"///path/to/function": SingleTarget("test-function"),
 			},
 		}, {
 			name: "path starts without slash",
@@ -148,8 +148,8 @@ func (suite *SafeTrieTestSuite) TestPathTreeSet() {
 					function: "test-function",
 				},
 			},
-			expectedResult: map[string][]string{
-				"path/to/function": {"test-function"},
+			expectedResult: map[string]FunctionTarget{
+				"path/to/function": SingleTarget("test-function"),
 			},
 		}, {
 			name:           "lots of paths and functions",
@@ -158,34 +158,34 @@ func (suite *SafeTrieTestSuite) TestPathTreeSet() {
 		}, {
 			name:           "path ends with slash",
 			args:           []safeTrieFunctionArgs{{path: "/path/to/function/", function: "test-function"}},
-			expectedResult: map[string][]string{"/path/to/function/": {"test-function"}},
+			expectedResult: map[string]FunctionTarget{"/path/to/function/": SingleTarget("test-function")},
 		}, {
 			name:           "path with dots",
 			args:           []safeTrieFunctionArgs{{path: "/path/./to/./function/", function: "test-function"}},
-			expectedResult: map[string][]string{"/path/./to/./function/": {"test-function"}},
+			expectedResult: map[string]FunctionTarget{"/path/./to/./function/": SingleTarget("test-function")},
 		}, {
 			name:           "upper case path",
 			args:           []safeTrieFunctionArgs{{path: "/PATH/TO/function", function: "test-function"}},
-			expectedResult: map[string][]string{"/PATH/TO/function": {"test-function"}},
+			expectedResult: map[string]FunctionTarget{"/PATH/TO/function": SingleTarget("test-function")},
 		}, {
 			name: "upper case function name",
 			args: []safeTrieFunctionArgs{
 				{path: "/path/to/function", function: "test-function"},
 				{path: "/path/to/function", function: "test-FUNCTION"},
 			},
-			expectedResult: map[string][]string{"/path/to/function": {"test-function", "test-FUNCTION"}},
+			expectedResult: map[string]FunctionTarget{"/path/to/function": &CanaryTarget{[2]string{"test-function", "test-FUNCTION"}}},
 		}, {
 			name: "path with numbers and hyphens",
 			args: []safeTrieFunctionArgs{
 				{path: "/api/v1/user-data/123", function: "test-function"},
 			},
-			expectedResult: map[string][]string{"/api/v1/user-data/123": {"test-function"}},
+			expectedResult: map[string]FunctionTarget{"/api/v1/user-data/123": SingleTarget("test-function")},
 		},
 	} {
 		suite.Run(testCase.name, func() {
 			testSafeTrie := suite.generateSafeTrieForTest([]safeTrieFunctionArgs{})
 			for _, setArgs := range testCase.args {
-				err := testSafeTrie.SetFunctionName(setArgs.path, setArgs.function)
+				err := testSafeTrie.Set(setArgs.path, setArgs.function)
 				if testCase.expectError {
 					suite.Require().Error(err)
 					suite.Require().ErrorContains(err, testCase.errorMessage)
@@ -212,53 +212,53 @@ func (suite *SafeTrieTestSuite) TestPathTreeGet() {
 	}
 	for _, testCase := range []struct {
 		name           string
-		arg            string
-		expectedResult []string
+		path           string
+		expectedResult FunctionTarget
 		expectError    bool
 		errorMessage   string
 	}{
 		{
 			name:           "get root path",
-			arg:            "/",
-			expectedResult: []string{"test-function"},
+			path:           "/",
+			expectedResult: SingleTarget("test-function"),
 		}, {
 			name:           "get regular path",
-			arg:            "/path/to/function1",
-			expectedResult: []string{"test-function1"},
+			path:           "/path/to/function1",
+			expectedResult: SingleTarget("test-function1"),
 		}, {
 			name:           "get nested path",
-			arg:            "/path/to/function1/nested",
-			expectedResult: []string{"test-function2"},
+			path:           "/path/to/function1/nested",
+			expectedResult: SingleTarget("test-function2"),
 		}, {
 			name:           "get closest match",
-			arg:            "/path/to/function1/nested/extra",
-			expectedResult: []string{"test-function2"},
+			path:           "/path/to/function1/nested/extra",
+			expectedResult: SingleTarget("test-function2"),
 		}, {
 			name:         "get empty path",
-			arg:          "",
+			path:         "",
 			expectError:  true,
 			errorMessage: "path is empty",
 		}, {
 			name:           "get closest match with different suffix",
-			arg:            "/path/to/function1/something/else",
-			expectedResult: []string{"test-function1"},
+			path:           "/path/to/function1/something/else",
+			expectedResult: SingleTarget("test-function1"),
 		}, {
 			name:           "get path with dots",
-			arg:            "/path/./to/./function/",
-			expectedResult: []string{"test-function1"},
+			path:           "/path/./to/./function/",
+			expectedResult: SingleTarget("test-function1"),
 		}, {
 			name:           "get path with slash",
-			arg:            "path//to//function/",
-			expectedResult: []string{"test-function1"},
+			path:           "path//to//function/",
+			expectedResult: SingleTarget("test-function1"),
 		}, {
 			name:           "get multiple functions for the same path",
-			arg:            "/path/to/multiple/functions",
-			expectedResult: []string{"test-function1", "test-function2"},
+			path:           "/path/to/multiple/functions",
+			expectedResult: &CanaryTarget{[2]string{"test-function1", "test-function2"}},
 		},
 	} {
 		suite.Run(testCase.name, func() {
 			testSafeTrie := suite.generateSafeTrieForTest(initialStateGetTest)
-			result, err := testSafeTrie.GetFunctionNames(testCase.arg)
+			result, err := testSafeTrie.Get(testCase.path)
 			if testCase.expectError {
 				suite.Require().Error(err)
 				suite.Require().ErrorContains(err, testCase.errorMessage)
@@ -275,7 +275,7 @@ func (suite *SafeTrieTestSuite) TestPathTreeDelete() {
 		initialState   []safeTrieFunctionArgs // initial state of the path tree before delete
 		name           string
 		deleteArgs     safeTrieFunctionArgs
-		expectedResult map[string][]string
+		expectedResult map[string]FunctionTarget
 		expectError    bool
 		errorMessage   string
 	}{
@@ -286,8 +286,8 @@ func (suite *SafeTrieTestSuite) TestPathTreeDelete() {
 				{"/path/to/function1/nested", "test-function2"},
 			},
 			deleteArgs: safeTrieFunctionArgs{"/path/to/function1", "test-function1"},
-			expectedResult: map[string][]string{
-				"/path/to/function1/nested": {"test-function2"},
+			expectedResult: map[string]FunctionTarget{
+				"/path/to/function1/nested": SingleTarget("test-function2"),
 			},
 		}, {
 			name: "delete a function from multiple values and validate that the other function is still there",
@@ -296,8 +296,8 @@ func (suite *SafeTrieTestSuite) TestPathTreeDelete() {
 				{"/path/to/multiple/functions", "test-function2"},
 			},
 			deleteArgs: safeTrieFunctionArgs{"/path/to/multiple/functions", "test-function1"},
-			expectedResult: map[string][]string{
-				"/path/to/multiple/functions": {"test-function2"},
+			expectedResult: map[string]FunctionTarget{
+				"/path/to/multiple/functions": SingleTarget("test-function2"),
 			},
 		}, {
 			name: "delete function that does not exist in the path",
@@ -305,8 +305,8 @@ func (suite *SafeTrieTestSuite) TestPathTreeDelete() {
 				{"/path/to/function1", "test-function1"},
 			},
 			deleteArgs: safeTrieFunctionArgs{"/path/to/function1", "test-function2"},
-			expectedResult: map[string][]string{
-				"/path/to/function1": {"test-function1"},
+			expectedResult: map[string]FunctionTarget{
+				"/path/to/function1": SingleTarget("test-function1"),
 			},
 		}, {
 			name: "delete function that does not exist in multiple value path",
@@ -315,8 +315,8 @@ func (suite *SafeTrieTestSuite) TestPathTreeDelete() {
 				{"/path/to/functions", "test-function2"},
 			},
 			deleteArgs: safeTrieFunctionArgs{"/path/to/functions", "test-not-existing-function"},
-			expectedResult: map[string][]string{
-				"/path/to/functions": {"test-function1", "test-function2"},
+			expectedResult: map[string]FunctionTarget{
+				"/path/to/functions": &CanaryTarget{[2]string{"test-function1", "test-function2"}},
 			},
 		}, {
 			name: "delete not exist path",
@@ -324,8 +324,8 @@ func (suite *SafeTrieTestSuite) TestPathTreeDelete() {
 				{"/path/to/function1", "test-function1"},
 			},
 			deleteArgs: safeTrieFunctionArgs{"/path/to/function1/nested", "test-function2"},
-			expectedResult: map[string][]string{
-				"/path/to/function1": {"test-function1"},
+			expectedResult: map[string]FunctionTarget{
+				"/path/to/function1": SingleTarget("test-function1"),
 			},
 		}, {
 			name: "delete path with suffix that does not exist",
@@ -334,16 +334,16 @@ func (suite *SafeTrieTestSuite) TestPathTreeDelete() {
 				{"/path/to/function1/nested", "test-function2"},
 			},
 			deleteArgs: safeTrieFunctionArgs{"/path/to/function1/path/suffix", "test-function1"},
-			expectedResult: map[string][]string{
-				"/path/to/function1":        {"test-function1"},
-				"/path/to/function1/nested": {"test-function2"},
+			expectedResult: map[string]FunctionTarget{
+				"/path/to/function1":        SingleTarget("test-function1"),
+				"/path/to/function1/nested": SingleTarget("test-function2"),
 			},
 		},
 	} {
 		suite.Run(testCase.name, func() {
 			testSafeTrie := suite.generateSafeTrieForTest(testCase.initialState)
 
-			err := testSafeTrie.DeleteFunctionName(testCase.deleteArgs.path, testCase.deleteArgs.function)
+			err := testSafeTrie.Delete(testCase.deleteArgs.path, testCase.deleteArgs.function)
 			if testCase.expectError {
 				suite.Require().Error(err)
 				suite.Require().ErrorContains(err, testCase.errorMessage)
@@ -387,19 +387,19 @@ func (suite *SafeTrieTestSuite) TestPathTreeIsEmpty() {
 
 // --- SafeTrieTestSuite suite methods ---
 
-// flattenSafeTrie converts a PathTrie into a map[string][]string
+// flattenSafeTrie converts a PathTrie into a map[string]FunctionTarget
 // This function is not part of the SafeTrieTestSuite because it is also in use in IngressCacheTestSuite
-func flattenSafeTrie(st *SafeTrie) (map[string][]string, error) {
-	resultMap := make(map[string][]string)
+func flattenSafeTrie(st *SafeTrie) (map[string]FunctionTarget, error) {
+	resultMap := make(map[string]FunctionTarget)
 	err := st.pathTrie.Walk(func(key string, value interface{}) error {
 		// The Walk function iterates over all nodes.
 		// Only store key-value pairs where a non-nil value has been explicitly 'Put'.
 		// If a node exists as an internal prefix (e.g., "/a" for "/a/b"), its 'value' will be nil.
 		// We only care about the values that were actually stored.
 		if value != nil {
-			convertedValue, ok := value.([]string)
+			convertedValue, ok := value.(FunctionTarget)
 			if !ok {
-				return fmt.Errorf("path value should be []string")
+				return fmt.Errorf("path value should be FunctionTarget")
 			}
 			resultMap[key] = convertedValue
 		}
@@ -421,11 +421,11 @@ func (suite *SafeTrieTestSuite) generatePathsAndFunctions(num int) []safeTrieFun
 	return args
 }
 
-func (suite *SafeTrieTestSuite) generateExpectedResultMap(num int) map[string][]string {
-	expectedResult := make(map[string][]string)
+func (suite *SafeTrieTestSuite) generateExpectedResultMap(num int) map[string]FunctionTarget {
+	expectedResult := make(map[string]FunctionTarget)
 	args := suite.generatePathsAndFunctions(num)
 	for i := 0; i < num; i++ {
-		expectedResult[args[i].path] = []string{args[i].function}
+		expectedResult[args[i].path] = SingleTarget(args[i].function)
 	}
 	return expectedResult
 }
@@ -437,7 +437,7 @@ func (suite *SafeTrieTestSuite) generateSafeTrieForTest(initialSafeTrieState []s
 
 	// set path tree with the provided required state
 	for _, args := range initialSafeTrieState {
-		err = safeTrie.SetFunctionName(args.path, args.function)
+		err = safeTrie.Set(args.path, args.function)
 		suite.Require().NoError(err)
 	}
 
@@ -446,4 +446,311 @@ func (suite *SafeTrieTestSuite) generateSafeTrieForTest(initialSafeTrieState []s
 
 func TestSafeTrie(t *testing.T) {
 	suite.Run(t, new(SafeTrieTestSuite))
+}
+
+// --- SingleTargetTestSuite ---
+type SingleTargetTestSuite struct {
+	suite.Suite
+}
+
+func (suite *SingleTargetTestSuite) TestContains() {
+	testCases := []struct {
+		name           string
+		functionName   string
+		expectedResult bool
+	}{
+		{
+			name:           "Contains exact match",
+			functionName:   "myFunction",
+			expectedResult: true,
+		}, {
+			name:           "Contains no match",
+			functionName:   "otherFunction",
+			expectedResult: false,
+		}, {
+			name:           "Contains empty function name no match",
+			functionName:   "",
+			expectedResult: false,
+		}, {
+			name:           "Contains case sensitive",
+			functionName:   "MYFUNCTION",
+			expectedResult: false,
+		},
+	}
+
+	for _, testCase := range testCases {
+		suite.Run(testCase.name, func() {
+			testSingleFunctionName := SingleTarget("myFunction")
+			result := testSingleFunctionName.Contains(testCase.functionName)
+			suite.Equal(testCase.expectedResult, result)
+		})
+	}
+}
+
+func (suite *SingleTargetTestSuite) TestRemoveFunctionName() {
+	testCases := []struct {
+		name           string
+		functionName   string
+		expectedResult FunctionTarget
+		expectError    bool
+		errorMessage   string
+	}{
+		{
+			name:           "RemoveExistingFunction",
+			functionName:   "test-function1",
+			expectedResult: nil,
+			expectError:    true,
+			errorMessage:   "cannot remove function name from SingleTarget, it only contains one function name",
+		},
+		{
+			name:           "RemoveNonExistingFunction",
+			functionName:   "otherFunction",
+			expectedResult: SingleTarget("test-function1"),
+		},
+	}
+
+	for _, testCase := range testCases {
+		suite.Run(testCase.name, func() {
+			testSingleFunctionName := SingleTarget("test-function1")
+			result, err := testSingleFunctionName.Delete(testCase.functionName)
+			if testCase.expectError {
+				suite.Require().Error(err)
+				suite.Require().ErrorContains(err, testCase.errorMessage)
+				suite.Nil(result)
+			} else {
+				suite.Equal(testCase.expectedResult, result)
+			}
+		})
+	}
+}
+
+func (suite *SingleTargetTestSuite) TestAddFunctionName() {
+	testCases := []struct {
+		name           string
+		functionName   string
+		expectedResult FunctionTarget
+	}{
+		{
+			name:           "Add same function name",
+			functionName:   "test-function1",
+			expectedResult: SingleTarget("test-function1"),
+		}, {
+			name:           "Add function name",
+			functionName:   "test-function2",
+			expectedResult: &CanaryTarget{[2]string{"test-function1", "test-function2"}},
+		},
+	}
+
+	for _, testCase := range testCases {
+		suite.Run(testCase.name, func() {
+			testSingleFunctionName := SingleTarget("test-function1")
+			result, err := testSingleFunctionName.Add(testCase.functionName)
+			suite.Require().NoError(err)
+			suite.Require().NotNil(result)
+			suite.Equal(testCase.expectedResult, result)
+		})
+	}
+}
+
+func (suite *SingleTargetTestSuite) TestToSliceString() {
+	testCases := []struct {
+		name               string
+		singleFunctionName string
+		expectedResult     []string
+	}{
+		{
+			name:               "ToSliceStringWithFunction",
+			singleFunctionName: "toSliceStringFunction",
+			expectedResult:     []string{"toSliceStringFunction"},
+		}, {
+			name:               "ToSliceStringWithSpecialChars",
+			singleFunctionName: "my-function_123",
+			expectedResult:     []string{"my-function_123"},
+		},
+	}
+
+	for _, testCase := range testCases {
+		suite.Run(testCase.name, func() {
+			testSingleFunctionName := SingleTarget(testCase.singleFunctionName)
+			result := testSingleFunctionName.ToSliceString()
+			suite.Equal(testCase.expectedResult, result)
+			suite.Len(result, 1)
+		})
+	}
+}
+
+func (suite *SingleTargetTestSuite) TestIsSingleFunctionName() {
+	testCases := []struct {
+		name               string
+		singleFunctionName SingleTarget
+	}{
+		{
+			name:               "IsSingleFunctionNameTrue",
+			singleFunctionName: SingleTarget("isSingleFunctionNameFunction"),
+		},
+	}
+
+	for _, testCase := range testCases {
+		suite.Run(testCase.name, func() {
+			result := testCase.singleFunctionName.IsSingle()
+			suite.Require().True(result)
+		})
+	}
+}
+
+// TestSingleFunctionNameTestSuite runs the test suite
+func TestSingleFunctionNameTestSuite(t *testing.T) {
+	suite.Run(t, new(SingleTargetTestSuite))
+}
+
+// --- CanaryTargetTestSuite ---
+type CanaryTargetTestSuite struct {
+	suite.Suite
+}
+
+func (suite *CanaryTargetTestSuite) TestContains() {
+	testCases := []struct {
+		name           string
+		functionName   string
+		expectedResult bool
+	}{
+		{
+			name:           "Contains match",
+			functionName:   "test-function1",
+			expectedResult: true,
+		}, {
+			name:           "Contains no match",
+			functionName:   "test-function3",
+			expectedResult: false,
+		}, {
+			name:           "Contains empty function name",
+			functionName:   "",
+			expectedResult: false,
+		}, {
+			name:           "Contains case sensitive",
+			functionName:   "TEST-function1",
+			expectedResult: false,
+		},
+	}
+
+	for _, testCase := range testCases {
+		suite.Run(testCase.name, func() {
+			testCanaryFunctionNames := &CanaryTarget{[2]string{"test-function1", "test-function2"}}
+			result := testCanaryFunctionNames.Contains(testCase.functionName)
+			suite.Equal(testCase.expectedResult, result)
+		})
+	}
+}
+
+func (suite *CanaryTargetTestSuite) TestRemoveFunctionName() {
+	testCases := []struct {
+		name           string
+		functionName   string
+		expectedResult FunctionTarget
+	}{
+		{
+			name:           "RemoveExistingFunction",
+			functionName:   "test-function1",
+			expectedResult: SingleTarget("test-function2"),
+		}, {
+			name:           "RemoveNotExistingFunction",
+			functionName:   "test-function3",
+			expectedResult: &CanaryTarget{[2]string{"test-function1", "test-function2"}},
+		},
+	}
+
+	for _, testCase := range testCases {
+		suite.Run(testCase.name, func() {
+			testCanaryFunctionNames := &CanaryTarget{[2]string{"test-function1", "test-function2"}}
+			result, err := testCanaryFunctionNames.Delete(testCase.functionName)
+			suite.Require().NoError(err)
+			suite.Require().Equal(testCase.expectedResult, result)
+		})
+	}
+}
+
+func (suite *CanaryTargetTestSuite) TestAddFunctionName() {
+	testCases := []struct {
+		name           string
+		functionName   string
+		expectedResult FunctionTarget
+		expectError    bool
+		errorMessage   string
+	}{
+		{
+			name:           "Add same function name",
+			functionName:   "test-function1",
+			expectedResult: &CanaryTarget{[2]string{"test-function1", "test-function2"}},
+		}, {
+			name:           "Add distinct function name to a CanaryTarget",
+			functionName:   "test-function3",
+			expectedResult: &CanaryTarget{[2]string{"test-function1", "test-function2"}},
+			expectError:    true,
+			errorMessage:   "cannot add function name to CanaryTarget, it already contains two function names",
+		},
+	}
+
+	for _, testCase := range testCases {
+		suite.Run(testCase.name, func() {
+			testCanaryFunctionNames := &CanaryTarget{[2]string{"test-function1", "test-function2"}}
+			result, err := testCanaryFunctionNames.Add(testCase.functionName)
+			if testCase.expectError {
+				suite.Require().Error(err)
+				suite.Require().ErrorContains(err, testCase.errorMessage)
+				suite.Equal(testCase.expectedResult, result)
+			} else {
+				suite.Require().NoError(err)
+				suite.Equal(testCase.expectedResult, result)
+			}
+		})
+	}
+}
+
+func (suite *CanaryTargetTestSuite) TestToSliceString() {
+	testCases := []struct {
+		name           string
+		canaryTarget   [2]string
+		expectedResult []string
+	}{
+		{
+			name:           "ToSliceStringWithFunction",
+			canaryTarget:   [2]string{"test-function1", "test-function2"},
+			expectedResult: []string{"test-function1", "test-function2"},
+		}, {
+			name:           "ToSliceStringWithSpecialChars",
+			canaryTarget:   [2]string{"my-function_123", "test-function2"},
+			expectedResult: []string{"my-function_123", "test-function2"},
+		},
+	}
+
+	for _, testCase := range testCases {
+		suite.Run(testCase.name, func() {
+			testCanaryFunctionNames := &CanaryTarget{testCase.canaryTarget}
+			result := testCanaryFunctionNames.ToSliceString()
+			suite.Equal(testCase.expectedResult, result)
+		})
+	}
+}
+
+func (suite *CanaryTargetTestSuite) TestIsSingleFunctionName() {
+	testCases := []struct {
+		name string
+	}{
+		{
+			name: "IsSingleFunctionNameTrue",
+		},
+	}
+
+	for _, testCase := range testCases {
+		suite.Run(testCase.name, func() {
+			testCanaryFunctionNames := &CanaryTarget{[2]string{"test-function1", "test-function2"}}
+			result := testCanaryFunctionNames.IsSingle()
+			suite.Require().False(result)
+		})
+	}
+}
+
+// TestCanaryFunctionNamesTestSuite runs the test suite
+func TestCanaryFunctionNamesTestSuite(t *testing.T) {
+	suite.Run(t, new(CanaryTargetTestSuite))
 }
