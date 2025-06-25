@@ -40,23 +40,24 @@ func NewIngressCache(logger logger.Logger) *IngressCache {
 }
 
 func (ic *IngressCache) Set(host, path, function string) error {
-	urlTree, exists := ic.syncMap.Load(host)
-	if !exists {
-		urlTree = NewSafeTrie()
-	}
+	urlTree, exists := ic.syncMap.LoadOrStore(host, NewSafeTrie())
 
 	ingressHostsTree, ok := urlTree.(IngressHostsTree)
 	if !ok {
+		if !exists {
+			ic.syncMap.Delete(host)
+		}
 		return errors.Errorf("cache set failed: invalid path tree value: got: %t", urlTree)
 	}
 
 	if err := ingressHostsTree.Set(path, function); err != nil {
+		if !exists {
+			ic.syncMap.Delete(host)
+		}
+
 		return errors.Wrap(err, "failed to set function name in the ingress host tree")
 	}
 
-	if !exists {
-		ic.syncMap.Store(host, urlTree)
-	}
 	return nil
 }
 
