@@ -21,6 +21,9 @@ such restriction.
 package ingresscache
 
 import (
+	"fmt"
+	"slices"
+	"sync"
 	"testing"
 
 	"github.com/nuclio/logger"
@@ -253,6 +256,156 @@ func (suite *IngressCacheTestSuite) TestDelete() {
 	}
 }
 
+// --- IngressCacheTestSuite flow tests ---
+
+func (suite *IngressCacheTestSuite) TestAllThreeMainFunctionalitiesWithTheSameHostAndPath() {
+	// This test verifies the flow of setting a function name in an empty IngressCache, then getting it, and finally deleting it.
+	// It ensures that the IngressCache behaves correctly when performing these operations sequentially.
+
+	testIngressCache := suite.getTestIngressCache([]ingressCacheTestInitialState{})
+	var err error
+	var getResult []string
+
+	// get when cache is empty
+	getResult, err = testIngressCache.Get("example.com", "/test/path")
+	suite.Require().Error(err)
+	suite.Require().ErrorContains(err, "cache get failed: host does not exist")
+	suite.Require().Nil(getResult, "Expected no function names for empty cache")
+
+	// Set a function name in an empty cache
+	err = testIngressCache.Set("example.com", "/test/path", "test-function-name-1")
+	suite.Require().NoError(err, "Expected no error when setting a function name in an empty cache")
+	getResult, err = testIngressCache.Get("example.com", "/test/path")
+	suite.Require().NoError(err, "Expected no error when getting function names after setting")
+	suite.Require().Equal([]string{"test-function-name-1"}, getResult, "Expected to get the function name that was just set")
+	flattenTestResult := suite.flattenIngressCache(testIngressCache)
+	suite.Require().Equal(flattenTestResult, map[string]map[string]FunctionTarget{
+		"example.com": {"/test/path": SingleTarget("test-function-name-1")},
+	})
+
+	// Set another function name for the same host and path
+	err = testIngressCache.Set("example.com", "/test/path", "test-function-name-2")
+	suite.Require().NoError(err, "Expected no error when setting another function name for the same host and path")
+	getResult, err = testIngressCache.Get("example.com", "/test/path")
+	suite.Require().NoError(err, "Expected no error when getting function names after setting another function name")
+	suite.Require().Equal([]string{"test-function-name-1", "test-function-name-2"}, getResult, "Expected to get the new function name that was just set")
+	flattenTestResult = suite.flattenIngressCache(testIngressCache)
+	suite.Require().Equal(flattenTestResult, map[string]map[string]FunctionTarget{
+		"example.com": {"/test/path": &CanaryTarget{[2]string{"test-function-name-1", "test-function-name-2"}}},
+	})
+
+	// Delete the first function name
+	err = testIngressCache.Delete("example.com", "/test/path", "test-function-name-1")
+	suite.Require().NoError(err, "Expected no error when deleting the first function name")
+	getResult, err = testIngressCache.Get("example.com", "/test/path")
+	suite.Require().NoError(err, "Expected no error when getting function names after deleting the first function name")
+	suite.Require().Equal(getResult, []string{"test-function-name-2"}, "Expected to get the remaining function name after deletion")
+	flattenTestResult = suite.flattenIngressCache(testIngressCache)
+	suite.Require().Equal(flattenTestResult, map[string]map[string]FunctionTarget{
+		"example.com": {"/test/path": SingleTarget("test-function-name-2")},
+	})
+}
+
+func (suite *IngressCacheTestSuite) TestParallelSetForTheSameHostAndDifferentPath() {
+	// This test simulates a scenario where multiple goroutines try to set the same host and different paths in the IngressCache concurrently.
+	// The expected behavior is that the IngressCache should handle concurrent writes without any errors and end up with a canaryTarget for each path.
+
+	testIngressCache := suite.getTestIngressCache([]ingressCacheTestInitialState{})
+	wg := sync.WaitGroup{}
+	for i := range 20 {
+		wg.Add(2)
+		path := fmt.Sprintf("/test/path/%d", i)
+
+		// first goroutine set test-function-name-1
+		go func(ingressCache *IngressCache, wg *sync.WaitGroup, path string) {
+			defer wg.Done()
+			err := ingressCache.Set("example.com", path, "test-function-name-1")
+			suite.Require().NoError(err, "Expected no error when setting a function name in an empty cache")
+		}(testIngressCache, &wg, path)
+
+		// second goroutine set test-function-name-2
+		go func(ingressCache *IngressCache, wg *sync.WaitGroup, path string) {
+			defer wg.Done()
+			err := ingressCache.Set("example.com", path, "test-function-name-2")
+			suite.Require().NoError(err, "Expected no error when setting a function name in an empty cache")
+		}(testIngressCache, &wg, path)
+	}
+	wg.Wait()
+
+	// After all goroutines finished, check that the expected result matches the IngressCache state
+	flattenTestResult := suite.flattenIngressCache(testIngressCache)
+	expectedResult := suite.generateExpectedResult(20, false)
+	suite.compareIngressHostCache(expectedResult, flattenTestResult)
+}
+
+func (suite *IngressCacheTestSuite) TestParallelSetForDifferentHosts() {
+	// This test simulates a scenario where multiple goroutines try to set different hosts and paths in the IngressCache concurrently.
+	// The expected behavior is that the IngressCache should handle concurrent writes without any errors and end up with a canaryTarget for each host and path.
+
+	testIngressCache := suite.getTestIngressCache([]ingressCacheTestInitialState{})
+	wg := sync.WaitGroup{}
+	for i := range 200 {
+		wg.Add(2)
+		host := fmt.Sprintf("example-%d.com", i)
+		path := fmt.Sprintf("/test/path/%d", i)
+
+		// first goroutine set test-function-name-1
+		go func(ingressCache *IngressCache, wg *sync.WaitGroup, host, path string) {
+			defer wg.Done()
+			err := ingressCache.Set(host, path, "test-function-name-1")
+			suite.Require().NoError(err, "Expected no error when setting a function name in an empty cache")
+		}(testIngressCache, &wg, host, path)
+
+		// second goroutine set test-function-name-2
+		go func(ingressCache *IngressCache, wg *sync.WaitGroup, host, path string) {
+			defer wg.Done()
+			err := ingressCache.Set(host, path, "test-function-name-2")
+			suite.Require().NoError(err, "Expected no error when setting a function name in an empty cache")
+		}(testIngressCache, &wg, host, path)
+	}
+	wg.Wait()
+
+	// After all goroutines finished, check that the expected result matches the IngressCache state
+	flattenTestResult := suite.flattenIngressCache(testIngressCache)
+	expectedResult := suite.generateExpectedResult(200, true)
+	suite.compareIngressHostCache(expectedResult, flattenTestResult)
+}
+
+func (suite *IngressCacheTestSuite) TestParallelSetForSameHostAndSamePath() {
+	// This test simulates a scenario where multiple goroutines try to set the same host and path in the IngressCache concurrently.
+	// The expected behavior is that the IngressCache should handle concurrent writes without any errors and end up with a single entry for the host and path
+
+	testIngressCache := suite.getTestIngressCache([]ingressCacheTestInitialState{})
+	wg := sync.WaitGroup{}
+	for range 20 {
+		wg.Add(2)
+
+		// first goroutine set test-function-name-1
+		go func(ingressCache *IngressCache, wg *sync.WaitGroup) {
+			defer wg.Done()
+			err := ingressCache.Set("example.com", "/test/path", "test-function-name-1")
+			suite.Require().NoError(err, "Expected no error when setting a function name in an empty cache")
+		}(testIngressCache, &wg)
+
+		// second goroutine set test-function-name-2
+		go func(ingressCache *IngressCache, wg *sync.WaitGroup) {
+			defer wg.Done()
+			err := ingressCache.Set("example.com", "/test/path", "test-function-name-2")
+			suite.Require().NoError(err, "Expected no error when setting a function name in an empty cache")
+		}(testIngressCache, &wg)
+	}
+	wg.Wait()
+
+	// After all goroutines finished, check that the expected result matches the IngressCache state
+	flattenTestResult := suite.flattenIngressCache(testIngressCache)
+	expectedResult := map[string]map[string]FunctionTarget{
+		"example.com": {
+			"/test/path": &CanaryTarget{[2]string{"test-function-name-1", "test-function-name-2"}},
+		},
+	}
+	suite.compareIngressHostCache(expectedResult, flattenTestResult)
+}
+
 // --- IngressCacheTestSuite suite methods ---
 
 // getTestIngressCache creates a IngressCache instance and sets the provided initial state
@@ -282,6 +435,44 @@ func (suite *IngressCacheTestSuite) flattenIngressCache(testIngressCache *Ingres
 	})
 
 	return output
+}
+
+func (suite *IngressCacheTestSuite) generateExpectedResult(num int, differentHosts bool) map[string]map[string]FunctionTarget {
+	output := make(map[string]map[string]FunctionTarget)
+	for i := range num {
+		path := fmt.Sprintf("/test/path/%d", i)
+		host := "example.com"
+		if differentHosts {
+			host = fmt.Sprintf("example-%d.com", i)
+		}
+
+		if output[host] == nil {
+			output[host] = map[string]FunctionTarget{}
+		}
+
+		output[host][path] = &CanaryTarget{functionNames: [2]string{"test-function-name-1", "test-function-name-2"}}
+	}
+
+	return output
+}
+
+// compareIngressHostCache compares the expected result with the test result
+func (suite *IngressCacheTestSuite) compareIngressHostCache(expectedResult, testResult map[string]map[string]FunctionTarget) {
+	suite.Require().Equal(len(expectedResult), len(testResult))
+
+	// Because the values in the map are pointers, we need to compare the values
+	for host, paths := range testResult {
+		suite.Require().Contains(expectedResult, host, "Expected host %s to be in the result", host)
+		for path, functionNames := range paths {
+			suite.Require().Contains(expectedResult[host], path, "Expected path %s to be in the result for host %s", path, host)
+			expectedFunctionNames := expectedResult[host][path].ToSliceString()
+			slices.Sort(expectedFunctionNames)
+			sortedFunctionNames := functionNames.ToSliceString()
+			slices.Sort(sortedFunctionNames)
+			suite.Require().Equal(expectedFunctionNames, sortedFunctionNames,
+				"Expected function names for host %s and path %s to match", host, path)
+		}
+	}
 }
 
 func TestIngressCache(t *testing.T) {
