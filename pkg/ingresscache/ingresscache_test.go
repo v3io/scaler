@@ -304,6 +304,16 @@ func (suite *IngressCacheTestSuite) TestAllThreeMainFunctionalitiesWithTheSameHo
 	suite.Require().Equal(flattenTestResult, map[string]map[string]FunctionTarget{
 		"example.com": {"/test/path": SingleTarget("test-function-name-2")},
 	})
+
+	// Delete the second function name and validate that the cache is empty
+	err = testIngressCache.Delete("example.com", "/test/path", "test-function-name-2")
+	suite.Require().NoError(err, "Expected no error when deleting the second function name")
+	getResult, err = testIngressCache.Get("example.com", "/test/path")
+	suite.Require().Error(err)
+	suite.Require().ErrorContains(err, "cache get failed: host does not exist")
+	suite.Require().Nil(getResult, "Expected no function names for empty cache")
+	flattenTestResult = suite.flattenIngressCache(testIngressCache)
+	suite.Require().Equal(flattenTestResult, map[string]map[string]FunctionTarget{})
 }
 
 func (suite *IngressCacheTestSuite) TestParallelSetForTheSameHostAndDifferentPath() {
