@@ -47,7 +47,13 @@ func NewIngressWatcher(
 		informer:     ingressInformer,
 	}
 
-	//TODO - need to add event handler here -> ingressInformer.AddEventHandler
+	if _, err := ingressInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    ingressWatcher.IngressHandlerAddFunc,
+		UpdateFunc: ingressWatcher.IngressHandlerUpdateFunc,
+		DeleteFunc: ingressWatcher.IngressHandlerDeleteFunc,
+	}); err != nil {
+		return nil, err
+	}
 
 	return ingressWatcher, nil
 }
@@ -68,25 +74,80 @@ func (iw *IngressWatcher) Stop() {
 	iw.factory.Shutdown()
 }
 
+// --- ResourceEventHandler methods ---
+
+func (iw *IngressWatcher) IngressHandlerAddFunc(obj interface{}) {
+	host, path, functions, err := iw.extractIngressValuesFromIngressResource(obj)
+	if err != nil {
+		iw.logger.WarnWith("Add ingress handler failure", "error", err)
+		return
+	}
+
+	if err = iw.ingressCache.Set(host, path, functions); err != nil {
+		iw.logger.WarnWith("Add ingress handler failure- failed to add the new value", "error", err, "object", obj)
+		return
+	}
+}
+
+func (iw *IngressWatcher) IngressHandlerUpdateFunc(oldObj, newObj interface{}) {
+	oldHost, oldPath, oldFunctions, err := iw.extractIngressValuesFromIngressResource(oldObj)
+	if err != nil {
+		iw.logger.WarnWith("Update ingress handler - failed to extract values from old object", "error", err)
+		return
+	}
+
+	newHost, newPath, newFunctions, err := iw.extractIngressValuesFromIngressResource(newObj)
+	if err != nil {
+		iw.logger.WarnWith("Update ingress handler - failed to extract values from new object", "error", err)
+		return
+	}
+
+	//TODO - think on the scenarios here again TOMORROW
+	// The current implementation is- remove the old ingress and add the new one if the host, path or function name has changed
+
+	if err = iw.ingressCache.Delete(oldHost, oldPath, oldFunctions); err != nil {
+		iw.logger.WarnWith("Update ingress handler failure - failed to delete old ingress", "error", err)
+	}
+
+	//TODO - need to see how the ingress is being used in the cache- see the diff or only new ingress
+	if err = iw.ingressCache.Set(newHost, newPath, newFunctions); err != nil {
+		iw.logger.WarnWith("Update ingress handler failure- failed to add the new value", "error", err, "object", newObj)
+		return
+	}
+}
+
+func (iw *IngressWatcher) IngressHandlerDeleteFunc(obj interface{}) {
+	host, path, functions, err := iw.extractIngressValuesFromIngressResource(obj)
+	if err != nil {
+		iw.logger.WarnWith("Delete ingress handler failure- failed to extract values from object", "error", err)
+		return
+	}
+
+	if err = iw.ingressCache.Delete(host, path, functions); err != nil {
+		iw.logger.WarnWith("Delete ingress handler failure- failed delete from cache", "error", err, "object", obj)
+		return
+	}
+}
+
 // --- internal methods ---
 
 // extractIngressValuesFromIngressResource extracts the host, path, and function name from the ingress resource.
-func (iw *IngressWatcher) extractIngressValuesFromIngressResource(obj interface{}) (string, string, string, error) {
+func (iw *IngressWatcher) extractIngressValuesFromIngressResource(obj interface{}) (string, string, []string, error) {
 	ingress, ok := obj.(*networkingv1.Ingress)
 	if !ok {
-		return "", "", "", errors.New("Failed to cast object to Ingress")
+		return "", "", nil, errors.New("Failed to cast object to Ingress")
 	}
 
 	//todo - add function to extract host, path and function name from ingress resource
 	// For now, we just store WA
-	host, path, function, err := iw.extractHostPathFunction(ingress)
+	host, path, functions, err := iw.extractHostPathFunction(ingress)
 	if err != nil {
-		return "", "", "", errors.Wrap(err, "Failed to extract host, path and function from ingress")
+		return "", "", nil, errors.Wrap(err, "Failed to extract host, path and function from ingress")
 	}
 
-	return host, path, function, nil
+	return host, path, functions, nil
 }
 
-func (iw *IngressWatcher) extractHostPathFunction(ingress *networkingv1.Ingress) (string, string, string, error) {
-	return "", "", "", nil //todo - implement this function to extract host, path and function name from ingress resource
+func (iw *IngressWatcher) extractHostPathFunction(ingress *networkingv1.Ingress) (string, string, []string, error) {
+	return "", "", nil, nil //todo - implement this function to extract host, path and function name from ingress resource
 }
