@@ -37,9 +37,9 @@ type IngressCacheTestSuite struct {
 }
 
 type testIngressCacheArgs struct {
-	host     string
-	path     string
-	function string
+	host      string
+	path      string
+	functions []string
 }
 
 type ingressCacheTestInitialState testIngressCacheArgs
@@ -62,43 +62,42 @@ func (suite *IngressCacheTestSuite) TestGet() {
 		errorMessage   string
 	}{
 		{
-			name:           "Get two functionName",
-			args:           testIngressCacheArgs{"example.com", "/test/path", ""},
+			name:           "Get two functionNames",
+			args:           testIngressCacheArgs{"example.com", "/test/path", []string{}},
 			expectedResult: []string{"test-function-name-1", "test-function-name-2"},
 			initialState: []ingressCacheTestInitialState{
-				{"example.com", "/test/path", "test-function-name-1"},
-				{"example.com", "/test/path", "test-function-name-2"},
+				{"example.com", "/test/path", []string{"test-function-name-1", "test-function-name-2"}},
 			},
 		}, {
-			name:           "Get single functionName",
-			args:           testIngressCacheArgs{"example.com", "/test/path", ""},
+			name:           "Get single functionNames",
+			args:           testIngressCacheArgs{"example.com", "/test/path", []string{}},
 			expectedResult: []string{"test-function-name-1"},
 			initialState: []ingressCacheTestInitialState{
-				{"example.com", "/test/path", "test-function-name-1"},
+				{"example.com", "/test/path", []string{"test-function-name-1"}},
 			},
 		}, {
 			name:           "Get with empty cache",
-			args:           testIngressCacheArgs{"not.exist", "/test/path", ""},
+			args:           testIngressCacheArgs{"not.exist", "/test/path", []string{}},
 			expectedResult: nil,
 			expectError:    true,
 			errorMessage:   "host does not exist",
 		}, {
 			name:           "Get with not existing host",
-			args:           testIngressCacheArgs{"not.exist", "/test/path", ""},
+			args:           testIngressCacheArgs{"not.exist", "/test/path", []string{}},
 			expectedResult: nil,
 			expectError:    true,
 			errorMessage:   "host does not exist",
 			initialState: []ingressCacheTestInitialState{
-				{"example.com", "/test/path", "test-function-name-1"},
+				{"example.com", "/test/path", []string{"test-function-name-1"}},
 			},
 		}, {
 			name:           "Get with not existing path",
-			args:           testIngressCacheArgs{"example.com", "/not/exists/test/path", ""},
+			args:           testIngressCacheArgs{"example.com", "/not/exists/test/path", []string{}},
 			expectedResult: nil,
 			expectError:    true,
-			errorMessage:   "failed to get the function name from the ingress host tree",
+			errorMessage:   "failed to get the functions name from the ingress host tree",
 			initialState: []ingressCacheTestInitialState{
-				{"example.com", "/test/path", "test-function-name-1"},
+				{"example.com", "/test/path", []string{"test-function-name-1"}},
 			},
 		},
 	} {
@@ -130,33 +129,33 @@ func (suite *IngressCacheTestSuite) TestSet() {
 	}{
 		{
 			name: "Set new host",
-			args: testIngressCacheArgs{"example.com", "/test/path", "test-function-name-1"},
+			args: testIngressCacheArgs{"example.com", "/test/path", []string{"test-function-name-1"}},
 			expectedResult: map[string]map[string]FunctionTarget{
 				"example.com": {"/test/path": SingleTarget("test-function-name-1")},
 			},
 		}, {
-			name: "Set unique functionName that will be added to existing host and path",
-			args: testIngressCacheArgs{"example.com", "/test/path", "test-function-name-2"},
+			name: "Set unique functionNames that will override the existing host and path value",
+			args: testIngressCacheArgs{"example.com", "/test/path", []string{"test-function-name-2"}},
 			initialState: []ingressCacheTestInitialState{
-				{"example.com", "/test/path", "test-function-name-1"},
+				{"example.com", "/test/path", []string{"test-function-name-1"}},
 			},
 			expectedResult: map[string]map[string]FunctionTarget{
-				"example.com": {"/test/path": &CanaryTarget{[2]string{"test-function-name-1", "test-function-name-2"}}},
+				"example.com": {"/test/path": SingleTarget("test-function-name-2")},
 			},
 		}, {
-			name: "Set existing functionName for existing host and path",
-			args: testIngressCacheArgs{"example.com", "/test/path", "test-function-name-1"},
+			name: "Set existing functionNames for existing host and path",
+			args: testIngressCacheArgs{"example.com", "/test/path", []string{"test-function-name-1"}},
 			initialState: []ingressCacheTestInitialState{
-				{"example.com", "/test/path", "test-function-name-1"},
+				{"example.com", "/test/path", []string{"test-function-name-1"}},
 			},
 			expectedResult: map[string]map[string]FunctionTarget{
 				"example.com": {"/test/path": SingleTarget("test-function-name-1")},
 			},
 		}, {
 			name: "Set another host and path",
-			args: testIngressCacheArgs{"google.com", "/test/path", "test-function-name-1"},
+			args: testIngressCacheArgs{"google.com", "/test/path", []string{"test-function-name-1"}},
 			initialState: []ingressCacheTestInitialState{
-				{"example.com", "/test/path", "test-function-name-1"},
+				{"example.com", "/test/path", []string{"test-function-name-1"}},
 			},
 			expectedResult: map[string]map[string]FunctionTarget{
 				"google.com":  {"/test/path": SingleTarget("test-function-name-1")},
@@ -167,7 +166,7 @@ func (suite *IngressCacheTestSuite) TestSet() {
 		suite.Run(testCase.name, func() {
 			testIngressCache := suite.getTestIngressCache(testCase.initialState)
 
-			err := testIngressCache.Set(testCase.args.host, testCase.args.path, testCase.args.function)
+			err := testIngressCache.Set(testCase.args.host, testCase.args.path, testCase.args.functions)
 			if testCase.expectError {
 				suite.Require().Error(err)
 				suite.Require().ErrorContains(err, testCase.errorMessage)
@@ -195,52 +194,51 @@ func (suite *IngressCacheTestSuite) TestDelete() {
 	}{
 		{
 			name:           "Delete when cache is empty",
-			args:           testIngressCacheArgs{"example.com", "/test/path", "test-function-name-1"},
+			args:           testIngressCacheArgs{"example.com", "/test/path", []string{"test-function-name-1"}},
 			expectedResult: map[string]map[string]FunctionTarget{},
 		}, {
 			name: "Delete not existed host",
-			args: testIngressCacheArgs{"google.com", "/test/path", "test-function-name-1"},
+			args: testIngressCacheArgs{"google.com", "/test/path", []string{"test-function-name-1"}},
 			initialState: []ingressCacheTestInitialState{
-				{"example.com", "/test/path", "test-function-name-1"},
+				{"example.com", "/test/path", []string{"test-function-name-1"}},
 			},
 			expectedResult: map[string]map[string]FunctionTarget{
 				"example.com": {"/test/path": SingleTarget("test-function-name-1")},
 			},
 		}, {
-			name: "Delete last function in host, validate host deletion",
-			args: testIngressCacheArgs{"example.com", "/test/path", "test-function-name-1"},
+			name: "Delete last functions in host, validate host deletion",
+			args: testIngressCacheArgs{"example.com", "/test/path", []string{"test-function-name-1"}},
 			initialState: []ingressCacheTestInitialState{
-				{"example.com", "/test/path", "test-function-name-1"},
-				{"google.com", "/test/path", "test-function-name-1"},
+				{"example.com", "/test/path", []string{"test-function-name-1"}},
+				{"google.com", "/test/path", []string{"test-function-name-1"}},
 			},
 			expectedResult: map[string]map[string]FunctionTarget{
 				"google.com": {"/test/path": SingleTarget("test-function-name-1")},
 			},
 		}, {
 			name: "Delete not existing url and validate host wasn't deleted",
-			args: testIngressCacheArgs{"example.com", "/not/exists/test/path", "test-function-name-2"},
+			args: testIngressCacheArgs{"example.com", "/not/exists/test/path", []string{"test-function-name-2"}},
 			initialState: []ingressCacheTestInitialState{
-				{"example.com", "/test/path", "test-function-name-1"},
+				{"example.com", "/test/path", []string{"test-function-name-1"}},
 			},
 			expectedResult: map[string]map[string]FunctionTarget{
 				"example.com": {"/test/path": SingleTarget("test-function-name-1")},
 			},
 		}, {
-			name: "Delete not last function in path and validate host wasn't deleted",
-			args: testIngressCacheArgs{"example.com", "/test/path", "test-function-name-2"},
+			name: "Delete one function from multiple functions and validate that nothing was deleted",
+			args: testIngressCacheArgs{"example.com", "/test/path", []string{"test-functions-name-2"}},
 			initialState: []ingressCacheTestInitialState{
-				{"example.com", "/test/path", "test-function-name-1"},
-				{"example.com", "/test/path", "test-function-name-2"},
+				{"example.com", "/test/path", []string{"test-function-name-1", "test-function-name-2"}},
 			},
 			expectedResult: map[string]map[string]FunctionTarget{
-				"example.com": {"/test/path": SingleTarget("test-function-name-1")},
+				"example.com": {"/test/path": &CanaryTarget{[2]string{"test-function-name-1", "test-function-name-2"}}},
 			},
 		},
 	} {
 		suite.Run(testCase.name, func() {
 			testIngressCache := suite.getTestIngressCache(testCase.initialState)
 
-			err := testIngressCache.Delete(testCase.args.host, testCase.args.path, testCase.args.function)
+			err := testIngressCache.Delete(testCase.args.host, testCase.args.path, testCase.args.functions)
 			if testCase.expectError {
 				suite.Require().Error(err)
 				suite.Require().ErrorContains(err, testCase.errorMessage)
@@ -259,7 +257,7 @@ func (suite *IngressCacheTestSuite) TestDelete() {
 // --- IngressCacheTestSuite flow tests ---
 
 func (suite *IngressCacheTestSuite) TestAllThreeMainFunctionalitiesWithTheSameHostAndPath() {
-	// This test verifies the flow of setting a function name in an empty IngressCache, then getting it, and finally deleting it.
+	// This test verifies the flow of setting a functions name in an empty IngressCache, then getting it, and finally deleting it.
 	// It ensures that the IngressCache behaves correctly when performing these operations sequentially.
 
 	testIngressCache := suite.getTestIngressCache([]ingressCacheTestInitialState{})
@@ -270,48 +268,48 @@ func (suite *IngressCacheTestSuite) TestAllThreeMainFunctionalitiesWithTheSameHo
 	getResult, err = testIngressCache.Get("example.com", "/test/path")
 	suite.Require().Error(err)
 	suite.Require().ErrorContains(err, "cache get failed: host does not exist")
-	suite.Require().Nil(getResult, "Expected no function names for empty cache")
+	suite.Require().Nil(getResult, "Expected no functions names for empty cache")
 
-	// Set a function name in an empty cache
-	err = testIngressCache.Set("example.com", "/test/path", "test-function-name-1")
-	suite.Require().NoError(err, "Expected no error when setting a function name in an empty cache")
+	// Set a functions name in an empty cache
+	err = testIngressCache.Set("example.com", "/test/path", []string{"test-function-name-1"})
+	suite.Require().NoError(err, "Expected no error when setting a functions name in an empty cache")
 	getResult, err = testIngressCache.Get("example.com", "/test/path")
-	suite.Require().NoError(err, "Expected no error when getting function names after setting")
-	suite.Require().Equal([]string{"test-function-name-1"}, getResult, "Expected to get the function name that was just set")
+	suite.Require().NoError(err, "Expected no error when getting functions names after setting")
+	suite.Require().Equal([]string{"test-function-name-1"}, getResult, "Expected to get the functions name that was just set")
 	flattenTestResult := suite.flattenIngressCache(testIngressCache)
 	suite.Require().Equal(flattenTestResult, map[string]map[string]FunctionTarget{
 		"example.com": {"/test/path": SingleTarget("test-function-name-1")},
 	})
 
-	// Set another function name for the same host and path
-	err = testIngressCache.Set("example.com", "/test/path", "test-function-name-2")
-	suite.Require().NoError(err, "Expected no error when setting another function name for the same host and path")
+	// Set another functions name for the same host and path
+	err = testIngressCache.Set("example.com", "/test/path", []string{"test-function-name-1", "test-function-name-2"})
+	suite.Require().NoError(err, "Expected no error when setting another functions name for the same host and path")
 	getResult, err = testIngressCache.Get("example.com", "/test/path")
-	suite.Require().NoError(err, "Expected no error when getting function names after setting another function name")
-	suite.Require().Equal([]string{"test-function-name-1", "test-function-name-2"}, getResult, "Expected to get the new function name that was just set")
+	suite.Require().NoError(err, "Expected no error when getting functions names after setting another functions name")
+	suite.Require().Equal([]string{"test-function-name-1", "test-function-name-2"}, getResult, "Expected to get the new functions name that was just set")
 	flattenTestResult = suite.flattenIngressCache(testIngressCache)
 	suite.Require().Equal(flattenTestResult, map[string]map[string]FunctionTarget{
 		"example.com": {"/test/path": &CanaryTarget{[2]string{"test-function-name-1", "test-function-name-2"}}},
 	})
 
-	// Delete the first function name
-	err = testIngressCache.Delete("example.com", "/test/path", "test-function-name-1")
-	suite.Require().NoError(err, "Expected no error when deleting the first function name")
+	// Delete only the first functions name shouldn't delete anything
+	err = testIngressCache.Delete("example.com", "/test/path", []string{"test-function-name-1"})
+	suite.Require().NoError(err, "Expected no error when deleting the first functions name")
 	getResult, err = testIngressCache.Get("example.com", "/test/path")
-	suite.Require().NoError(err, "Expected no error when getting function names after deleting the first function name")
-	suite.Require().Equal(getResult, []string{"test-function-name-2"}, "Expected to get the remaining function name after deletion")
+	suite.Require().NoError(err, "Expected no error when getting functions names after deleting the first functions name")
+	suite.Require().Equal(getResult, []string{"test-function-name-1", "test-function-name-2"}, "Expected to get the remaining functions name after deletion")
 	flattenTestResult = suite.flattenIngressCache(testIngressCache)
 	suite.Require().Equal(flattenTestResult, map[string]map[string]FunctionTarget{
-		"example.com": {"/test/path": SingleTarget("test-function-name-2")},
+		"example.com": {"/test/path": &CanaryTarget{[2]string{"test-function-name-1", "test-function-name-2"}}},
 	})
 
-	// Delete the second function name and validate that the cache is empty
-	err = testIngressCache.Delete("example.com", "/test/path", "test-function-name-2")
-	suite.Require().NoError(err, "Expected no error when deleting the second function name")
+	// Delete the first and second functions name should delete the functionTarget, validate that the cache is empty
+	err = testIngressCache.Delete("example.com", "/test/path", []string{"test-function-name-1", "test-function-name-2"})
+	suite.Require().NoError(err, "Expected no error when deleting the second functions name")
 	getResult, err = testIngressCache.Get("example.com", "/test/path")
 	suite.Require().Error(err)
 	suite.Require().ErrorContains(err, "cache get failed: host does not exist")
-	suite.Require().Nil(getResult, "Expected no function names for empty cache")
+	suite.Require().Nil(getResult, "Expected no functions names for empty cache")
 	flattenTestResult = suite.flattenIngressCache(testIngressCache)
 	suite.Require().Equal(flattenTestResult, map[string]map[string]FunctionTarget{})
 }
@@ -326,18 +324,18 @@ func (suite *IngressCacheTestSuite) TestParallelSetForTheSameHostAndDifferentPat
 		wg.Add(2)
 		path := fmt.Sprintf("/test/path/%d", i)
 
-		// first goroutine set test-function-name-1
+		// first goroutine set functionTarget
 		go func(ingressCache *IngressCache, wg *sync.WaitGroup, path string) {
 			defer wg.Done()
-			err := ingressCache.Set("example.com", path, "test-function-name-1")
-			suite.Require().NoError(err, "Expected no error when setting a function name in an empty cache")
+			err := ingressCache.Set("example.com", path, []string{"test-function-name-1", "test-function-name-2"})
+			suite.Require().NoError(err, "Expected no error when setting a functions name in an empty cache")
 		}(testIngressCache, &wg, path)
 
-		// second goroutine set test-function-name-2
+		// second goroutine set functionTarget
 		go func(ingressCache *IngressCache, wg *sync.WaitGroup, path string) {
 			defer wg.Done()
-			err := ingressCache.Set("example.com", path, "test-function-name-2")
-			suite.Require().NoError(err, "Expected no error when setting a function name in an empty cache")
+			err := ingressCache.Set("example.com", path, []string{"test-function-name-1", "test-function-name-2"})
+			suite.Require().NoError(err, "Expected no error when setting a functions name in an empty cache")
 		}(testIngressCache, &wg, path)
 	}
 	wg.Wait()
@@ -359,18 +357,18 @@ func (suite *IngressCacheTestSuite) TestParallelSetForDifferentHosts() {
 		host := fmt.Sprintf("example-%d.com", i)
 		path := fmt.Sprintf("/test/path/%d", i)
 
-		// first goroutine set test-function-name-1
+		// first goroutine set
 		go func(ingressCache *IngressCache, wg *sync.WaitGroup, host, path string) {
 			defer wg.Done()
-			err := ingressCache.Set(host, path, "test-function-name-1")
-			suite.Require().NoError(err, "Expected no error when setting a function name in an empty cache")
+			err := ingressCache.Set(host, path, []string{"test-function-name-1", "test-function-name-2"})
+			suite.Require().NoError(err, "Expected no error when setting a functions name in an empty cache")
 		}(testIngressCache, &wg, host, path)
 
-		// second goroutine set test-function-name-2
+		// second goroutine set
 		go func(ingressCache *IngressCache, wg *sync.WaitGroup, host, path string) {
 			defer wg.Done()
-			err := ingressCache.Set(host, path, "test-function-name-2")
-			suite.Require().NoError(err, "Expected no error when setting a function name in an empty cache")
+			err := ingressCache.Set(host, path, []string{"test-function-name-1", "test-function-name-2"})
+			suite.Require().NoError(err, "Expected no error when setting a functions name in an empty cache")
 		}(testIngressCache, &wg, host, path)
 	}
 	wg.Wait()
@@ -390,18 +388,18 @@ func (suite *IngressCacheTestSuite) TestParallelSetForSameHostAndSamePath() {
 	for range 20 {
 		wg.Add(2)
 
-		// first goroutine set test-function-name-1
+		// first goroutine set
 		go func(ingressCache *IngressCache, wg *sync.WaitGroup) {
 			defer wg.Done()
-			err := ingressCache.Set("example.com", "/test/path", "test-function-name-1")
-			suite.Require().NoError(err, "Expected no error when setting a function name in an empty cache")
+			err := ingressCache.Set("example.com", "/test/path", []string{"test-function-name-1", "test-function-name-2"})
+			suite.Require().NoError(err, "Expected no error when setting a functions name in an empty cache")
 		}(testIngressCache, &wg)
 
-		// second goroutine set test-function-name-2
+		// second goroutine set
 		go func(ingressCache *IngressCache, wg *sync.WaitGroup) {
 			defer wg.Done()
-			err := ingressCache.Set("example.com", "/test/path", "test-function-name-2")
-			suite.Require().NoError(err, "Expected no error when setting a function name in an empty cache")
+			err := ingressCache.Set("example.com", "/test/path", []string{"test-function-name-1", "test-function-name-2"})
+			suite.Require().NoError(err, "Expected no error when setting a functions name in an empty cache")
 		}(testIngressCache, &wg)
 	}
 	wg.Wait()
@@ -425,7 +423,7 @@ func (suite *IngressCacheTestSuite) getTestIngressCache(initialState []ingressCa
 
 	// Set the initial state in the IngressCache
 	for _, args := range initialState {
-		err = ingressCache.Set(args.host, args.path, args.function)
+		err = ingressCache.Set(args.host, args.path, args.functions)
 		suite.Require().NoError(err)
 	}
 
@@ -480,7 +478,7 @@ func (suite *IngressCacheTestSuite) compareIngressHostCache(expectedResult, test
 			sortedFunctionNames := functionNames.ToSliceString()
 			slices.Sort(sortedFunctionNames)
 			suite.Require().Equal(expectedFunctionNames, sortedFunctionNames,
-				"Expected function names for host %s and path %s to match", host, path)
+				"Expected functions names for host %s and path %s to match", host, path)
 		}
 	}
 }
