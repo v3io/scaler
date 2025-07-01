@@ -21,22 +21,22 @@ such restriction.
 package ingresscache
 
 type IngressHostCache interface {
-	// Set adds a new item to the cache for the given host, path and function name. Will overwrite existing values if any
-	Set(host string, path string, function string) error
+	// Set adds a new item to the cache for the given host, path and functions name. Will overwrite existing values if any
+	Set(host string, path string, function []string) error
 
-	// Delete removes the specified function from the cache for the given host and path. Will do nothing if host, path or function do not exist
-	Delete(host string, path string, function string) error
+	// Delete removes the specified functions from the cache for the given host and path. Will do nothing if host, path or functions do not exist
+	Delete(host string, path string, function []string) error
 
 	// Get retrieves all function names for the given host and path
 	Get(host string, path string) ([]string, error)
 }
 
 type IngressHostsTree interface {
-	// Set sets a function for a given path. Will overwrite existing values if the path already exists
-	Set(path string, function string) error
+	// Set sets a functions for a given path. Will overwrite existing values if the path already exists
+	Set(path string, functions []string) error
 
-	// Delete removes the function from the given path and deletes the deepest suffix used only by that function; does nothing if the path or function doesn't exist.
-	Delete(path string, function string) error
+	// Delete removes the functions from the given path and deletes the deepest suffix used only by that functions; does nothing if the path or functions doesn't exist.
+	Delete(path string, functions []string) error
 
 	// Get retrieves the best matching function names for a given path based on longest prefix match
 	Get(path string) (FunctionTarget, error)
@@ -47,18 +47,9 @@ type IngressHostsTree interface {
 
 // FunctionTarget defines the trie.PathTrie value
 type FunctionTarget interface {
-	// Contains checks if the function name is present
-	Contains(functionName string) bool
+	// Equal checks if the functions functionTarget is the same as the provided FunctionTarget
+	Equal(functionTarget FunctionTarget) bool
 
-	// Delete returns an updated FunctionTarget after removing the function name
-	Delete(functionName string) (FunctionTarget, error)
-
-	// Add returns an updated FunctionTarget after adding the function name
-	Add(functionName string) (FunctionTarget, error)
-
-	// ToSliceString returns a slice of function names
+	// ToSliceString returns a slice of functions names
 	ToSliceString() []string
-
-	// IsSingle returns true if the struct type is SingleTarget
-	IsSingle() bool
 }
