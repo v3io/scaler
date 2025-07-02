@@ -536,7 +536,7 @@ func (suite *PairTargetTestSuite) TestEqual() {
 			target:         PairTarget{"test-target1", "test-target3"},
 			expectedResult: false,
 		}, {
-			name:           "Equal empty targets name",
+			name:           "Equal empty PairTarget no match",
 			target:         PairTarget{},
 			expectedResult: false,
 		}, {

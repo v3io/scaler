@@ -21,7 +21,7 @@ such restriction.
 package ingresscache
 
 type IngressHostCache interface {
-	// Set adds a new item to the cache for the given host, path and targets name. Will overwrite existing values if any
+	// Set adds a new item to the cache for the given host, path and targets. Will overwrite existing values if any
 	Set(host string, path string, targets []string) error
 
 	// Delete removes the specified targets from the cache for the given host and path. Will do nothing if host, path or targets do not exist
@@ -32,13 +32,13 @@ type IngressHostCache interface {
 }
 
 type IngressHostsTree interface {
-	// Set sets a targets for a given path. Will overwrite existing values if the path already exists
+	// Set sets the targets for a given path. Will overwrite existing values if the path already exists
 	Set(path string, targets []string) error
 
-	// Delete removes the targets from the given path and deletes the deepest suffix used only by that targets; does nothing if the path or targets doesn't exist.
+	// Delete removes the targets from the given path and deletes the deepest suffix used only by these targets; does nothing if the path or targets don't exist.
 	Delete(path string, targets []string) error
 
-	// Get retrieves the best matching target names for a given path based on longest prefix match
+	// Get retrieves the best matching targets for a given path based on longest prefix match
 	Get(path string) (Target, error)
 
 	// IsEmpty checks if the tree is empty
@@ -50,6 +50,6 @@ type Target interface {
 	// Equal returns true if the otherTarget is equal to the current target
 	Equal(otherTarget Target) bool
 
-	// ToSliceString returns a slice of targets names
+	// ToSliceString returns a slice of targets
 	ToSliceString() []string
 }

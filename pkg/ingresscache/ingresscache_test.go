@@ -95,7 +95,7 @@ func (suite *IngressCacheTestSuite) TestGet() {
 			args:           testIngressCacheArgs{"example.com", "/not/exists/test/path", []string{}},
 			expectedResult: nil,
 			expectError:    true,
-			errorMessage:   "failed to get the targets name from the ingress host tree",
+			errorMessage:   "failed to get the targets from the ingress host tree",
 			initialState: []ingressCacheTestInitialState{
 				{"example.com", "/test/path", []string{"test-target-name-1"}},
 			},
@@ -257,7 +257,7 @@ func (suite *IngressCacheTestSuite) TestDelete() {
 // --- IngressCacheTestSuite flow tests ---
 
 func (suite *IngressCacheTestSuite) TestAllThreeMainFunctionalitiesWithTheSameHostAndPath() {
-	// This test verifies the flow of setting a targets name in an empty IngressCache, then getting it, and finally deleting it.
+	// This test verifies the flow of setting targets in an empty IngressCache, then getting it, and finally deleting it.
 	// It ensures that the IngressCache behaves correctly when performing these operations sequentially.
 
 	testIngressCache := suite.getTestIngressCache([]ingressCacheTestInitialState{})
@@ -268,48 +268,48 @@ func (suite *IngressCacheTestSuite) TestAllThreeMainFunctionalitiesWithTheSameHo
 	getResult, err = testIngressCache.Get("example.com", "/test/path")
 	suite.Require().Error(err)
 	suite.Require().ErrorContains(err, "cache get failed: host does not exist")
-	suite.Require().Nil(getResult, "Expected no targets names for empty cache")
+	suite.Require().Nil(getResult, "Expected no targets for empty cache")
 
-	// Set a targets name in an empty cache
+	// Set targets in an empty cache
 	err = testIngressCache.Set("example.com", "/test/path", []string{"test-target-name-1"})
-	suite.Require().NoError(err, "Expected no error when setting a targets name in an empty cache")
+	suite.Require().NoError(err, "Expected no error when setting targets in an empty cache")
 	getResult, err = testIngressCache.Get("example.com", "/test/path")
-	suite.Require().NoError(err, "Expected no error when getting targets names after setting")
-	suite.Require().Equal([]string{"test-target-name-1"}, getResult, "Expected to get the targets name that was just set")
+	suite.Require().NoError(err, "Expected no error when getting targets after setting")
+	suite.Require().Equal([]string{"test-target-name-1"}, getResult, "Expected to get the targets that was just set")
 	flattenTestResult := suite.flattenIngressCache(testIngressCache)
 	suite.Require().Equal(flattenTestResult, map[string]map[string]Target{
 		"example.com": {"/test/path": SingleTarget("test-target-name-1")},
 	})
 
-	// Set another targets name for the same host and path
+	// Set another targets for the same host and path
 	err = testIngressCache.Set("example.com", "/test/path", []string{"test-target-name-1", "test-target-name-2"})
-	suite.Require().NoError(err, "Expected no error when setting another targets name for the same host and path")
+	suite.Require().NoError(err, "Expected no error when setting another targets for the same host and path")
 	getResult, err = testIngressCache.Get("example.com", "/test/path")
-	suite.Require().NoError(err, "Expected no error when getting targets names after setting another targets name")
-	suite.Require().Equal([]string{"test-target-name-1", "test-target-name-2"}, getResult, "Expected to get the new targets name that was just set")
+	suite.Require().NoError(err, "Expected no error when getting targets after setting another targets")
+	suite.Require().Equal([]string{"test-target-name-1", "test-target-name-2"}, getResult, "Expected to get the new targets that was just set")
 	flattenTestResult = suite.flattenIngressCache(testIngressCache)
 	suite.Require().Equal(flattenTestResult, map[string]map[string]Target{
 		"example.com": {"/test/path": PairTarget{"test-target-name-1", "test-target-name-2"}},
 	})
 
-	// Delete only the first targets name shouldn't delete anything
+	// Delete only the first target name shouldn't delete anything
 	err = testIngressCache.Delete("example.com", "/test/path", []string{"test-target-name-1"})
 	suite.Require().NoError(err, "Expected no error when deleting the first targets name")
 	getResult, err = testIngressCache.Get("example.com", "/test/path")
-	suite.Require().NoError(err, "Expected no error when getting targets names after deleting the first targets name")
-	suite.Require().Equal(getResult, []string{"test-target-name-1", "test-target-name-2"}, "Expected to get the remaining targets name after deletion")
+	suite.Require().NoError(err, "Expected no error when getting targets after deleting the first targets name")
+	suite.Require().Equal(getResult, []string{"test-target-name-1", "test-target-name-2"}, "Expected to get the remaining targets after deletion")
 	flattenTestResult = suite.flattenIngressCache(testIngressCache)
 	suite.Require().Equal(flattenTestResult, map[string]map[string]Target{
 		"example.com": {"/test/path": PairTarget{"test-target-name-1", "test-target-name-2"}},
 	})
 
-	// Delete the first and second targets name should delete the targetTarget, validate that the cache is empty
+	// Delete the first and second target's names should delete the targetTarget, validate that the cache is empty
 	err = testIngressCache.Delete("example.com", "/test/path", []string{"test-target-name-1", "test-target-name-2"})
-	suite.Require().NoError(err, "Expected no error when deleting the second targets name")
+	suite.Require().NoError(err, "Expected no error when deleting an existing target")
 	getResult, err = testIngressCache.Get("example.com", "/test/path")
 	suite.Require().Error(err)
 	suite.Require().ErrorContains(err, "cache get failed: host does not exist")
-	suite.Require().Nil(getResult, "Expected no targets names for empty cache")
+	suite.Require().Nil(getResult, "Expected no targets for empty cache")
 	flattenTestResult = suite.flattenIngressCache(testIngressCache)
 	suite.Require().Equal(flattenTestResult, map[string]map[string]Target{})
 }
@@ -328,14 +328,14 @@ func (suite *IngressCacheTestSuite) TestParallelSetForTheSameHostAndDifferentPat
 		go func(ingressCache *IngressCache, wg *sync.WaitGroup, path string) {
 			defer wg.Done()
 			err := ingressCache.Set("example.com", path, []string{"test-target-name-1", "test-target-name-2"})
-			suite.Require().NoError(err, "Expected no error when setting a targets name in an empty cache")
+			suite.Require().NoError(err, "Expected no error when setting targets in an empty cache")
 		}(testIngressCache, &wg, path)
 
 		// second goroutine set targetTarget
 		go func(ingressCache *IngressCache, wg *sync.WaitGroup, path string) {
 			defer wg.Done()
 			err := ingressCache.Set("example.com", path, []string{"test-target-name-1", "test-target-name-2"})
-			suite.Require().NoError(err, "Expected no error when setting a targets name in an empty cache")
+			suite.Require().NoError(err, "Expected no error when setting targets in an empty cache")
 		}(testIngressCache, &wg, path)
 	}
 	wg.Wait()
@@ -361,14 +361,14 @@ func (suite *IngressCacheTestSuite) TestParallelSetForDifferentHosts() {
 		go func(ingressCache *IngressCache, wg *sync.WaitGroup, host, path string) {
 			defer wg.Done()
 			err := ingressCache.Set(host, path, []string{"test-target-name-1", "test-target-name-2"})
-			suite.Require().NoError(err, "Expected no error when setting a targets name in an empty cache")
+			suite.Require().NoError(err, "Expected no error when setting targets in an empty cache")
 		}(testIngressCache, &wg, host, path)
 
 		// second goroutine set
 		go func(ingressCache *IngressCache, wg *sync.WaitGroup, host, path string) {
 			defer wg.Done()
 			err := ingressCache.Set(host, path, []string{"test-target-name-1", "test-target-name-2"})
-			suite.Require().NoError(err, "Expected no error when setting a targets name in an empty cache")
+			suite.Require().NoError(err, "Expected no error when setting targets in an empty cache")
 		}(testIngressCache, &wg, host, path)
 	}
 	wg.Wait()
@@ -392,14 +392,14 @@ func (suite *IngressCacheTestSuite) TestParallelSetForSameHostAndSamePath() {
 		go func(ingressCache *IngressCache, wg *sync.WaitGroup) {
 			defer wg.Done()
 			err := ingressCache.Set("example.com", "/test/path", []string{"test-target-name-1", "test-target-name-2"})
-			suite.Require().NoError(err, "Expected no error when setting a targets name in an empty cache")
+			suite.Require().NoError(err, "Expected no error when setting targets in an empty cache")
 		}(testIngressCache, &wg)
 
 		// second goroutine set
 		go func(ingressCache *IngressCache, wg *sync.WaitGroup) {
 			defer wg.Done()
 			err := ingressCache.Set("example.com", "/test/path", []string{"test-target-name-1", "test-target-name-2"})
-			suite.Require().NoError(err, "Expected no error when setting a targets name in an empty cache")
+			suite.Require().NoError(err, "Expected no error when setting targets in an empty cache")
 		}(testIngressCache, &wg)
 	}
 	wg.Wait()
@@ -416,7 +416,7 @@ func (suite *IngressCacheTestSuite) TestParallelSetForSameHostAndSamePath() {
 
 // --- IngressCacheTestSuite suite methods ---
 
-// getTestIngressCache creates a IngressCache instance and sets the provided initial state
+// getTestIngressCache creates an IngressCache instance and sets the provided initial state
 func (suite *IngressCacheTestSuite) getTestIngressCache(initialState []ingressCacheTestInitialState) *IngressCache {
 	var err error
 	ingressCache := NewIngressCache(suite.logger)
@@ -478,7 +478,7 @@ func (suite *IngressCacheTestSuite) compareIngressHostCache(expectedResult, test
 			sortedTargetNames := targetNames.ToSliceString()
 			slices.Sort(sortedTargetNames)
 			suite.Require().Equal(expectedTargetNames, sortedTargetNames,
-				"Expected targets names for host %s and path %s to match", host, path)
+				"Expected targets for host %s and path %s to match", host, path)
 		}
 	}
 }

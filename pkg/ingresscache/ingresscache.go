@@ -55,7 +55,7 @@ func (ic *IngressCache) Set(host, path string, targets []string) error {
 			ic.syncMap.Delete(host)
 		}
 
-		return errors.Wrap(err, "failed to set targets name in the ingress host tree")
+		return errors.Wrap(err, "failed to set targets in the ingress host tree")
 	}
 
 	return nil
@@ -74,7 +74,7 @@ func (ic *IngressCache) Delete(host, path string, targets []string) error {
 	}
 
 	if err := ingressHostsTree.Delete(path, targets); err != nil {
-		return errors.Wrap(err, "failed to delete targets name from the ingress host tree")
+		return errors.Wrap(err, "failed to delete targets from the ingress host tree")
 	}
 
 	if ingressHostsTree.IsEmpty() {
@@ -100,7 +100,7 @@ func (ic *IngressCache) Get(host, path string) ([]string, error) {
 
 	result, err := ingressHostsTree.Get(path)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get the targets name from the ingress host tree")
+		return nil, errors.Wrap(err, "failed to get the targets from the ingress host tree")
 	}
 
 	return result.ToSliceString(), nil

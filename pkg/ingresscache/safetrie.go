@@ -40,7 +40,7 @@ func NewSafeTrie() *SafeTrie {
 	}
 }
 
-// Set adds a targets for a given path. If the path does not exist, it creates it
+// Set adds targets for a given path. If the path does not exist, it creates it
 func (st *SafeTrie) Set(path string, targets []string) error {
 	if path == "" {
 		return errors.New("path is empty")
@@ -58,7 +58,7 @@ func (st *SafeTrie) Set(path string, targets []string) error {
 	return nil
 }
 
-// Delete removes a targets from a path and cleans up the longest suffix of the path only used by that targets
+// Delete removes the targets from a path and cleans up the longest suffix of the path only used by these targets
 func (st *SafeTrie) Delete(path string, targets []string) error {
 	st.rwMutex.Lock()
 	defer st.rwMutex.Unlock()
@@ -74,13 +74,13 @@ func (st *SafeTrie) Delete(path string, targets []string) error {
 		return errors.Errorf("path value should be Target, got %T", pathValue)
 	}
 
-	requestTarget, err := st.NewTarget(targets)
+	targetToDelete, err := st.NewTarget(targets)
 	if err != nil {
 		return errors.Wrap(err, "failed to create Target for targets")
 	}
 
 	// If the Target instances do not match, nothing to delete
-	if !currentTarget.Equal(requestTarget) {
+	if !currentTarget.Equal(targetToDelete) {
 		return nil
 	}
 
