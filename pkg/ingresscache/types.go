@@ -21,35 +21,35 @@ such restriction.
 package ingresscache
 
 type IngressHostCache interface {
-	// Set adds a new item to the cache for the given host, path and functions name. Will overwrite existing values if any
-	Set(host string, path string, function []string) error
+	// Set adds a new item to the cache for the given host, path and targets name. Will overwrite existing values if any
+	Set(host string, path string, targets []string) error
 
-	// Delete removes the specified functions from the cache for the given host and path. Will do nothing if host, path or functions do not exist
-	Delete(host string, path string, function []string) error
+	// Delete removes the specified targets from the cache for the given host and path. Will do nothing if host, path or targets do not exist
+	Delete(host string, path string, targets []string) error
 
-	// Get retrieves all function names for the given host and path
+	// Get retrieves all target names for the given host and path
 	Get(host string, path string) ([]string, error)
 }
 
 type IngressHostsTree interface {
-	// Set sets a functions for a given path. Will overwrite existing values if the path already exists
-	Set(path string, functions []string) error
+	// Set sets a targets for a given path. Will overwrite existing values if the path already exists
+	Set(path string, targets []string) error
 
-	// Delete removes the functions from the given path and deletes the deepest suffix used only by that functions; does nothing if the path or functions doesn't exist.
-	Delete(path string, functions []string) error
+	// Delete removes the targets from the given path and deletes the deepest suffix used only by that targets; does nothing if the path or targets doesn't exist.
+	Delete(path string, targets []string) error
 
-	// Get retrieves the best matching function names for a given path based on longest prefix match
-	Get(path string) (FunctionTarget, error)
+	// Get retrieves the best matching target names for a given path based on longest prefix match
+	Get(path string) (Target, error)
 
 	// IsEmpty checks if the tree is empty
 	IsEmpty() bool
 }
 
-// FunctionTarget defines the trie.PathTrie value
-type FunctionTarget interface {
-	// Equal checks if the functions functionTarget is the same as the provided FunctionTarget
-	Equal(functionTarget FunctionTarget) bool
+// Target defines the trie.PathTrie value
+type Target interface {
+	// Equal returns true if the otherTarget is equal to the current target
+	Equal(otherTarget Target) bool
 
-	// ToSliceString returns a slice of functions names
+	// ToSliceString returns a slice of targets names
 	ToSliceString() []string
 }

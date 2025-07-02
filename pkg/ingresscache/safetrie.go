@@ -40,26 +40,26 @@ func NewSafeTrie() *SafeTrie {
 	}
 }
 
-// Set adds a functions for a given path. If the path does not exist, it creates it
-func (st *SafeTrie) Set(path string, functions []string) error {
+// Set adds a targets for a given path. If the path does not exist, it creates it
+func (st *SafeTrie) Set(path string, targets []string) error {
 	if path == "" {
 		return errors.New("path is empty")
 	}
 
-	functionTarget, err := st.NewFunctionTarget(functions)
+	newTarget, err := st.NewTarget(targets)
 	if err != nil {
-		return errors.Wrap(err, "failed to create FunctionTarget")
+		return errors.Wrap(err, "failed to create Target")
 	}
 
 	st.rwMutex.Lock()
 	defer st.rwMutex.Unlock()
 
-	st.pathTrie.Put(path, functionTarget)
+	st.pathTrie.Put(path, newTarget)
 	return nil
 }
 
-// Delete removes a functions from a path and cleans up the longest suffix of the path only used by that functions
-func (st *SafeTrie) Delete(path string, functions []string) error {
+// Delete removes a targets from a path and cleans up the longest suffix of the path only used by that targets
+func (st *SafeTrie) Delete(path string, targets []string) error {
 	st.rwMutex.Lock()
 	defer st.rwMutex.Unlock()
 
@@ -69,18 +69,18 @@ func (st *SafeTrie) Delete(path string, functions []string) error {
 		return nil
 	}
 
-	currentFunctionNames, ok := pathValue.(FunctionTarget)
+	currentTarget, ok := pathValue.(Target)
 	if !ok {
-		return errors.Errorf("path value should be FunctionTarget, got %T", pathValue)
+		return errors.Errorf("path value should be Target, got %T", pathValue)
 	}
 
-	requestFunctionNames, err := st.NewFunctionTarget(functions)
+	requestTarget, err := st.NewTarget(targets)
 	if err != nil {
-		return errors.Wrap(err, "failed to create FunctionTarget for functions")
+		return errors.Wrap(err, "failed to create Target for targets")
 	}
 
-	// If the functionTargets do not match, nothing to delete
-	if !currentFunctionNames.Equal(requestFunctionNames) {
+	// If the Target instances do not match, nothing to delete
+	if !currentTarget.Equal(requestTarget) {
 		return nil
 	}
 
@@ -88,8 +88,8 @@ func (st *SafeTrie) Delete(path string, functions []string) error {
 	return nil
 }
 
-// Get retrieve the closest prefix matching the path and returns the associated functions
-func (st *SafeTrie) Get(path string) (FunctionTarget, error) {
+// Get retrieve the closest prefix matching the path and returns the associated targets
+func (st *SafeTrie) Get(path string) (Target, error) {
 	var walkPathResult interface{}
 	if path == "" {
 		return nil, errors.New("path is empty")
@@ -108,12 +108,12 @@ func (st *SafeTrie) Get(path string) (FunctionTarget, error) {
 		return nil, errors.Errorf("no value found for path: %s", path)
 	}
 
-	functionNames, ok := walkPathResult.(FunctionTarget)
+	target, ok := walkPathResult.(Target)
 	if !ok {
-		return nil, errors.Errorf("walkPathResult value should be FunctionTarget, got %v", walkPathResult)
+		return nil, errors.Errorf("walkPathResult value should be Target, got %v", walkPathResult)
 	}
 
-	return functionNames, nil
+	return target, nil
 }
 
 // IsEmpty return true if the SafeTrie is empty
@@ -127,56 +127,54 @@ func (st *SafeTrie) IsEmpty() bool {
 	return walkResult == nil
 }
 
-// NewFunctionTarget returns a FunctionTarget based on the length of the input slice
-func (st *SafeTrie) NewFunctionTarget(inputs []string) (FunctionTarget, error) {
+// NewTarget returns a Target based on the length of the input slice
+func (st *SafeTrie) NewTarget(inputs []string) (Target, error) {
 	switch len(inputs) {
 	case 1:
 		return SingleTarget(inputs[0]), nil
 	case 2:
-		return &CanaryTarget{[2]string{inputs[0], inputs[1]}}, nil
+		return PairTarget{inputs[0], inputs[1]}, nil
 	default:
 		return nil, errors.New("unexpected input length")
 	}
 }
 
-// ----- implementations for FunctionTarget interface -----
+// ----- implementations for Target interface -----
 
 type SingleTarget string
 
-func (s SingleTarget) Equal(functionTarget FunctionTarget) bool {
-	singleFunctionTarget, ok := functionTarget.(SingleTarget)
+func (s SingleTarget) Equal(otherTarget Target) bool {
+	otherSingleTarget, ok := otherTarget.(SingleTarget)
 	if !ok {
 		return false
 	}
 
-	return string(s) == string(singleFunctionTarget)
+	return string(s) == string(otherSingleTarget)
 }
 
 func (s SingleTarget) ToSliceString() []string {
 	return []string{string(s)}
 }
 
-type CanaryTarget struct {
-	functionNames [2]string
-}
+type PairTarget [2]string
 
-func (c CanaryTarget) Equal(functionTarget FunctionTarget) bool {
-	canaryTarget, ok := functionTarget.(*CanaryTarget)
+func (p PairTarget) Equal(otherTarget Target) bool {
+	target, ok := otherTarget.(PairTarget)
 	if !ok {
 		return false
 	}
 
-	if c.functionNames[0] == canaryTarget.functionNames[0] && c.functionNames[1] == canaryTarget.functionNames[1] {
+	if p[0] == target[0] && p[1] == target[1] {
 		return true
 	}
 
-	if c.functionNames[0] == canaryTarget.functionNames[1] && c.functionNames[1] == canaryTarget.functionNames[0] {
+	if p[0] == target[1] && p[1] == target[0] {
 		return true
 	}
 
 	return false
 }
 
-func (c CanaryTarget) ToSliceString() []string {
-	return []string{c.functionNames[0], c.functionNames[1]}
+func (p PairTarget) ToSliceString() []string {
+	return []string{p[0], p[1]}
 }
