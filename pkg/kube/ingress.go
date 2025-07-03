@@ -4,15 +4,15 @@ import (
 	"context"
 	"time"
 
+	"github.com/v3io/scaler/pkg/ingresscache"
+
+	"github.com/nuclio/errors"
+	"github.com/nuclio/logger"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-
-	"github.com/nuclio/errors"
-	"github.com/nuclio/logger"
-	"github.com/v3io/scaler/pkg/ingresscache"
 )
 
 type ResolveTargetsFromIngressCallback func(ingress *networkingv1.Ingress) ([]string, error)
