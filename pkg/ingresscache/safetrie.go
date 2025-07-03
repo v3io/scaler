@@ -40,48 +40,26 @@ func NewSafeTrie() *SafeTrie {
 	}
 }
 
-// Set adds a function for a given path. If the path does not exist, it creates it
-func (st *SafeTrie) Set(path string, function string) error {
+// Set adds targets for a given path. If the path does not exist, it creates it
+func (st *SafeTrie) Set(path string, targets []string) error {
 	if path == "" {
 		return errors.New("path is empty")
 	}
 
-	if function == "" {
-		return errors.New("function is empty")
+	newTarget, err := st.NewTarget(targets)
+	if err != nil {
+		return errors.Wrap(err, "failed to create Target")
 	}
 
 	st.rwMutex.Lock()
 	defer st.rwMutex.Unlock()
 
-	// get the exact path value in order to avoid creating a new path if it already exists
-	pathValue := st.pathTrie.Get(path)
-	if pathValue == nil {
-		st.pathTrie.Put(path, SingleTarget(function))
-		return nil
-	}
-
-	pathFunctionNames, ok := pathValue.(FunctionTarget)
-	if !ok {
-		return errors.Errorf("path value should be FunctionTarget, got %T", pathValue)
-	}
-
-	if pathFunctionNames.Contains(function) {
-		// Although Add() checks if the function exists and returns the same value, it still performs a trie walk that ends with no changes when values are identical.
-		// This validation avoids that unnecessary walk
-		return nil
-	}
-
-	functionNames, err := pathFunctionNames.Add(function)
-	if err != nil {
-		return errors.Wrapf(err, "failed to set function name to path. path: %s, function: %s", path, function)
-	}
-
-	st.pathTrie.Put(path, functionNames)
+	st.pathTrie.Put(path, newTarget)
 	return nil
 }
 
-// Delete removes a function from a path and cleans up the longest suffix of the path only used by that function
-func (st *SafeTrie) Delete(path string, function string) error {
+// Delete removes the targets from a path and cleans up the longest suffix of the path only used by these targets
+func (st *SafeTrie) Delete(path string, targets []string) error {
 	st.rwMutex.Lock()
 	defer st.rwMutex.Unlock()
 
@@ -91,30 +69,27 @@ func (st *SafeTrie) Delete(path string, function string) error {
 		return nil
 	}
 
-	pathFunctionNames, ok := pathValue.(FunctionTarget)
+	currentTarget, ok := pathValue.(Target)
 	if !ok {
-		return errors.Errorf("path value should be FunctionTarget, got %T", pathValue)
+		return errors.Errorf("path value should be Target, got %T", pathValue)
 	}
 
-	// If the function to delete matches the current function name, and it's the only value, delete the path
-	if pathFunctionNames.IsSingle() {
-		if pathFunctionNames.Contains(function) {
-			st.pathTrie.Delete(path)
-		}
+	targetToDelete, err := st.NewTarget(targets)
+	if err != nil {
+		return errors.Wrap(err, "failed to create Target for targets")
+	}
+
+	// If the Target instances do not match, nothing to delete
+	if !currentTarget.Equal(targetToDelete) {
 		return nil
 	}
 
-	// update the path with the new function names after deletion
-	functionNames, err := pathFunctionNames.Delete(function)
-	if err != nil {
-		return errors.Wrapf(err, "failed to remove function name from path. function: %s, path: %s", function, path)
-	}
-	st.pathTrie.Put(path, functionNames)
+	st.pathTrie.Delete(path)
 	return nil
 }
 
-// Get retrieve the closest prefix matching the path and returns the associated functions
-func (st *SafeTrie) Get(path string) (FunctionTarget, error) {
+// Get retrieve the closest prefix matching the path and returns the associated targets
+func (st *SafeTrie) Get(path string) (Target, error) {
 	var walkPathResult interface{}
 	if path == "" {
 		return nil, errors.New("path is empty")
@@ -133,12 +108,12 @@ func (st *SafeTrie) Get(path string) (FunctionTarget, error) {
 		return nil, errors.Errorf("no value found for path: %s", path)
 	}
 
-	functionNames, ok := walkPathResult.(FunctionTarget)
+	target, ok := walkPathResult.(Target)
 	if !ok {
-		return nil, errors.Errorf("walkPathResult value should be FunctionTarget, got %v", walkPathResult)
+		return nil, errors.Errorf("walkPathResult value should be Target, got %v", walkPathResult)
 	}
 
-	return functionNames, nil
+	return target, nil
 }
 
 // IsEmpty return true if the SafeTrie is empty
@@ -152,75 +127,54 @@ func (st *SafeTrie) IsEmpty() bool {
 	return walkResult == nil
 }
 
-// ----- implementations for FunctionTarget interface -----
+// NewTarget returns a Target based on the length of the input slice
+func (st *SafeTrie) NewTarget(inputs []string) (Target, error) {
+	switch len(inputs) {
+	case 1:
+		return SingleTarget(inputs[0]), nil
+	case 2:
+		return PairTarget{inputs[0], inputs[1]}, nil
+	default:
+		return nil, errors.New("unexpected input length")
+	}
+}
+
+// ----- implementations for Target interface -----
 
 type SingleTarget string
 
-func (s SingleTarget) Contains(functionName string) bool {
-	return string(s) == functionName
-}
-
-func (s SingleTarget) Delete(functionName string) (FunctionTarget, error) {
-	if !s.Contains(functionName) {
-		// if the function name is not found, return the original SingleTarget
-		return s, nil
+func (s SingleTarget) Equal(otherTarget Target) bool {
+	otherSingleTarget, ok := otherTarget.(SingleTarget)
+	if !ok {
+		return false
 	}
 
-	// this should never be called for SingleTarget
-	return nil, errors.New("cannot remove function name from SingleTarget, it only contains one function name")
-}
-
-func (s SingleTarget) Add(functionName string) (FunctionTarget, error) {
-	if s.Contains(functionName) {
-		return s, nil
-	}
-
-	return &CanaryTarget{functionNames: [2]string{string(s), functionName}}, nil
+	return string(s) == string(otherSingleTarget)
 }
 
 func (s SingleTarget) ToSliceString() []string {
 	return []string{string(s)}
 }
 
-func (s SingleTarget) IsSingle() bool {
-	return true
-}
+type PairTarget [2]string
 
-type CanaryTarget struct {
-	functionNames [2]string
-}
-
-func (c *CanaryTarget) Contains(functionName string) bool {
-	return c.functionNames[0] == functionName || c.functionNames[1] == functionName
-}
-
-func (c *CanaryTarget) Delete(functionName string) (FunctionTarget, error) {
-	if c.functionNames[0] == functionName {
-		return SingleTarget(c.functionNames[1]), nil
+func (p PairTarget) Equal(otherTarget Target) bool {
+	target, ok := otherTarget.(PairTarget)
+	if !ok {
+		return false
 	}
 
-	if c.functionNames[1] == functionName {
-		return SingleTarget(c.functionNames[0]), nil
+	if p[0] == target[0] && p[1] == target[1] {
+		return true
 	}
 
-	// if reached here, it means CanaryTarget does not contain the function name
-	return c, nil
-}
-
-func (c *CanaryTarget) Add(functionName string) (FunctionTarget, error) {
-	if c.Contains(functionName) {
-		// If the function already exists, return the original CanaryTarget
-		return c, nil
+	if p[0] == target[1] && p[1] == target[0] {
+		return true
 	}
 
-	// This should never be called for CanaryTarget since it should always contain exactly two function names
-	return c, errors.New("cannot add function name to CanaryTarget, it already contains two function names")
-}
-
-func (c *CanaryTarget) ToSliceString() []string {
-	return []string{c.functionNames[0], c.functionNames[1]}
-}
-
-func (c *CanaryTarget) IsSingle() bool {
 	return false
+}
+
+func (p PairTarget) ToSliceString() []string {
+	return []string{p[0], p[1]}
 }

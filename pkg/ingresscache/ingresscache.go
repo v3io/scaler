@@ -39,7 +39,7 @@ func NewIngressCache(logger logger.Logger) *IngressCache {
 	}
 }
 
-func (ic *IngressCache) Set(host, path, function string) error {
+func (ic *IngressCache) Set(host, path string, targets []string) error {
 	urlTree, exists := ic.syncMap.LoadOrStore(host, NewSafeTrie())
 
 	ingressHostsTree, ok := urlTree.(IngressHostsTree)
@@ -50,18 +50,18 @@ func (ic *IngressCache) Set(host, path, function string) error {
 		return errors.Errorf("cache set failed: invalid path tree value: got: %t", urlTree)
 	}
 
-	if err := ingressHostsTree.Set(path, function); err != nil {
+	if err := ingressHostsTree.Set(path, targets); err != nil {
 		if !exists {
 			ic.syncMap.Delete(host)
 		}
 
-		return errors.Wrap(err, "failed to set function name in the ingress host tree")
+		return errors.Wrap(err, "failed to set targets in the ingress host tree")
 	}
 
 	return nil
 }
 
-func (ic *IngressCache) Delete(host, path, function string) error {
+func (ic *IngressCache) Delete(host, path string, targets []string) error {
 	urlTree, exists := ic.syncMap.Load(host)
 	if !exists {
 		ic.logger.Debug("cache delete: host not found")
@@ -73,8 +73,8 @@ func (ic *IngressCache) Delete(host, path, function string) error {
 		return errors.Errorf("cache delete failed: invalid path tree value: got: %t", urlTree)
 	}
 
-	if err := ingressHostsTree.Delete(path, function); err != nil {
-		return errors.Wrap(err, "failed to delete function name from the ingress host tree")
+	if err := ingressHostsTree.Delete(path, targets); err != nil {
+		return errors.Wrap(err, "failed to delete targets from the ingress host tree")
 	}
 
 	if ingressHostsTree.IsEmpty() {
@@ -100,7 +100,7 @@ func (ic *IngressCache) Get(host, path string) ([]string, error) {
 
 	result, err := ingressHostsTree.Get(path)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get the function name from the ingress host tree")
+		return nil, errors.Wrap(err, "failed to get the targets from the ingress host tree")
 	}
 
 	return result.ToSliceString(), nil
