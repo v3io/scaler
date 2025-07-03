@@ -31,12 +31,13 @@ func NewIngressWatcher(
 	ctx context.Context,
 	dlxLogger logger.Logger,
 	kubeClient kubernetes.Interface,
+	ingressCache *ingresscache.IngressCache,
 	resolveCallback ResolveTargetsFromIngressCallback,
 	namespace, labelsFilter string,
 ) (*IngressWatcher, error) {
 	factory := informers.NewSharedInformerFactoryWithOptions(
 		kubeClient,
-		30*time.Second, //TODO - consider make if configurable or const
+		30*time.Second,
 		informers.WithNamespace(namespace),
 		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
 			options.LabelSelector = labelsFilter
@@ -47,7 +48,7 @@ func NewIngressWatcher(
 	ingressWatcher := &IngressWatcher{
 		ctx:                    ctx,
 		logger:                 dlxLogger,
-		ingressCache:           ingresscache.NewIngressCache(dlxLogger), //TODO - consider decouple the ingress cache init from the watcher
+		ingressCache:           ingressCache,
 		factory:                factory,
 		informer:               ingressInformer,
 		resolveTargetsCallback: resolveCallback,
