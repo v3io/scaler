@@ -35,13 +35,40 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+const (
+	defaultResyncInterval = 30 * time.Second
+)
+
+// ResolveTargetsFromIngressCallback defines a function that extracts a list of target identifiers
+// (e.g., names of services the Ingress routes traffic to) from a Kubernetes Ingress resource.
+//
+// This function is expected to be implemented externally and passed into the IngressWatcher,
+// allowing for custom logic such as parsing annotations, labels, or other ingress metadata.
+//
+// Parameters:
+//   - ingress: The Kubernetes Ingress resource to extract targets from
+//
+// Returns:
+//   - []string: A slice of target identifiers (e.g., service names, endpoint addresses)
+//   - error: An error if target resolution fails
+//
+// Implementation guidelines:
+// - Return a non-nil slice when targets are successfully resolved
+// - Return a non-nil error if resolution fails or no targets are found
+// - Should handle nil or malformed Ingress objects gracefully and return an error in such cases
 type ResolveTargetsFromIngressCallback func(ingress *networkingv1.Ingress) ([]string, error)
+
+type ingressValue struct {
+	host    string
+	path    string
+	targets []string
+}
 
 // IngressWatcher watches for changes in Kubernetes Ingress resources and updates the ingress cache accordingly
 type IngressWatcher struct {
 	ctx                    context.Context
 	logger                 logger.Logger
-	ingressCache           ingresscache.IngressHostCache
+	cache                  ingresscache.IngressHostCache
 	factory                informers.SharedInformerFactory
 	informer               cache.SharedIndexInformer
 	resolveTargetsCallback ResolveTargetsFromIngressCallback
@@ -51,13 +78,19 @@ func NewIngressWatcher(
 	ctx context.Context,
 	dlxLogger logger.Logger,
 	kubeClient kubernetes.Interface,
-	ingressCache *ingresscache.IngressCache,
+	ingressCache ingresscache.IngressCache,
 	resolveCallback ResolveTargetsFromIngressCallback,
+	resyncTimeout *time.Duration,
 	namespace, labelsFilter string,
 ) (*IngressWatcher, error) {
+	if resyncTimeout == nil {
+		defaultTimeout := defaultResyncInterval
+		resyncTimeout = &defaultTimeout
+	}
+
 	factory := informers.NewSharedInformerFactoryWithOptions(
 		kubeClient,
-		30*time.Second,
+		*resyncTimeout,
 		informers.WithNamespace(namespace),
 		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
 			options.LabelSelector = labelsFilter
@@ -67,17 +100,17 @@ func NewIngressWatcher(
 
 	ingressWatcher := &IngressWatcher{
 		ctx:                    ctx,
-		logger:                 dlxLogger,
-		ingressCache:           ingressCache,
+		logger:                 dlxLogger.GetChild("watcher"),
+		cache:                  &ingressCache,
 		factory:                factory,
 		informer:               ingressInformer,
 		resolveTargetsCallback: resolveCallback,
 	}
 
 	if _, err := ingressInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    ingressWatcher.IngressHandlerAddFunc,
-		UpdateFunc: ingressWatcher.IngressHandlerUpdateFunc,
-		DeleteFunc: ingressWatcher.IngressHandlerDeleteFunc,
+		AddFunc:    ingressWatcher.AddHandler,
+		UpdateFunc: ingressWatcher.UpdateHandler,
+		DeleteFunc: ingressWatcher.DeleteHandler,
 	}); err != nil {
 		return nil, err
 	}
@@ -86,153 +119,195 @@ func NewIngressWatcher(
 }
 
 func (iw *IngressWatcher) Start() error {
-	iw.logger.Debug("Starting IngressWatcher")
+	iw.logger.Info("Starting ingress watcher")
 	iw.factory.Start(iw.ctx.Done())
 
 	if !cache.WaitForCacheSync(iw.ctx.Done(), iw.informer.HasSynced) {
-		return errors.New("failed to sync ingress cache")
+		return errors.New("Failed to sync ingress cache")
 	}
+
+	iw.logger.Info("Ingress watcher started successfully")
 
 	return nil
 }
 
 func (iw *IngressWatcher) Stop() {
-	iw.logger.Debug("Stopping IngressWatcher")
+	iw.logger.Info("Stopping ingress watcher")
 	iw.factory.Shutdown()
 }
 
 // --- ResourceEventHandler methods ---
 
-func (iw *IngressWatcher) IngressHandlerAddFunc(obj interface{}) {
-	host, path, targets, err := iw.extractIngressValuesFromIngressResource(obj)
+func (iw *IngressWatcher) AddHandler(obj interface{}) {
+	ingress, err := iw.extractValuesFromIngressResource(obj)
 	if err != nil {
-		iw.logger.WarnWith("Add ingress handler failure", "error", err)
+		iw.logger.WarnWith("Add ingress handler failure - failed to extract values from ingress resource",
+			"error", err.Error())
 		return
 	}
 
-	if err = iw.ingressCache.Set(host, path, targets); err != nil {
-		iw.logger.WarnWith("Add ingress handler failure- failed to add the new value", "error", err, "object", obj)
+	if err := iw.cache.Set(ingress.host, ingress.path, ingress.targets); err != nil {
+		iw.logger.WarnWith("Add ingress handler failure - failed to add the new value to ingress cache",
+			"error", err.Error(),
+			"object", obj,
+			"host", ingress.host,
+			"path", ingress.path,
+			"targets", ingress.targets)
 		return
 	}
 }
 
-func (iw *IngressWatcher) IngressHandlerUpdateFunc(oldObj, newObj interface{}) {
-	oldHost, oldPath, oldTargets, err := iw.extractIngressValuesFromIngressResource(oldObj)
+func (iw *IngressWatcher) UpdateHandler(oldObj, newObj interface{}) {
+	oldIngress, err := iw.extractValuesFromIngressResource(oldObj)
 	if err != nil {
-		iw.logger.WarnWith("Update ingress handler - failed to extract values from old object", "error", err)
+		iw.logger.WarnWith("Update ingress handler - failed to extract values from old object",
+			"error", err.Error())
 		return
 	}
 
-	newHost, newPath, newTargets, err := iw.extractIngressValuesFromIngressResource(newObj)
+	newIngress, err := iw.extractValuesFromIngressResource(newObj)
 	if err != nil {
-		iw.logger.WarnWith("Update ingress handler - failed to extract values from new object", "error", err)
+		iw.logger.WarnWith("Update ingress handler - failed to extract values from new object",
+			"error", err.Error())
 		return
 	}
 
 	// if the host or path has changed, we need to delete the old entry
-	if oldHost != newHost || oldPath != newPath {
-		if err = iw.ingressCache.Delete(oldHost, oldPath, oldTargets); err != nil {
-			iw.logger.WarnWith("Update ingress handler failure - failed to delete old ingress", "error", err)
+	if oldIngress.host != newIngress.host || oldIngress.path != newIngress.path {
+		if err := iw.cache.Delete(oldIngress.host, oldIngress.path, oldIngress.targets); err != nil {
+			iw.logger.WarnWith("Update ingress handler failure - failed to delete old ingress",
+				"error", err.Error(),
+				"object", oldObj,
+				"host", oldIngress.host,
+				"path", oldIngress.path,
+				"targets", oldIngress.targets)
 		}
 	}
 
-	if err = iw.ingressCache.Set(newHost, newPath, newTargets); err != nil {
-		iw.logger.WarnWith("Update ingress handler failure- failed to add the new value", "error", err, "object", newObj)
+	if err := iw.cache.Set(newIngress.host, newIngress.path, newIngress.targets); err != nil {
+		iw.logger.WarnWith("Update ingress handler failure - failed to add the new value",
+			"error", err.Error(),
+			"object", newObj,
+			"host", newIngress.host,
+			"path", newIngress.path,
+			"targets", newIngress.targets)
 		return
 	}
 }
 
-func (iw *IngressWatcher) IngressHandlerDeleteFunc(obj interface{}) {
-	host, path, targets, err := iw.extractIngressValuesFromIngressResource(obj)
+func (iw *IngressWatcher) DeleteHandler(obj interface{}) {
+	ingress, err := iw.extractValuesFromIngressResource(obj)
 	if err != nil {
-		iw.logger.WarnWith("Delete ingress handler failure- failed to extract values from object", "error", err)
+		iw.logger.WarnWith("Delete ingress handler failure- failed to extract values from object",
+			"error", err.Error())
 		return
 	}
 
-	if err = iw.ingressCache.Delete(host, path, targets); err != nil {
-		iw.logger.WarnWith("Delete ingress handler failure- failed delete from cache", "error", err, "object", obj)
+	if err := iw.cache.Delete(ingress.host, ingress.path, ingress.targets); err != nil {
+		iw.logger.WarnWith("Delete ingress handler failure- failed delete from cache",
+			"error", err.Error(),
+			"object", obj,
+			"host", ingress.host,
+			"path", ingress.path,
+			"targets", ingress.targets)
 		return
 	}
 }
 
 // --- internal methods ---
 
-// extractIngressValuesFromIngressResource extracts the host, path, and targets from the ingress resource.
-func (iw *IngressWatcher) extractIngressValuesFromIngressResource(obj interface{}) (string, string, []string, error) {
+// extractValuesFromIngressResource extracts the relevant values from a Kubernetes Ingress resource
+func (iw *IngressWatcher) extractValuesFromIngressResource(obj interface{}) (*ingressValue, error) {
 	ingress, ok := obj.(*networkingv1.Ingress)
 	if !ok {
-		return "", "", nil, errors.New("Failed to cast object to Ingress")
-	}
-
-	host, path, targets, err := iw.extractHostPathTarget(ingress)
-	if err != nil {
-		return "", "", nil, errors.Wrap(err, "Failed to extract host, path and targets from ingress")
-	}
-
-	return host, path, targets, nil
-}
-
-// extractHostPathTarget extracts the host, path, and targets from the ingress resource
-func (iw *IngressWatcher) extractHostPathTarget(ingress *networkingv1.Ingress) (string, string, []string, error) {
-	host, err := iw.getHostFromIngress(ingress)
-	if err != nil {
-		return "", "", nil, errors.Wrap(err, "Failed to extract host from ingress")
-	}
-
-	path, err := iw.getPathFromIngress(ingress)
-	if err != nil {
-		return "", "", nil, errors.Wrap(err, "Failed to extract path from ingress")
+		return nil, errors.New("Failed to cast object to Ingress")
 	}
 
 	targets, err := iw.resolveTargetsCallback(ingress)
 	if err != nil {
-		return "", "", nil, errors.Wrap(err, "Failed to extract targets from ingress labels")
+		return nil, errors.Wrap(err, "Failed to extract targets from ingress labels")
 	}
 
-	return host, path, targets, nil
+	if len(targets) == 0 {
+		return nil, errors.New("No targets found in ingress")
+	}
+
+	host, err := iw.getHostFromIngress(ingress)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to extract host from ingress")
+	}
+
+	path, err := iw.getPathFromIngress(ingress)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to extract path from ingress")
+	}
+
+	return &ingressValue{
+		host:    host,
+		path:    path,
+		targets: targets,
+	}, nil
 }
 
 func (iw *IngressWatcher) getHostFromIngress(ingress *networkingv1.Ingress) (string, error) {
-	if ingress == nil {
-		return "", errors.New("ingress is nil")
+	rule, err := iw.getFirstRule(ingress)
+	if err != nil || rule == nil {
+		return "", errors.Wrap(err, "Failed to get first rule from ingress")
 	}
 
-	if len(ingress.Spec.Rules) == 0 {
-		return "", errors.New("no rules found in ingress")
-	}
-
-	// Ingress must contain exactly one rule
-	rule := ingress.Spec.Rules[0]
 	if rule.Host == "" {
-		return "", errors.New("host is empty in ingress rule")
+		return "", errors.New("Host is empty in ingress rule")
 	}
 
 	return rule.Host, nil
 }
 
 func (iw *IngressWatcher) getPathFromIngress(ingress *networkingv1.Ingress) (string, error) {
-	if ingress == nil {
-		return "", errors.New("ingress is nil")
+	rule, err := iw.getFirstRule(ingress)
+	if err != nil || rule == nil {
+		return "", errors.Wrap(err, "Failed to get first rule from ingress")
 	}
 
-	if len(ingress.Spec.Rules) == 0 {
-		return "", errors.New("no rules found in ingress")
-	}
-
-	rule := ingress.Spec.Rules[0]
 	if rule.HTTP == nil {
-		return "", errors.New("no HTTP configuration found in ingress rule")
+		return "", errors.New("No HTTP configuration found in ingress rule")
 	}
 
-	if len(rule.HTTP.Paths) == 0 {
-		return "", errors.New("no paths found in ingress HTTP rule")
+	switch len(rule.HTTP.Paths) {
+	case 0:
+		return "", errors.New("No paths found in ingress HTTP paths")
+	case 1:
+		// Exactly one path exists — proceed with it as expected
+	default:
+		// Although Kubernetes allows defining multiple paths in a single HTTP rule,
+		// the scaler takes only the first path by design to ensure consistent scaling behavior.
+		iw.logger.InfoWith("Multiple paths found in ingress",
+			"ingress", ingress)
 	}
 
-	// Ingress must contain exactly one rule
-	httpPath := rule.HTTP.Paths[0]
-	if httpPath.Path == "" {
-		return "", errors.New("path is empty in ingress HTTP rule")
+	firstPath := rule.HTTP.Paths[0]
+	path := firstPath.Path
+	if path == "" {
+		return "", errors.New("Path is empty in the first ingress HTTP path")
 	}
 
-	return httpPath.Path, nil
+	return path, nil
+}
+
+func (iw *IngressWatcher) getFirstRule(ingress *networkingv1.Ingress) (*networkingv1.IngressRule, error) {
+	if ingress == nil {
+		return nil, errors.New("Ingress is nil")
+	}
+
+	switch len(ingress.Spec.Rules) {
+	case 0:
+		return nil, errors.New("No rules found in ingress")
+	case 1:
+		// Exactly one rule exists — proceed with it as expected
+	default:
+		// Although Kubernetes allows defining multiple rules in a single Ingress resource,
+		// the scaler takes only the first rule by design to ensure consistent scaling behavior.
+		iw.logger.InfoWith("Multiple rules found in ingress",
+			"ingress", ingress)
+	}
+	return &ingress.Spec.Rules[0], nil
 }
