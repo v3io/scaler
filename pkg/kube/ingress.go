@@ -54,7 +54,7 @@ const (
 //
 // Implementation guidelines:
 // - Return a non-nil slice when targets are successfully resolved
-// - Return a non-nil error if resolution fails or no targets are found
+// - Return a non-nil error if resolution fails
 // - Should handle nil or malformed Ingress objects gracefully and return an error in such cases
 type ResolveTargetsFromIngressCallback func(ingress *networkingv1.Ingress) ([]string, error)
 
@@ -79,9 +79,10 @@ func NewIngressWatcher(
 	dlxLogger logger.Logger,
 	kubeClient kubernetes.Interface,
 	ingressCache ingresscache.IngressCache,
-	resolveCallback ResolveTargetsFromIngressCallback,
+	resolveTargetsCallback ResolveTargetsFromIngressCallback,
 	resyncTimeout *time.Duration,
-	namespace, labelsFilter string,
+	namespace string,
+	labelsFilter string,
 ) (*IngressWatcher, error) {
 	if resyncTimeout == nil {
 		defaultTimeout := defaultResyncInterval
@@ -104,7 +105,7 @@ func NewIngressWatcher(
 		cache:                  &ingressCache,
 		factory:                factory,
 		informer:               ingressInformer,
-		resolveTargetsCallback: resolveCallback,
+		resolveTargetsCallback: resolveTargetsCallback,
 	}
 
 	if _, err := ingressInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -112,7 +113,7 @@ func NewIngressWatcher(
 		UpdateFunc: ingressWatcher.UpdateHandler,
 		DeleteFunc: ingressWatcher.DeleteHandler,
 	}); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Failed to add event handlers to informer")
 	}
 
 	return ingressWatcher, nil
@@ -280,7 +281,7 @@ func (iw *IngressWatcher) getPathFromIngress(ingress *networkingv1.Ingress) (str
 	default:
 		// Although Kubernetes allows defining multiple paths in a single HTTP rule,
 		// the scaler takes only the first path by design to ensure consistent scaling behavior.
-		iw.logger.InfoWith("Multiple paths found in ingress",
+		iw.logger.InfoWith("Multiple paths found in ingress, taking first path",
 			"ingress", ingress)
 	}
 
@@ -306,7 +307,7 @@ func (iw *IngressWatcher) getFirstRule(ingress *networkingv1.Ingress) (*networki
 	default:
 		// Although Kubernetes allows defining multiple rules in a single Ingress resource,
 		// the scaler takes only the first rule by design to ensure consistent scaling behavior.
-		iw.logger.InfoWith("Multiple rules found in ingress",
+		iw.logger.InfoWith("Multiple rules found in ingress, taking first rule",
 			"ingress", ingress)
 	}
 	return &ingress.Spec.Rules[0], nil
