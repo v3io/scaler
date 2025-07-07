@@ -141,7 +141,7 @@ func (iw *IngressWatcher) Stop() {
 func (iw *IngressWatcher) AddHandler(obj interface{}) {
 	ingress, err := iw.extractValuesFromIngressResource(obj)
 	if err != nil {
-		iw.logger.WarnWith("Add ingress handler failure - failed to extract values from ingress resource",
+		iw.logger.DebugWith("Add ingress handler failure - failed to extract values from ingress resource",
 			"error", err.Error())
 		return
 	}
@@ -160,14 +160,14 @@ func (iw *IngressWatcher) AddHandler(obj interface{}) {
 func (iw *IngressWatcher) UpdateHandler(oldObj, newObj interface{}) {
 	oldIngress, err := iw.extractValuesFromIngressResource(oldObj)
 	if err != nil {
-		iw.logger.WarnWith("Update ingress handler - failed to extract values from old object",
+		iw.logger.DebugWith("Update ingress handler - failed to extract values from old object",
 			"error", err.Error())
 		return
 	}
 
 	newIngress, err := iw.extractValuesFromIngressResource(newObj)
 	if err != nil {
-		iw.logger.WarnWith("Update ingress handler - failed to extract values from new object",
+		iw.logger.DebugWith("Update ingress handler - failed to extract values from new object",
 			"error", err.Error())
 		return
 	}
@@ -198,7 +198,7 @@ func (iw *IngressWatcher) UpdateHandler(oldObj, newObj interface{}) {
 func (iw *IngressWatcher) DeleteHandler(obj interface{}) {
 	ingress, err := iw.extractValuesFromIngressResource(obj)
 	if err != nil {
-		iw.logger.WarnWith("Delete ingress handler failure- failed to extract values from object",
+		iw.logger.DebugWith("Delete ingress handler failure- failed to extract values from object",
 			"error", err.Error())
 		return
 	}
