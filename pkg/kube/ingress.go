@@ -59,6 +59,7 @@ const (
 type ResolveTargetsFromIngressCallback func(ingress *networkingv1.Ingress) ([]string, error)
 
 type ingressValue struct {
+	name    string
 	host    string
 	path    string
 	targets []string
@@ -151,11 +152,18 @@ func (iw *IngressWatcher) AddHandler(obj interface{}) {
 		iw.logger.WarnWith("Add ingress handler failure - failed to add the new value to ingress cache",
 			"error", err.Error(),
 			"object", obj,
+			"ingress name", ingress.name,
 			"host", ingress.host,
 			"path", ingress.path,
 			"targets", ingress.targets)
 		return
 	}
+
+	iw.logger.DebugWith("Add ingress handler - successfully added ingress to cache",
+		"ingress name", ingress.name,
+		"host", ingress.host,
+		"path", ingress.path,
+		"targets", ingress.targets)
 }
 
 func (iw *IngressWatcher) UpdateHandler(oldObj, newObj interface{}) {
@@ -178,6 +186,7 @@ func (iw *IngressWatcher) UpdateHandler(oldObj, newObj interface{}) {
 		if err := iw.cache.Delete(oldIngress.host, oldIngress.path, oldIngress.targets); err != nil {
 			iw.logger.WarnWith("Update ingress handler failure - failed to delete old ingress",
 				"error", err.Error(),
+				"ingress name", oldIngress.name,
 				"object", oldObj,
 				"host", oldIngress.host,
 				"path", oldIngress.path,
@@ -189,11 +198,18 @@ func (iw *IngressWatcher) UpdateHandler(oldObj, newObj interface{}) {
 		iw.logger.WarnWith("Update ingress handler failure - failed to add the new value",
 			"error", err.Error(),
 			"object", newObj,
+			"ingress name", newIngress.name,
 			"host", newIngress.host,
 			"path", newIngress.path,
 			"targets", newIngress.targets)
 		return
 	}
+
+	iw.logger.DebugWith("Update ingress handler - successfully updated ingress in cache",
+		"ingress name", newIngress.name,
+		"host", newIngress.host,
+		"path", newIngress.path,
+		"targets", newIngress.targets)
 }
 
 func (iw *IngressWatcher) DeleteHandler(obj interface{}) {
@@ -208,11 +224,18 @@ func (iw *IngressWatcher) DeleteHandler(obj interface{}) {
 		iw.logger.WarnWith("Delete ingress handler failure- failed delete from cache",
 			"error", err.Error(),
 			"object", obj,
+			"ingress name", ingress.name,
 			"host", ingress.host,
 			"path", ingress.path,
 			"targets", ingress.targets)
 		return
 	}
+
+	iw.logger.DebugWith("Delete ingress handler - successfully deleted ingress from cache",
+		"ingress name", ingress.name,
+		"host", ingress.host,
+		"path", ingress.path,
+		"targets", ingress.targets)
 }
 
 // --- internal methods ---
@@ -247,6 +270,7 @@ func (iw *IngressWatcher) extractValuesFromIngressResource(obj interface{}) (*in
 		host:    host,
 		path:    path,
 		targets: targets,
+		name:    ingress.Name,
 	}, nil
 }
 
