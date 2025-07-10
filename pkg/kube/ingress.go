@@ -68,6 +68,7 @@ type ingressValue struct {
 // IngressWatcher watches for changes in Kubernetes Ingress resources and updates the ingress cache accordingly
 type IngressWatcher struct {
 	ctx                    context.Context
+	cancel                 context.CancelFunc
 	logger                 logger.Logger
 	cache                  ingresscache.IngressHostCache
 	factory                informers.SharedInformerFactory
@@ -76,23 +77,24 @@ type IngressWatcher struct {
 }
 
 func NewIngressWatcher(
-	ctx context.Context,
+	dlxCtx context.Context,
 	dlxLogger logger.Logger,
 	kubeClient kubernetes.Interface,
-	ingressCache ingresscache.IngressCache,
+	ingressCache ingresscache.IngressHostCache,
 	resolveTargetsCallback ResolveTargetsFromIngressCallback,
-	resyncTimeout *time.Duration,
+	resyncTimeout time.Duration,
 	namespace string,
 	labelSelector string,
 ) (*IngressWatcher, error) {
-	if resyncTimeout == nil {
-		defaultTimeout := defaultResyncInterval
-		resyncTimeout = &defaultTimeout
+	if resyncTimeout == 0 {
+		resyncTimeout = defaultResyncInterval
 	}
+
+	ctx, cancel := context.WithCancel(dlxCtx)
 
 	factory := informers.NewSharedInformerFactoryWithOptions(
 		kubeClient,
-		*resyncTimeout,
+		resyncTimeout,
 		informers.WithNamespace(namespace),
 		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
 			options.LabelSelector = labelSelector
@@ -102,8 +104,9 @@ func NewIngressWatcher(
 
 	ingressWatcher := &IngressWatcher{
 		ctx:                    ctx,
+		cancel:                 cancel,
 		logger:                 dlxLogger.GetChild("watcher"),
-		cache:                  &ingressCache,
+		cache:                  ingressCache,
 		factory:                factory,
 		informer:               ingressInformer,
 		resolveTargetsCallback: resolveTargetsCallback,
@@ -135,6 +138,7 @@ func (iw *IngressWatcher) Start() error {
 
 func (iw *IngressWatcher) Stop() {
 	iw.logger.Info("Stopping ingress watcher")
+	iw.cancel()
 	iw.factory.Shutdown()
 }
 
