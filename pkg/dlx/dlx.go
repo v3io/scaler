@@ -29,6 +29,7 @@ import (
 
 	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"
+	"k8s.io/client-go/kubernetes"
 )
 
 type DLX struct {
@@ -40,7 +41,9 @@ type DLX struct {
 
 func NewDLX(parentLogger logger.Logger,
 	resourceScaler scalertypes.ResourceScaler,
-	options scalertypes.DLXOptions) (*DLX, error) {
+	options scalertypes.DLXOptions,
+	kubeClientSet kubernetes.Interface,
+) (*DLX, error) {
 	childLogger := parentLogger.GetChild("dlx")
 	childLogger.InfoWith("Creating DLX",
 		"options", options)

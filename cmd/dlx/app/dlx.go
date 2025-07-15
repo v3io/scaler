@@ -113,7 +113,7 @@ func createDLX(
 		return nil, errors.Wrap(err, "Failed to initialize root logger")
 	}
 
-	newScaler, err := dlx.NewDLX(rootLogger, resourceScaler, options)
+	newScaler, err := dlx.NewDLX(rootLogger, resourceScaler, options, kubeClientSet)
 
 	if err != nil {
 		return nil, err
