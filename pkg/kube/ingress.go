@@ -39,6 +39,7 @@ type ingressValue struct {
 	name    string
 	host    string
 	path    string
+	version string
 	targets []string
 }
 
@@ -148,6 +149,29 @@ func (iw *IngressWatcher) AddHandler(obj interface{}) {
 }
 
 func (iw *IngressWatcher) UpdateHandler(oldObj, newObj interface{}) {
+	oldIngressResource, ok := oldObj.(*networkingv1.Ingress)
+	if !ok {
+		iw.logger.DebugWith("Failed to cast old object to Ingress",
+			"object", oldObj)
+		return
+	}
+
+	newIngressResource, ok := newObj.(*networkingv1.Ingress)
+	if !ok {
+		iw.logger.DebugWith("Failed to cast new object to Ingress",
+			"object", newObj)
+		return
+	}
+
+	// ResourceVersion is managed by Kubernetes and indicates whether the resource has changed.
+	// Comparing resourceVersion helps avoid unnecessary updates triggered by periodic informer resync
+	if oldIngressResource.ResourceVersion == newIngressResource.ResourceVersion {
+		iw.logger.DebugWith("No changes in resource, skipping",
+			"resourceVersion", oldIngressResource.ResourceVersion,
+			"ingressName", oldIngressResource.Name)
+		return
+	}
+
 	oldIngress, err := iw.extractValuesFromIngressResource(oldObj)
 	if err != nil {
 		iw.logger.DebugWith("Update ingress handler - failed to extract values from old object",
@@ -230,7 +254,7 @@ func (iw *IngressWatcher) extractValuesFromIngressResource(obj interface{}) (*in
 
 	targets, err := iw.resolveTargetsCallback(ingress)
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to extract targets from ingress labels")
+		return nil, errors.Wrapf(err, "Failed to extract targets from ingress labels: %s", err.Error())
 	}
 
 	if len(targets) == 0 {

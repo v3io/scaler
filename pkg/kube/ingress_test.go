@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	"github.com/v3io/scaler/pkg/ingresscache"
+	"github.com/v3io/scaler/pkg/scalertypes"
 
 	"github.com/nuclio/logger"
 	nucliozap "github.com/nuclio/zap"
@@ -116,7 +117,7 @@ func (suite *IngressWatcherTestSuite) TestAddHandler() {
 			testIngressWatcher, err := suite.createTestIngressWatcher()
 			suite.Require().NoError(err)
 
-			testObj = suite.createDummyIngress(testCase.testArgs.host, testCase.testArgs.path, testCase.testArgs.targets)
+			testObj = suite.createDummyIngress(testCase.testArgs.host, testCase.testArgs.path, testCase.testArgs.version, testCase.testArgs.targets)
 
 			if testCase.expectError {
 				testObj = &networkingv1.IngressSpec{}
@@ -162,11 +163,39 @@ func (suite *IngressWatcherTestSuite) TestUpdateHandler() {
 			testOldObj: ingressValue{
 				host:    "www.example.com",
 				path:    "/test/path",
+				version: "1",
 				targets: []string{"test-targets-name-1", "test-targets-name-2"},
 			},
 			testNewObj: ingressValue{
 				host:    "www.example.com",
 				path:    "/test/path",
+				version: "2",
+				targets: []string{"test-targets-name-1", "test-targets-name-3"},
+			},
+			initialCachedData: &ingressValue{
+				host:    "www.example.com",
+				path:    "/test/path",
+				targets: []string{"test-targets-name-1", "test-targets-name-2"},
+			},
+		}, {
+			name: "Update PairTarget - same ResourceVersion, no change in targets",
+			expectedResults: []expectedResult{
+				{
+					host:    "www.example.com",
+					path:    "/test/path",
+					targets: []string{"test-targets-name-1", "test-targets-name-2"},
+				},
+			},
+			testOldObj: ingressValue{
+				host:    "www.example.com",
+				path:    "/test/path",
+				version: "1",
+				targets: []string{"test-targets-name-1", "test-targets-name-2"},
+			},
+			testNewObj: ingressValue{
+				host:    "www.example.com",
+				path:    "/test/path",
+				version: "1",
 				targets: []string{"test-targets-name-1", "test-targets-name-3"},
 			},
 			initialCachedData: &ingressValue{
@@ -184,11 +213,13 @@ func (suite *IngressWatcherTestSuite) TestUpdateHandler() {
 			testOldObj: ingressValue{
 				host:    "www.example.com",
 				path:    "/test/path",
+				version: "1",
 				targets: []string{"test-targets-name-1", "test-targets-name-2"},
 			},
 			testNewObj: ingressValue{
 				host:    "www.example.com",
 				path:    "/another/path",
+				version: "2",
 				targets: []string{"test-targets-name-1", "test-targets-name-2"},
 			},
 			expectedResults: []expectedResult{
@@ -213,11 +244,13 @@ func (suite *IngressWatcherTestSuite) TestUpdateHandler() {
 			testOldObj: ingressValue{
 				host:    "www.example.com",
 				path:    "/test/path",
+				version: "1",
 				targets: []string{"test-targets-name-1", "test-targets-name-2"},
 			},
 			testNewObj: ingressValue{
 				host:    "www.google.com",
 				path:    "/test/path",
+				version: "2",
 				targets: []string{"test-targets-name-1", "test-targets-name-2"},
 			},
 			expectedResults: []expectedResult{
@@ -238,8 +271,8 @@ func (suite *IngressWatcherTestSuite) TestUpdateHandler() {
 			testIngressWatcher, err := suite.createTestIngressWatcher()
 			suite.Require().NoError(err)
 
-			testOldObj := suite.createDummyIngress(testCase.testOldObj.host, testCase.testOldObj.path, testCase.testOldObj.targets)
-			testNewObj := suite.createDummyIngress(testCase.testNewObj.host, testCase.testNewObj.path, testCase.testNewObj.targets)
+			testOldObj := suite.createDummyIngress(testCase.testOldObj.host, testCase.testOldObj.path, testCase.testOldObj.version, testCase.testOldObj.targets)
+			testNewObj := suite.createDummyIngress(testCase.testNewObj.host, testCase.testNewObj.path, testCase.testNewObj.version, testCase.testNewObj.targets)
 
 			if testCase.initialCachedData != nil {
 				err = testIngressWatcher.cache.Set(testCase.initialCachedData.host, testCase.initialCachedData.path, testCase.initialCachedData.targets)
@@ -337,7 +370,7 @@ func (suite *IngressWatcherTestSuite) TestDeleteHandler() {
 			testIngressWatcher, err := suite.createTestIngressWatcher()
 			suite.Require().NoError(err)
 
-			testObj = suite.createDummyIngress(testCase.testArgs.host, testCase.testArgs.path, testCase.testArgs.targets)
+			testObj = suite.createDummyIngress(testCase.testArgs.host, testCase.testArgs.path, testCase.testArgs.version, testCase.testArgs.targets)
 
 			if testCase.expectError {
 				testObj = &networkingv1.IngressSpec{}
@@ -374,7 +407,7 @@ func (suite *IngressWatcherTestSuite) TestGetPathFromIngress() {
 	tests := []testCase{
 		{
 			name:     "Valid ingress with path",
-			ingress:  suite.createDummyIngress("host", "/test", []string{"target"}),
+			ingress:  suite.createDummyIngress("host", "/test", "1", []string{"target"}),
 			expected: "/test",
 		},
 		{
@@ -463,7 +496,7 @@ func (suite *IngressWatcherTestSuite) TestGetHostFromIngress() {
 	}{
 		{
 			name:     "Valid ingress with host",
-			ingress:  suite.createDummyIngress("test-host", "/test", []string{"target"}),
+			ingress:  suite.createDummyIngress("test-host", "/test", "1", []string{"target"}),
 			expected: "test-host",
 		},
 		{
@@ -527,15 +560,15 @@ func (suite *IngressWatcherTestSuite) createTestIngressWatcher() (*IngressWatche
 	return NewIngressWatcher(ctx,
 		suite.logger,
 		suite.kubeClientSet,
-		*ingresscache.NewIngressCache(suite.logger),
+		ingresscache.NewIngressCache(suite.logger),
 		suite.createMockResolveFunc(),
-		nil,
+		scalertypes.Duration{},
 		"test-namespace",
 		"test-labels-filter",
 	)
 }
 
-func (suite *IngressWatcherTestSuite) createMockResolveFunc() ResolveTargetsFromIngressCallback {
+func (suite *IngressWatcherTestSuite) createMockResolveFunc() scalertypes.ResolveTargetsFromIngressCallback {
 	return func(ingress *networkingv1.Ingress) ([]string, error) {
 		// Extract targets from ingress - matches createDummyIngress structure (1 rule, 1 path)
 		if len(ingress.Spec.Rules) != 1 {
@@ -563,12 +596,13 @@ func (suite *IngressWatcherTestSuite) createMockResolveFunc() ResolveTargetsFrom
 }
 
 // createDummyIngress Creates a dummy Ingress object for testing
-func (suite *IngressWatcherTestSuite) createDummyIngress(host, path string, targets []string) *networkingv1.Ingress {
+func (suite *IngressWatcherTestSuite) createDummyIngress(host, path, version string, targets []string) *networkingv1.Ingress {
 	target := strings.Join(targets, ",")
 	return &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-ingress",
-			Namespace: "test-namespace",
+			Name:            "test-ingress",
+			Namespace:       "test-namespace",
+			ResourceVersion: version,
 		},
 		Spec: networkingv1.IngressSpec{
 			Rules: []networkingv1.IngressRule{
