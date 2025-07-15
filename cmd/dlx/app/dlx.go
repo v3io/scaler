@@ -24,12 +24,14 @@ import (
 	"os"
 	"time"
 
+	"github.com/v3io/scaler/pkg/common"
 	"github.com/v3io/scaler/pkg/dlx"
 	"github.com/v3io/scaler/pkg/pluginloader"
 	"github.com/v3io/scaler/pkg/scalertypes"
 
 	"github.com/nuclio/errors"
 	"github.com/nuclio/zap"
+	"k8s.io/client-go/kubernetes"
 )
 
 func Run(kubeconfigPath string,
@@ -75,7 +77,17 @@ func Run(kubeconfigPath string,
 		dlxOptions = resourceScalerConfig.DLXOptions
 	}
 
-	newDLX, err := createDLX(resourceScaler, dlxOptions)
+	restConfig, err := common.GetClientConfig(kubeconfigPath)
+	if err != nil {
+		return errors.Wrap(err, "Failed to get client configuration")
+	}
+
+	kubeClientSet, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return errors.Wrap(err, "Failed to create k8s client set")
+	}
+
+	newDLX, err := createDLX(resourceScaler, dlxOptions, kubeClientSet)
 	if err != nil {
 		return errors.Wrap(err, "Failed to create dlx")
 	}
@@ -88,7 +100,11 @@ func Run(kubeconfigPath string,
 	select {}
 }
 
-func createDLX(resourceScaler scalertypes.ResourceScaler, options scalertypes.DLXOptions) (*dlx.DLX, error) {
+func createDLX(
+	resourceScaler scalertypes.ResourceScaler,
+	options scalertypes.DLXOptions,
+	kubeClientSet kubernetes.Interface,
+) (*dlx.DLX, error) {
 	rootLogger, err := nucliozap.NewNuclioZap("scaler",
 		"console",
 		nil,
@@ -99,7 +115,7 @@ func createDLX(resourceScaler scalertypes.ResourceScaler, options scalertypes.DL
 		return nil, errors.Wrap(err, "Failed to initialize root logger")
 	}
 
-	newScaler, err := dlx.NewDLX(rootLogger, resourceScaler, options)
+	newScaler, err := dlx.NewDLX(rootLogger, resourceScaler, options, kubeClientSet)
 
 	if err != nil {
 		return nil, err
