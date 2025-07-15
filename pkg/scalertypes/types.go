@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/nuclio/errors"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -51,16 +52,42 @@ const (
 	MultiTargetStrategyCanary  MultiTargetStrategy = "canary"
 )
 
+const (
+	DefaultResyncInterval = 30 * time.Second
+)
+
+// ResolveTargetsFromIngressCallback defines a function that extracts a list of target identifiers
+// (e.g., names of services the Ingress routes traffic to) from a Kubernetes Ingress resource.
+//
+// This function is expected to be implemented externally and passed into the IngressWatcher,
+// allowing for custom logic such as parsing annotations, labels, or other ingress metadata.
+//
+// Parameters:
+//   - ingress: The Kubernetes Ingress resource to extract targets from
+//
+// Returns:
+//   - []string: A slice of target identifiers (e.g., service names, endpoint addresses)
+//   - error: An error if target resolution fails
+//
+// Implementation guidelines:
+// - Return a non-nil slice when targets are successfully resolved
+// - Return a non-nil error if resolution fails
+// - Should handle nil or malformed Ingress objects gracefully and return an error in such cases
+type ResolveTargetsFromIngressCallback func(ingress *networkingv1.Ingress) ([]string, error)
+
 type DLXOptions struct {
 	Namespace string
 
 	// comma delimited
-	TargetNameHeader         string
-	TargetPathHeader         string
-	TargetPort               int
-	ListenAddress            string
-	ResourceReadinessTimeout Duration
-	MultiTargetStrategy      MultiTargetStrategy
+	TargetNameHeader                  string
+	TargetPathHeader                  string
+	TargetPort                        int
+	ListenAddress                     string
+	ResourceReadinessTimeout          Duration
+	MultiTargetStrategy               MultiTargetStrategy
+	LabelSelector                     string
+	ResolveTargetsFromIngressCallback ResolveTargetsFromIngressCallback `json:"-"`
+	ResyncInterval                    Duration
 }
 
 type ResourceScaler interface {

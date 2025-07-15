@@ -22,9 +22,9 @@ package kube
 
 import (
 	"context"
-	"time"
 
 	"github.com/v3io/scaler/pkg/ingresscache"
+	"github.com/v3io/scaler/pkg/scalertypes"
 
 	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"
@@ -34,29 +34,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 )
-
-const (
-	defaultResyncInterval = 30 * time.Second
-)
-
-// ResolveTargetsFromIngressCallback defines a function that extracts a list of target identifiers
-// (e.g., names of services the Ingress routes traffic to) from a Kubernetes Ingress resource.
-//
-// This function is expected to be implemented externally and passed into the IngressWatcher,
-// allowing for custom logic such as parsing annotations, labels, or other ingress metadata.
-//
-// Parameters:
-//   - ingress: The Kubernetes Ingress resource to extract targets from
-//
-// Returns:
-//   - []string: A slice of target identifiers (e.g., service names, endpoint addresses)
-//   - error: An error if target resolution fails
-//
-// Implementation guidelines:
-// - Return a non-nil slice when targets are successfully resolved
-// - Return a non-nil error if resolution fails
-// - Should handle nil or malformed Ingress objects gracefully and return an error in such cases
-type ResolveTargetsFromIngressCallback func(ingress *networkingv1.Ingress) ([]string, error)
 
 type ingressValue struct {
 	name    string
@@ -73,7 +50,7 @@ type IngressWatcher struct {
 	cache                  ingresscache.IngressHostCache
 	factory                informers.SharedInformerFactory
 	informer               cache.SharedIndexInformer
-	resolveTargetsCallback ResolveTargetsFromIngressCallback
+	resolveTargetsCallback scalertypes.ResolveTargetsFromIngressCallback
 }
 
 func NewIngressWatcher(
@@ -81,20 +58,20 @@ func NewIngressWatcher(
 	dlxLogger logger.Logger,
 	kubeClient kubernetes.Interface,
 	ingressCache ingresscache.IngressHostCache,
-	resolveTargetsCallback ResolveTargetsFromIngressCallback,
-	resyncTimeout time.Duration,
+	resolveTargetsCallback scalertypes.ResolveTargetsFromIngressCallback,
+	resyncInterval scalertypes.Duration,
 	namespace string,
 	labelSelector string,
 ) (*IngressWatcher, error) {
-	if resyncTimeout == 0 {
-		resyncTimeout = defaultResyncInterval
+	if resyncInterval.Duration == 0 {
+		resyncInterval = scalertypes.Duration{Duration: scalertypes.DefaultResyncInterval}
 	}
 
 	ctx, cancel := context.WithCancel(dlxCtx)
 
 	factory := informers.NewSharedInformerFactoryWithOptions(
 		kubeClient,
-		resyncTimeout,
+		resyncInterval.Duration,
 		informers.WithNamespace(namespace),
 		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
 			options.LabelSelector = labelSelector
