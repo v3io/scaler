@@ -24,6 +24,8 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/v3io/scaler/pkg/ingresscache"
+	"github.com/v3io/scaler/pkg/kube"
 	"github.com/v3io/scaler/pkg/scalertypes"
 
 	"github.com/nuclio/errors"
@@ -35,6 +37,8 @@ type DLX struct {
 	logger  logger.Logger
 	handler Handler
 	server  *http.Server
+	cache   ingresscache.IngressHostCache
+	watcher *kube.IngressWatcher
 }
 
 func NewDLX(parentLogger logger.Logger,
@@ -53,6 +57,7 @@ func NewDLX(parentLogger logger.Logger,
 		return nil, errors.Wrap(err, "Failed to create function starter")
 	}
 
+	cache := ingresscache.NewIngressCache(childLogger)
 	handler, err := NewHandler(childLogger,
 		resourceStarter,
 		resourceScaler,
@@ -64,23 +69,46 @@ func NewDLX(parentLogger logger.Logger,
 		return nil, errors.Wrap(err, "Failed to create handler")
 	}
 
+	watcher, err := kube.NewIngressWatcher(
+		context.Background(),
+		childLogger,
+		kubeClientSet,
+		cache,
+		options.ResolveTargetsFromIngressCallback,
+		options.ResyncInterval,
+		options.Namespace,
+		options.LabelSelector,
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to create ingress watcher")
+	}
+
 	return &DLX{
 		logger:  childLogger,
 		handler: handler,
 		server: &http.Server{
 			Addr: options.ListenAddress,
 		},
+		cache:   cache,
+		watcher: watcher,
 	}, nil
 }
 
 func (d *DLX) Start() error {
 	d.logger.DebugWith("Starting", "server", d.server.Addr)
 	http.HandleFunc("/", d.handler.HandleFunc)
+
+	// Start the ingress watcher synchronously to ensure cache is fully synced before DLX begins handling traffic
+	if err := d.watcher.Start(); err != nil {
+		return errors.Wrap(err, "Failed to start ingress watcher")
+	}
+
 	go d.server.ListenAndServe() // nolint: errcheck
 	return nil
 }
 
 func (d *DLX) Stop(context context.Context) error {
 	d.logger.DebugWith("Stopping", "server", d.server.Addr)
+	d.watcher.Stop()
 	return d.server.Shutdown(context)
 }
