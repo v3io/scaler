@@ -39,6 +39,7 @@ type ingressValue struct {
 	name    string
 	host    string
 	path    string
+	version string
 	targets []string
 }
 
