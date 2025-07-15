@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/v3io/scaler/pkg/autoscaler"
+	"github.com/v3io/scaler/pkg/common"
 	"github.com/v3io/scaler/pkg/pluginloader"
 	"github.com/v3io/scaler/pkg/scalertypes"
 
@@ -35,7 +36,6 @@ import (
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/metrics/pkg/client/custom_metrics"
 )
 
@@ -73,7 +73,7 @@ func Run(kubeconfigPath string,
 		autoScalerOptions = resourceScalerConfig.AutoScalerOptions
 	}
 
-	restConfig, err := getClientConfig(kubeconfigPath)
+	restConfig, err := common.GetClientConfig(kubeconfigPath)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get client configuration")
 	}
@@ -118,12 +118,4 @@ func createAutoScaler(restConfig *rest.Config,
 	}
 
 	return newScaler, nil
-}
-
-func getClientConfig(kubeconfigPath string) (*rest.Config, error) {
-	if kubeconfigPath != "" {
-		return clientcmd.BuildConfigFromFlags("", kubeconfigPath)
-	}
-
-	return rest.InClusterConfig()
 }
