@@ -57,7 +57,6 @@ func NewIngressWatcher(
 	dlxCtx context.Context,
 	dlxLogger logger.Logger,
 	kubeClient kubernetes.Interface,
-	ingressCache ingresscache.IngressHostCache,
 	resolveTargetsCallback scalertypes.ResolveTargetsFromIngressCallback,
 	resyncInterval scalertypes.Duration,
 	namespace string,
@@ -83,7 +82,7 @@ func NewIngressWatcher(
 		ctx:                    ctxWithCancel,
 		cancel:                 cancel,
 		logger:                 dlxLogger.GetChild("watcher"),
-		cache:                  ingressCache,
+		cache:                  ingresscache.NewIngressCache(dlxLogger),
 		factory:                factory,
 		informer:               ingressInformer,
 		resolveTargetsCallback: resolveTargetsCallback,
@@ -117,6 +116,11 @@ func (iw *IngressWatcher) Stop() {
 	iw.logger.Info("Stopping ingress watcher")
 	iw.cancel()
 	iw.factory.Shutdown()
+}
+
+// GetIngressHostCacheReader expose read-only access to the ingress cache
+func (iw *IngressWatcher) GetIngressHostCacheReader() ingresscache.IngressHostCacheReader {
+	return iw.cache
 }
 
 // --- ResourceEventHandler methods ---

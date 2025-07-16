@@ -25,7 +25,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/v3io/scaler/pkg/ingresscache"
 	"github.com/v3io/scaler/pkg/scalertypes"
 
 	"github.com/nuclio/logger"
@@ -562,7 +561,6 @@ func (suite *IngressWatcherTestSuite) createTestIngressWatcher() (*IngressWatche
 	return NewIngressWatcher(ctx,
 		suite.logger,
 		suite.kubeClientSet,
-		ingresscache.NewIngressCache(suite.logger),
 		suite.createMockResolveFunc(),
 		scalertypes.Duration{},
 		"test-namespace",
