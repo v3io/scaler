@@ -36,7 +36,6 @@ type DLX struct {
 	logger  logger.Logger
 	handler Handler
 	server  *http.Server
-	cache   ingresscache.IngressHostCache
 	watcher *kube.IngressWatcher
 }
 
@@ -86,7 +85,6 @@ func NewDLX(parentLogger logger.Logger,
 		server: &http.Server{
 			Addr: options.ListenAddress,
 		},
-		cache:   cache,
 		watcher: watcher,
 	}, nil
 }
