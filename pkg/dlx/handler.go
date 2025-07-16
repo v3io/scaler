@@ -101,15 +101,15 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 		resourceNames = append(resourceNames, resourceName)
 		resourceTargetURLMap[resourceName] = targetURL
 	} else {
-		targetNameHeaderValue := req.Header.Get(h.targetNameHeader)
-		path := req.Header.Get(h.targetPathHeader)
-		if targetNameHeaderValue == "" {
-			h.logger.WarnWith("When ingress not set, must pass header value",
-				"missingHeader", h.targetNameHeader)
+		path, resourceNames, err := h.getResourceNameAndPath(req)
+		if err != nil {
+			h.logger.WarnWith("Failed to get resource names and path from request",
+				"error", err.Error(),
+				"host", req.Host,
+				"path", req.URL.Path)
 			res.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		resourceNames = strings.Split(targetNameHeaderValue, ",")
 		for _, resourceName := range resourceNames {
 			targetURL, status := h.parseTargetURL(resourceName, path)
 			if targetURL == nil {
@@ -165,6 +165,43 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 	}
 
 	proxy.ServeHTTP(res, req)
+}
+
+func (h *Handler) getResourceNameAndPath(req *http.Request) (string, []string, error) {
+	// first try to get the target name and path from the ingress cache
+	path, resourceNames, err := h.extractValuesFromIngress(req)
+	if err == nil {
+		return path, resourceNames, nil
+	}
+
+	h.logger.DebugWith("Failed to get target name from ingress cache, try to extract from the request headers",
+		"host", req.Host,
+		"path", req.URL.Path,
+		"error", err.Error())
+
+	// old implementation for backward compatibility
+	targetNameHeaderValue := req.Header.Get(h.targetNameHeader)
+	path = req.Header.Get(h.targetPathHeader)
+	if targetNameHeaderValue == "" {
+		return "", nil, errors.New("No target name header found")
+	}
+	resourceNames = strings.Split(targetNameHeaderValue, ",")
+	return path, resourceNames, nil
+}
+
+func (h *Handler) extractValuesFromIngress(req *http.Request) (string, []string, error) {
+	host := req.Host
+	path := req.URL.Path
+	resourceNames, err := h.ingressCache.Get(host, path)
+	if err != nil {
+		return "", nil, errors.New("Failed to get target name from ingress cache")
+	}
+
+	if len(resourceNames) == 0 {
+		return "", nil, errors.New("No resourceNames found in ingress cache")
+	}
+
+	return path, resourceNames, nil
 }
 
 func (h *Handler) parseTargetURL(resourceName, path string) (*url.URL, int) {
