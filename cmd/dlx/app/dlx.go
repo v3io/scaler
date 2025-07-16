@@ -82,8 +82,7 @@ func Run(kubeconfigPath string,
 		return errors.Wrap(err, "Failed to get client configuration")
 	}
 
-	dlxOptions.KubeClientSet, err = kubernetes.NewForConfig(restConfig)
-	if err != nil {
+	if dlxOptions.KubeClientSet, err = kubernetes.NewForConfig(restConfig); err != nil {
 		return errors.Wrap(err, "Failed to create k8s client set")
 	}
 
