@@ -79,10 +79,9 @@ func NewHandler(parentLogger logger.Logger,
 }
 
 func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
+	var path string
+	var err error
 	var resourceNames []string
-
-	responseChannel := make(chan ResourceStatusResult, 1)
-	defer close(responseChannel)
 
 	// first try to see if our request came from ingress controller
 	forwardedHost := req.Header.Get("X-Forwarded-Host")
@@ -101,7 +100,7 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 		resourceNames = append(resourceNames, resourceName)
 		resourceTargetURLMap[resourceName] = targetURL
 	} else {
-		path, resourceNames, err := h.getResourceNameAndPath(req)
+		path, resourceNames, err = h.getResourceNameAndPath(req)
 		if err != nil {
 			h.logger.WarnWith("Failed to get resource names and path from request",
 				"error", err.Error(),
@@ -219,17 +218,17 @@ func (h *Handler) parseTargetURL(resourceName, path string) (*url.URL, int) {
 }
 
 func (h *Handler) startResources(resourceNames []string) *ResourceStatusResult {
-	responseChannel := make(chan ResourceStatusResult, len(resourceNames))
-	defer close(responseChannel)
+	responseChan := make(chan ResourceStatusResult, len(resourceNames))
+	defer close(responseChan)
 
 	// Start all resources in separate go routines
 	for _, resourceName := range resourceNames {
-		go h.resourceStarter.handleResourceStart(resourceName, responseChannel)
+		go h.resourceStarter.handleResourceStart(resourceName, responseChan)
 	}
 
 	// Wait for all resources to finish starting
 	for range resourceNames {
-		statusResult := <-responseChannel
+		statusResult := <-responseChan
 
 		if statusResult.Error != nil {
 			h.logger.WarnWith("Failed to start resource",
