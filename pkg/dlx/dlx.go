@@ -76,20 +76,6 @@ func NewDLX(parentLogger logger.Logger,
 		return nil, errors.Wrap(err, "Failed to create handler")
 	}
 
-	watcher, err := kube.NewIngressWatcher(
-		context.Background(),
-		childLogger,
-		options.KubeClientSet,
-		cache,
-		options.ResolveTargetsFromIngressCallback,
-		options.ResyncInterval,
-		options.Namespace,
-		options.LabelSelector,
-	)
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to create ingress watcher")
-	}
-
 	return &DLX{
 		logger:  childLogger,
 		handler: handler,

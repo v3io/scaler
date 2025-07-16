@@ -26,7 +26,6 @@ import (
 	"testing"
 
 	"github.com/v3io/scaler/pkg/scalertypes"
-	"github.com/v3io/scaler/pkg/scalertypes"
 
 	"github.com/nuclio/logger"
 	nucliozap "github.com/nuclio/zap"
