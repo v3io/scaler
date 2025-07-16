@@ -30,6 +30,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/v3io/scaler/pkg/ingresscache"
 	"github.com/v3io/scaler/pkg/scalertypes"
 
 	"github.com/nuclio/errors"
@@ -49,6 +50,7 @@ type Handler struct {
 	targetURLCache      *cache.LRUExpireCache
 	proxyLock           sync.Locker
 	lastProxyErrorTime  time.Time
+	ingressCache        ingresscache.IngressHostCacheReader
 }
 
 func NewHandler(parentLogger logger.Logger,
@@ -57,7 +59,8 @@ func NewHandler(parentLogger logger.Logger,
 	targetNameHeader string,
 	targetPathHeader string,
 	targetPort int,
-	multiTargetStrategy scalertypes.MultiTargetStrategy) (Handler, error) {
+	multiTargetStrategy scalertypes.MultiTargetStrategy,
+	ingressCache ingresscache.IngressHostCacheReader) (Handler, error) {
 	h := Handler{
 		logger:              parentLogger.GetChild("handler"),
 		resourceStarter:     resourceStarter,
@@ -69,6 +72,7 @@ func NewHandler(parentLogger logger.Logger,
 		targetURLCache:      cache.NewLRUExpireCache(100),
 		proxyLock:           &sync.Mutex{},
 		lastProxyErrorTime:  time.Now(),
+		ingressCache:        ingressCache,
 	}
 	h.HandleFunc = h.handleRequest
 	return h, nil
