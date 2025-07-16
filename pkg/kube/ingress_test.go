@@ -196,7 +196,6 @@ func (suite *IngressWatcherTestSuite) TestUpdateHandler() {
 			testNewObj: ingressValue{
 				host:    "www.example.com",
 				path:    "/test/path",
-				version: "1",
 				targets: []string{"test-targets-name-1", "test-targets-name-3"},
 			},
 			OldObjVersion: "1",
@@ -247,14 +246,12 @@ func (suite *IngressWatcherTestSuite) TestUpdateHandler() {
 			testOldObj: ingressValue{
 				host:    "www.example.com",
 				path:    "/test/path",
-				version: "1",
 				targets: []string{"test-targets-name-1", "test-targets-name-2"},
 			},
 			OldObjVersion: "1",
 			testNewObj: ingressValue{
 				host:    "www.google.com",
 				path:    "/test/path",
-				version: "2",
 				targets: []string{"test-targets-name-1", "test-targets-name-2"},
 			},
 			newObjVersion: "2",
