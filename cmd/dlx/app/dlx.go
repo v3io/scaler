@@ -82,12 +82,12 @@ func Run(kubeconfigPath string,
 		return errors.Wrap(err, "Failed to get client configuration")
 	}
 
-	kubeClientSet, err := kubernetes.NewForConfig(restConfig)
+	dlxOptions.KubeClientSet, err = kubernetes.NewForConfig(restConfig)
 	if err != nil {
 		return errors.Wrap(err, "Failed to create k8s client set")
 	}
 
-	newDLX, err := createDLX(resourceScaler, dlxOptions, kubeClientSet)
+	newDLX, err := createDLX(resourceScaler, dlxOptions)
 	if err != nil {
 		return errors.Wrap(err, "Failed to create dlx")
 	}
@@ -103,7 +103,6 @@ func Run(kubeconfigPath string,
 func createDLX(
 	resourceScaler scalertypes.ResourceScaler,
 	options scalertypes.DLXOptions,
-	kubeClientSet kubernetes.Interface,
 ) (*dlx.DLX, error) {
 	rootLogger, err := nucliozap.NewNuclioZap("scaler",
 		"console",
@@ -115,7 +114,7 @@ func createDLX(
 		return nil, errors.Wrap(err, "Failed to initialize root logger")
 	}
 
-	newScaler, err := dlx.NewDLX(rootLogger, resourceScaler, options, kubeClientSet)
+	newScaler, err := dlx.NewDLX(rootLogger, resourceScaler, options)
 
 	if err != nil {
 		return nil, err

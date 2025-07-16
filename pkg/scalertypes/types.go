@@ -30,6 +30,7 @@ import (
 	"github.com/nuclio/errors"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes"
 )
 
 type AutoScalerOptions struct {
@@ -88,6 +89,7 @@ type DLXOptions struct {
 	LabelSelector                     string
 	ResolveTargetsFromIngressCallback ResolveTargetsFromIngressCallback `json:"-"`
 	ResyncInterval                    Duration
+	KubeClientSet                     kubernetes.Interface `json:"-"`
 }
 
 type ResourceScaler interface {

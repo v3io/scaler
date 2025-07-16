@@ -39,7 +39,6 @@ type ingressValue struct {
 	name    string
 	host    string
 	path    string
-	version string
 	targets []string
 }
 
@@ -68,7 +67,7 @@ func NewIngressWatcher(
 		resyncInterval = scalertypes.Duration{Duration: scalertypes.DefaultResyncInterval}
 	}
 
-	ctx, cancel := context.WithCancel(dlxCtx)
+	ctxWithCancel, cancel := context.WithCancel(dlxCtx)
 
 	factory := informers.NewSharedInformerFactoryWithOptions(
 		kubeClient,
@@ -81,7 +80,7 @@ func NewIngressWatcher(
 	ingressInformer := factory.Networking().V1().Ingresses().Informer()
 
 	ingressWatcher := &IngressWatcher{
-		ctx:                    ctx,
+		ctx:                    ctxWithCancel,
 		cancel:                 cancel,
 		logger:                 dlxLogger.GetChild("watcher"),
 		cache:                  ingressCache,
@@ -166,9 +165,6 @@ func (iw *IngressWatcher) UpdateHandler(oldObj, newObj interface{}) {
 	// ResourceVersion is managed by Kubernetes and indicates whether the resource has changed.
 	// Comparing resourceVersion helps avoid unnecessary updates triggered by periodic informer resync
 	if oldIngressResource.ResourceVersion == newIngressResource.ResourceVersion {
-		iw.logger.DebugWith("No changes in resource, skipping",
-			"resourceVersion", oldIngressResource.ResourceVersion,
-			"ingressName", oldIngressResource.Name)
 		return
 	}
 

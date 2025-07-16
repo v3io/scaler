@@ -117,7 +117,7 @@ func (suite *IngressWatcherTestSuite) TestAddHandler() {
 			testIngressWatcher, err := suite.createTestIngressWatcher()
 			suite.Require().NoError(err)
 
-			testObj = suite.createDummyIngress(testCase.testArgs.host, testCase.testArgs.path, testCase.testArgs.version, testCase.testArgs.targets)
+			testObj = suite.createDummyIngress(testCase.testArgs.host, testCase.testArgs.path, "1", testCase.testArgs.targets)
 
 			if testCase.expectError {
 				testObj = &networkingv1.IngressSpec{}
@@ -150,6 +150,8 @@ func (suite *IngressWatcherTestSuite) TestUpdateHandler() {
 		initialCachedData *ingressValue
 		testOldObj        ingressValue
 		testNewObj        ingressValue
+		OldObjVersion     string
+		newObjVersion     string
 	}{
 		{
 			name: "Update PairTarget - same host and path, different targets",
@@ -163,15 +165,15 @@ func (suite *IngressWatcherTestSuite) TestUpdateHandler() {
 			testOldObj: ingressValue{
 				host:    "www.example.com",
 				path:    "/test/path",
-				version: "1",
 				targets: []string{"test-targets-name-1", "test-targets-name-2"},
 			},
+			OldObjVersion: "1",
 			testNewObj: ingressValue{
 				host:    "www.example.com",
 				path:    "/test/path",
-				version: "2",
 				targets: []string{"test-targets-name-1", "test-targets-name-3"},
 			},
+			newObjVersion: "2",
 			initialCachedData: &ingressValue{
 				host:    "www.example.com",
 				path:    "/test/path",
@@ -189,15 +191,15 @@ func (suite *IngressWatcherTestSuite) TestUpdateHandler() {
 			testOldObj: ingressValue{
 				host:    "www.example.com",
 				path:    "/test/path",
-				version: "1",
 				targets: []string{"test-targets-name-1", "test-targets-name-2"},
 			},
 			testNewObj: ingressValue{
 				host:    "www.example.com",
 				path:    "/test/path",
-				version: "1",
 				targets: []string{"test-targets-name-1", "test-targets-name-3"},
 			},
+			OldObjVersion: "1",
+			newObjVersion: "1",
 			initialCachedData: &ingressValue{
 				host:    "www.example.com",
 				path:    "/test/path",
@@ -213,15 +215,15 @@ func (suite *IngressWatcherTestSuite) TestUpdateHandler() {
 			testOldObj: ingressValue{
 				host:    "www.example.com",
 				path:    "/test/path",
-				version: "1",
 				targets: []string{"test-targets-name-1", "test-targets-name-2"},
 			},
+			OldObjVersion: "1",
 			testNewObj: ingressValue{
 				host:    "www.example.com",
 				path:    "/another/path",
-				version: "2",
 				targets: []string{"test-targets-name-1", "test-targets-name-2"},
 			},
+			newObjVersion: "2",
 			expectedResults: []expectedResult{
 				{
 					host:           "www.example.com",
@@ -244,15 +246,15 @@ func (suite *IngressWatcherTestSuite) TestUpdateHandler() {
 			testOldObj: ingressValue{
 				host:    "www.example.com",
 				path:    "/test/path",
-				version: "1",
 				targets: []string{"test-targets-name-1", "test-targets-name-2"},
 			},
+			OldObjVersion: "1",
 			testNewObj: ingressValue{
 				host:    "www.google.com",
 				path:    "/test/path",
-				version: "2",
 				targets: []string{"test-targets-name-1", "test-targets-name-2"},
 			},
+			newObjVersion: "2",
 			expectedResults: []expectedResult{
 				{
 					host:           "www.example.com",
@@ -271,8 +273,8 @@ func (suite *IngressWatcherTestSuite) TestUpdateHandler() {
 			testIngressWatcher, err := suite.createTestIngressWatcher()
 			suite.Require().NoError(err)
 
-			testOldObj := suite.createDummyIngress(testCase.testOldObj.host, testCase.testOldObj.path, testCase.testOldObj.version, testCase.testOldObj.targets)
-			testNewObj := suite.createDummyIngress(testCase.testNewObj.host, testCase.testNewObj.path, testCase.testNewObj.version, testCase.testNewObj.targets)
+			testOldObj := suite.createDummyIngress(testCase.testOldObj.host, testCase.testOldObj.path, testCase.OldObjVersion, testCase.testOldObj.targets)
+			testNewObj := suite.createDummyIngress(testCase.testNewObj.host, testCase.testNewObj.path, testCase.newObjVersion, testCase.testNewObj.targets)
 
 			if testCase.initialCachedData != nil {
 				err = testIngressWatcher.cache.Set(testCase.initialCachedData.host, testCase.initialCachedData.path, testCase.initialCachedData.targets)
@@ -370,7 +372,7 @@ func (suite *IngressWatcherTestSuite) TestDeleteHandler() {
 			testIngressWatcher, err := suite.createTestIngressWatcher()
 			suite.Require().NoError(err)
 
-			testObj = suite.createDummyIngress(testCase.testArgs.host, testCase.testArgs.path, testCase.testArgs.version, testCase.testArgs.targets)
+			testObj = suite.createDummyIngress(testCase.testArgs.host, testCase.testArgs.path, "1", testCase.testArgs.targets)
 
 			if testCase.expectError {
 				testObj = &networkingv1.IngressSpec{}
