@@ -20,15 +20,19 @@ such restriction.
 
 package ingresscache
 
+type IngressHostCacheReader interface {
+	// Get retrieves all target names for the given host and path
+	Get(host string, path string) ([]string, error)
+}
+
 type IngressHostCache interface {
+	IngressHostCacheReader
+
 	// Set adds a new item to the cache for the given host, path and targets. Will overwrite existing values if any
 	Set(host string, path string, targets []string) error
 
 	// Delete removes the specified targets from the cache for the given host and path. Will do nothing if host, path or targets do not exist
 	Delete(host string, path string, targets []string) error
-
-	// Get retrieves all target names for the given host and path
-	Get(host string, path string) ([]string, error)
 }
 
 type IngressHostsTree interface {

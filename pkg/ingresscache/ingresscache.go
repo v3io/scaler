@@ -35,7 +35,7 @@ type IngressCache struct {
 func NewIngressCache(logger logger.Logger) *IngressCache {
 	return &IngressCache{
 		syncMap: &sync.Map{},
-		logger:  logger,
+		logger:  logger.GetChild("cache"),
 	}
 }
 

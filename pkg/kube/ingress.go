@@ -22,9 +22,9 @@ package kube
 
 import (
 	"context"
-	"time"
 
 	"github.com/v3io/scaler/pkg/ingresscache"
+	"github.com/v3io/scaler/pkg/scalertypes"
 
 	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"
@@ -34,29 +34,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 )
-
-const (
-	defaultResyncInterval = 30 * time.Second
-)
-
-// ResolveTargetsFromIngressCallback defines a function that extracts a list of target identifiers
-// (e.g., names of services the Ingress routes traffic to) from a Kubernetes Ingress resource.
-//
-// This function is expected to be implemented externally and passed into the IngressWatcher,
-// allowing for custom logic such as parsing annotations, labels, or other ingress metadata.
-//
-// Parameters:
-//   - ingress: The Kubernetes Ingress resource to extract targets from
-//
-// Returns:
-//   - []string: A slice of target identifiers (e.g., service names, endpoint addresses)
-//   - error: An error if target resolution fails
-//
-// Implementation guidelines:
-// - Return a non-nil slice when targets are successfully resolved
-// - Return a non-nil error if resolution fails
-// - Should handle nil or malformed Ingress objects gracefully and return an error in such cases
-type ResolveTargetsFromIngressCallback func(ingress *networkingv1.Ingress) ([]string, error)
 
 type ingressValue struct {
 	name    string
@@ -68,31 +45,32 @@ type ingressValue struct {
 // IngressWatcher watches for changes in Kubernetes Ingress resources and updates the ingress cache accordingly
 type IngressWatcher struct {
 	ctx                    context.Context
+	cancel                 context.CancelFunc
 	logger                 logger.Logger
 	cache                  ingresscache.IngressHostCache
 	factory                informers.SharedInformerFactory
 	informer               cache.SharedIndexInformer
-	resolveTargetsCallback ResolveTargetsFromIngressCallback
+	resolveTargetsCallback scalertypes.ResolveTargetsFromIngressCallback
 }
 
 func NewIngressWatcher(
-	ctx context.Context,
+	dlxCtx context.Context,
 	dlxLogger logger.Logger,
 	kubeClient kubernetes.Interface,
-	ingressCache ingresscache.IngressCache,
-	resolveTargetsCallback ResolveTargetsFromIngressCallback,
-	resyncTimeout *time.Duration,
+	resolveTargetsCallback scalertypes.ResolveTargetsFromIngressCallback,
+	resyncInterval scalertypes.Duration,
 	namespace string,
 	labelSelector string,
 ) (*IngressWatcher, error) {
-	if resyncTimeout == nil {
-		defaultTimeout := defaultResyncInterval
-		resyncTimeout = &defaultTimeout
+	if resyncInterval.Duration == 0 {
+		resyncInterval = scalertypes.Duration{Duration: scalertypes.DefaultResyncInterval}
 	}
+
+	ctxWithCancel, cancel := context.WithCancel(dlxCtx)
 
 	factory := informers.NewSharedInformerFactoryWithOptions(
 		kubeClient,
-		*resyncTimeout,
+		resyncInterval.Duration,
 		informers.WithNamespace(namespace),
 		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
 			options.LabelSelector = labelSelector
@@ -101,9 +79,10 @@ func NewIngressWatcher(
 	ingressInformer := factory.Networking().V1().Ingresses().Informer()
 
 	ingressWatcher := &IngressWatcher{
-		ctx:                    ctx,
+		ctx:                    ctxWithCancel,
+		cancel:                 cancel,
 		logger:                 dlxLogger.GetChild("watcher"),
-		cache:                  &ingressCache,
+		cache:                  ingresscache.NewIngressCache(dlxLogger),
 		factory:                factory,
 		informer:               ingressInformer,
 		resolveTargetsCallback: resolveTargetsCallback,
@@ -135,7 +114,13 @@ func (iw *IngressWatcher) Start() error {
 
 func (iw *IngressWatcher) Stop() {
 	iw.logger.Info("Stopping ingress watcher")
+	iw.cancel()
 	iw.factory.Shutdown()
+}
+
+// GetIngressHostCacheReader expose read-only access to the ingress cache
+func (iw *IngressWatcher) GetIngressHostCacheReader() ingresscache.IngressHostCacheReader {
+	return iw.cache
 }
 
 // --- ResourceEventHandler methods ---
@@ -167,6 +152,26 @@ func (iw *IngressWatcher) AddHandler(obj interface{}) {
 }
 
 func (iw *IngressWatcher) UpdateHandler(oldObj, newObj interface{}) {
+	oldIngressResource, ok := oldObj.(*networkingv1.Ingress)
+	if !ok {
+		iw.logger.DebugWith("Failed to cast old object to Ingress",
+			"object", oldObj)
+		return
+	}
+
+	newIngressResource, ok := newObj.(*networkingv1.Ingress)
+	if !ok {
+		iw.logger.DebugWith("Failed to cast new object to Ingress",
+			"object", newObj)
+		return
+	}
+
+	// ResourceVersion is managed by Kubernetes and indicates whether the resource has changed.
+	// Comparing resourceVersion helps avoid unnecessary updates triggered by periodic informer resync
+	if oldIngressResource.ResourceVersion == newIngressResource.ResourceVersion {
+		return
+	}
+
 	oldIngress, err := iw.extractValuesFromIngressResource(oldObj)
 	if err != nil {
 		iw.logger.DebugWith("Update ingress handler - failed to extract values from old object",
@@ -249,7 +254,7 @@ func (iw *IngressWatcher) extractValuesFromIngressResource(obj interface{}) (*in
 
 	targets, err := iw.resolveTargetsCallback(ingress)
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to extract targets from ingress labels")
+		return nil, errors.Wrapf(err, "Failed to extract targets from ingress labels: %s", err.Error())
 	}
 
 	if len(targets) == 0 {

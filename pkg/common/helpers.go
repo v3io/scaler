@@ -23,6 +23,9 @@ package common
 import (
 	"math/rand"
 	"time"
+
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 var SeededRand = rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -37,4 +40,12 @@ func UniquifyStringSlice(stringList []string) []string {
 		}
 	}
 	return list
+}
+
+func GetClientConfig(kubeconfigPath string) (*rest.Config, error) {
+	if kubeconfigPath != "" {
+		return clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+	}
+
+	return rest.InClusterConfig()
 }
