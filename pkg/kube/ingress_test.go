@@ -64,47 +64,47 @@ func (suite *IngressWatcherTestSuite) SetupTest() {
 func (suite *IngressWatcherTestSuite) TestAddHandler() {
 	for _, testCase := range []struct {
 		name              string
-		testArgs          ingressValue
+		testArgs          IngressValue
 		expectedResult    []string
-		initialCachedData *ingressValue
+		initialCachedData *IngressValue
 		errorMessage      string
 		expectError       bool
 	}{
 		{
 			name: "Add PairTarget",
-			testArgs: ingressValue{
-				host:    "www.example.com",
-				path:    "/test/path",
-				targets: []string{"test-targets-name-1", "test-targets-name-2"},
+			testArgs: IngressValue{
+				Host:    "www.example.com",
+				Path:    "/test/path",
+				Targets: []string{"test-targets-name-1", "test-targets-name-2"},
 			},
 			expectedResult: []string{"test-targets-name-1", "test-targets-name-2"},
 		}, {
 			name: "Add SingleTarget",
-			testArgs: ingressValue{
-				host:    "www.example.com",
-				path:    "/test/path",
-				targets: []string{"test-targets-name-1"},
+			testArgs: IngressValue{
+				Host:    "www.example.com",
+				Path:    "/test/path",
+				Targets: []string{"test-targets-name-1"},
 			},
 			expectedResult: []string{"test-targets-name-1"},
 		}, {
 			name: "Add SingleTarget with different name to the same host and path",
-			testArgs: ingressValue{
-				host:    "www.example.com",
-				path:    "/test/path",
-				targets: []string{"test-targets-name-2"},
+			testArgs: IngressValue{
+				Host:    "www.example.com",
+				Path:    "/test/path",
+				Targets: []string{"test-targets-name-2"},
 			},
 			expectedResult: []string{"test-targets-name-2"},
-			initialCachedData: &ingressValue{
-				host:    "www.example.com",
-				path:    "/test/path",
-				targets: []string{"test-targets-name-1"},
+			initialCachedData: &IngressValue{
+				Host:    "www.example.com",
+				Path:    "/test/path",
+				Targets: []string{"test-targets-name-1"},
 			},
 		}, {
 			name: "bad input- should fail",
-			testArgs: ingressValue{
-				host:    "www.example.com",
-				path:    "/test/path",
-				targets: []string{"test-targets-name-2"},
+			testArgs: IngressValue{
+				Host:    "www.example.com",
+				Path:    "/test/path",
+				Targets: []string{"test-targets-name-2"},
 			},
 			expectedResult: []string{},
 			expectError:    true,
@@ -116,20 +116,20 @@ func (suite *IngressWatcherTestSuite) TestAddHandler() {
 			testIngressWatcher, err := suite.createTestIngressWatcher()
 			suite.Require().NoError(err)
 
-			testObj = suite.createDummyIngress(testCase.testArgs.host, testCase.testArgs.path, "1", testCase.testArgs.targets)
+			testObj = suite.createDummyIngress(testCase.testArgs.Host, testCase.testArgs.Path, "1", testCase.testArgs.Targets)
 
 			if testCase.expectError {
 				testObj = &networkingv1.IngressSpec{}
 			}
 
 			if testCase.initialCachedData != nil {
-				err = testIngressWatcher.cache.Set(testCase.initialCachedData.host, testCase.initialCachedData.path, testCase.initialCachedData.targets)
+				err = testIngressWatcher.cache.Set(testCase.initialCachedData.Host, testCase.initialCachedData.Path, testCase.initialCachedData.Targets)
 				suite.Require().NoError(err)
 			}
 
 			testIngressWatcher.AddHandler(testObj)
 			// get the targets from the cache and compare values
-			resultTargetNames, err := testIngressWatcher.cache.Get(testCase.testArgs.host, testCase.testArgs.path)
+			resultTargetNames, err := testIngressWatcher.cache.Get(testCase.testArgs.Host, testCase.testArgs.Path)
 			if testCase.expectError {
 				suite.Require().Error(err)
 				suite.Require().ErrorContains(err, testCase.errorMessage)
@@ -146,9 +146,9 @@ func (suite *IngressWatcherTestSuite) TestUpdateHandler() {
 	for _, testCase := range []struct {
 		name              string
 		expectedResults   []expectedResult
-		initialCachedData *ingressValue
-		testOldObj        ingressValue
-		testNewObj        ingressValue
+		initialCachedData *IngressValue
+		testOldObj        IngressValue
+		testNewObj        IngressValue
 		OldObjVersion     string
 		newObjVersion     string
 	}{
@@ -161,22 +161,22 @@ func (suite *IngressWatcherTestSuite) TestUpdateHandler() {
 					targets: []string{"test-targets-name-1", "test-targets-name-3"},
 				},
 			},
-			testOldObj: ingressValue{
-				host:    "www.example.com",
-				path:    "/test/path",
-				targets: []string{"test-targets-name-1", "test-targets-name-2"},
+			testOldObj: IngressValue{
+				Host:    "www.example.com",
+				Path:    "/test/path",
+				Targets: []string{"test-targets-name-1", "test-targets-name-2"},
 			},
 			OldObjVersion: "1",
-			testNewObj: ingressValue{
-				host:    "www.example.com",
-				path:    "/test/path",
-				targets: []string{"test-targets-name-1", "test-targets-name-3"},
+			testNewObj: IngressValue{
+				Host:    "www.example.com",
+				Path:    "/test/path",
+				Targets: []string{"test-targets-name-1", "test-targets-name-3"},
 			},
 			newObjVersion: "2",
-			initialCachedData: &ingressValue{
-				host:    "www.example.com",
-				path:    "/test/path",
-				targets: []string{"test-targets-name-1", "test-targets-name-2"},
+			initialCachedData: &IngressValue{
+				Host:    "www.example.com",
+				Path:    "/test/path",
+				Targets: []string{"test-targets-name-1", "test-targets-name-2"},
 			},
 		}, {
 			name: "Update PairTarget - same ResourceVersion, no change in targets",
@@ -187,40 +187,40 @@ func (suite *IngressWatcherTestSuite) TestUpdateHandler() {
 					targets: []string{"test-targets-name-1", "test-targets-name-2"},
 				},
 			},
-			testOldObj: ingressValue{
-				host:    "www.example.com",
-				path:    "/test/path",
-				targets: []string{"test-targets-name-1", "test-targets-name-2"},
+			testOldObj: IngressValue{
+				Host:    "www.example.com",
+				Path:    "/test/path",
+				Targets: []string{"test-targets-name-1", "test-targets-name-2"},
 			},
-			testNewObj: ingressValue{
-				host:    "www.example.com",
-				path:    "/test/path",
-				targets: []string{"test-targets-name-1", "test-targets-name-3"},
+			testNewObj: IngressValue{
+				Host:    "www.example.com",
+				Path:    "/test/path",
+				Targets: []string{"test-targets-name-1", "test-targets-name-3"},
 			},
 			OldObjVersion: "1",
 			newObjVersion: "1",
-			initialCachedData: &ingressValue{
-				host:    "www.example.com",
-				path:    "/test/path",
-				targets: []string{"test-targets-name-1", "test-targets-name-2"},
+			initialCachedData: &IngressValue{
+				Host:    "www.example.com",
+				Path:    "/test/path",
+				Targets: []string{"test-targets-name-1", "test-targets-name-2"},
 			},
 		}, {
 			name: "Update PairTarget - different path- should Delete old targets",
-			initialCachedData: &ingressValue{
-				host:    "www.example.com",
-				path:    "/test/path",
-				targets: []string{"test-targets-name-1", "test-targets-name-2"},
+			initialCachedData: &IngressValue{
+				Host:    "www.example.com",
+				Path:    "/test/path",
+				Targets: []string{"test-targets-name-1", "test-targets-name-2"},
 			},
-			testOldObj: ingressValue{
-				host:    "www.example.com",
-				path:    "/test/path",
-				targets: []string{"test-targets-name-1", "test-targets-name-2"},
+			testOldObj: IngressValue{
+				Host:    "www.example.com",
+				Path:    "/test/path",
+				Targets: []string{"test-targets-name-1", "test-targets-name-2"},
 			},
 			OldObjVersion: "1",
-			testNewObj: ingressValue{
-				host:    "www.example.com",
-				path:    "/another/path",
-				targets: []string{"test-targets-name-1", "test-targets-name-2"},
+			testNewObj: IngressValue{
+				Host:    "www.example.com",
+				Path:    "/another/path",
+				Targets: []string{"test-targets-name-1", "test-targets-name-2"},
 			},
 			newObjVersion: "2",
 			expectedResults: []expectedResult{
@@ -237,21 +237,21 @@ func (suite *IngressWatcherTestSuite) TestUpdateHandler() {
 			},
 		}, {
 			name: "Update PairTarget - different host- should Delete old targets",
-			initialCachedData: &ingressValue{
-				host:    "www.example.com",
-				path:    "/test/path",
-				targets: []string{"test-targets-name-1", "test-targets-name-2"},
+			initialCachedData: &IngressValue{
+				Host:    "www.example.com",
+				Path:    "/test/path",
+				Targets: []string{"test-targets-name-1", "test-targets-name-2"},
 			},
-			testOldObj: ingressValue{
-				host:    "www.example.com",
-				path:    "/test/path",
-				targets: []string{"test-targets-name-1", "test-targets-name-2"},
+			testOldObj: IngressValue{
+				Host:    "www.example.com",
+				Path:    "/test/path",
+				Targets: []string{"test-targets-name-1", "test-targets-name-2"},
 			},
 			OldObjVersion: "1",
-			testNewObj: ingressValue{
-				host:    "www.google.com",
-				path:    "/test/path",
-				targets: []string{"test-targets-name-1", "test-targets-name-2"},
+			testNewObj: IngressValue{
+				Host:    "www.google.com",
+				Path:    "/test/path",
+				Targets: []string{"test-targets-name-1", "test-targets-name-2"},
 			},
 			newObjVersion: "2",
 			expectedResults: []expectedResult{
@@ -272,11 +272,11 @@ func (suite *IngressWatcherTestSuite) TestUpdateHandler() {
 			testIngressWatcher, err := suite.createTestIngressWatcher()
 			suite.Require().NoError(err)
 
-			testOldObj := suite.createDummyIngress(testCase.testOldObj.host, testCase.testOldObj.path, testCase.OldObjVersion, testCase.testOldObj.targets)
-			testNewObj := suite.createDummyIngress(testCase.testNewObj.host, testCase.testNewObj.path, testCase.newObjVersion, testCase.testNewObj.targets)
+			testOldObj := suite.createDummyIngress(testCase.testOldObj.Host, testCase.testOldObj.Path, testCase.OldObjVersion, testCase.testOldObj.Targets)
+			testNewObj := suite.createDummyIngress(testCase.testNewObj.Host, testCase.testNewObj.Path, testCase.newObjVersion, testCase.testNewObj.Targets)
 
 			if testCase.initialCachedData != nil {
-				err = testIngressWatcher.cache.Set(testCase.initialCachedData.host, testCase.initialCachedData.path, testCase.initialCachedData.targets)
+				err = testIngressWatcher.cache.Set(testCase.initialCachedData.Host, testCase.initialCachedData.Path, testCase.initialCachedData.Targets)
 				suite.Require().NoError(err)
 			}
 
@@ -301,23 +301,23 @@ func (suite *IngressWatcherTestSuite) TestUpdateHandler() {
 func (suite *IngressWatcherTestSuite) TestDeleteHandler() {
 	for _, testCase := range []struct {
 		name              string
-		testArgs          ingressValue
+		testArgs          IngressValue
 		expectedResult    expectedResult
-		initialCachedData *ingressValue
+		initialCachedData *IngressValue
 		errorMessage      string
 		expectError       bool
 	}{
 		{
 			name: "Delete PairTarget",
-			initialCachedData: &ingressValue{
-				host:    "www.example.com",
-				path:    "/test/path",
-				targets: []string{"test-targets-name-1", "test-targets-name-2"},
+			initialCachedData: &IngressValue{
+				Host:    "www.example.com",
+				Path:    "/test/path",
+				Targets: []string{"test-targets-name-1", "test-targets-name-2"},
 			},
-			testArgs: ingressValue{
-				host:    "www.example.com",
-				path:    "/test/path",
-				targets: []string{"test-targets-name-1", "test-targets-name-2"},
+			testArgs: IngressValue{
+				Host:    "www.example.com",
+				Path:    "/test/path",
+				Targets: []string{"test-targets-name-1", "test-targets-name-2"},
 			},
 			expectedResult: expectedResult{
 				host:           "www.example.com",
@@ -328,15 +328,15 @@ func (suite *IngressWatcherTestSuite) TestDeleteHandler() {
 			},
 		}, {
 			name: "Delete SingleTarget",
-			initialCachedData: &ingressValue{
-				host:    "www.example.com",
-				path:    "/test/path",
-				targets: []string{"test-targets-name-1"},
+			initialCachedData: &IngressValue{
+				Host:    "www.example.com",
+				Path:    "/test/path",
+				Targets: []string{"test-targets-name-1"},
 			},
-			testArgs: ingressValue{
-				host:    "www.example.com",
-				path:    "/test/path",
-				targets: []string{"test-targets-name-1"},
+			testArgs: IngressValue{
+				Host:    "www.example.com",
+				Path:    "/test/path",
+				Targets: []string{"test-targets-name-1"},
 			},
 			expectedResult: expectedResult{
 				host:           "www.example.com",
@@ -347,15 +347,15 @@ func (suite *IngressWatcherTestSuite) TestDeleteHandler() {
 			},
 		}, {
 			name: "bad input- should fail and keep the cache as is",
-			initialCachedData: &ingressValue{
-				host:    "www.example.com",
-				path:    "/test/path",
-				targets: []string{"test-targets-name-1"},
+			initialCachedData: &IngressValue{
+				Host:    "www.example.com",
+				Path:    "/test/path",
+				Targets: []string{"test-targets-name-1"},
 			},
-			testArgs: ingressValue{
-				host:    "www.example.com",
-				path:    "/test/path",
-				targets: []string{"test-targets-name-2"},
+			testArgs: IngressValue{
+				Host:    "www.example.com",
+				Path:    "/test/path",
+				Targets: []string{"test-targets-name-2"},
 			},
 			expectedResult: expectedResult{
 				host:    "www.example.com",
@@ -371,14 +371,14 @@ func (suite *IngressWatcherTestSuite) TestDeleteHandler() {
 			testIngressWatcher, err := suite.createTestIngressWatcher()
 			suite.Require().NoError(err)
 
-			testObj = suite.createDummyIngress(testCase.testArgs.host, testCase.testArgs.path, "1", testCase.testArgs.targets)
+			testObj = suite.createDummyIngress(testCase.testArgs.Host, testCase.testArgs.Path, "1", testCase.testArgs.Targets)
 
 			if testCase.expectError {
 				testObj = &networkingv1.IngressSpec{}
 			}
 
 			if testCase.initialCachedData != nil {
-				err = testIngressWatcher.cache.Set(testCase.initialCachedData.host, testCase.initialCachedData.path, testCase.initialCachedData.targets)
+				err = testIngressWatcher.cache.Set(testCase.initialCachedData.Host, testCase.initialCachedData.Path, testCase.initialCachedData.Targets)
 				suite.Require().NoError(err)
 			}
 

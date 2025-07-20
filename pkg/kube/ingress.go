@@ -35,11 +35,11 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-type ingressValue struct {
-	name    string
-	host    string
-	path    string
-	targets []string
+type IngressValue struct {
+	Name    string
+	Host    string
+	Path    string
+	Targets []string
 }
 
 // IngressWatcher watches for changes in Kubernetes Ingress resources and updates the ingress cache accordingly
@@ -133,22 +133,22 @@ func (iw *IngressWatcher) AddHandler(obj interface{}) {
 		return
 	}
 
-	if err := iw.cache.Set(ingress.host, ingress.path, ingress.targets); err != nil {
+	if err := iw.cache.Set(ingress.Host, ingress.Path, ingress.Targets); err != nil {
 		iw.logger.WarnWith("Add ingress handler failure - failed to add the new value to ingress cache",
 			"error", err.Error(),
 			"object", obj,
-			"ingressName", ingress.name,
-			"host", ingress.host,
-			"path", ingress.path,
-			"targets", ingress.targets)
+			"ingressName", ingress.Name,
+			"host", ingress.Host,
+			"path", ingress.Path,
+			"targets", ingress.Targets)
 		return
 	}
 
 	iw.logger.DebugWith("Add ingress handler - successfully added ingress to cache",
-		"ingressName", ingress.name,
-		"host", ingress.host,
-		"path", ingress.path,
-		"targets", ingress.targets)
+		"ingressName", ingress.Name,
+		"host", ingress.Host,
+		"path", ingress.Path,
+		"targets", ingress.Targets)
 }
 
 func (iw *IngressWatcher) UpdateHandler(oldObj, newObj interface{}) {
@@ -187,34 +187,34 @@ func (iw *IngressWatcher) UpdateHandler(oldObj, newObj interface{}) {
 	}
 
 	// if the host or path has changed, we need to delete the old entry
-	if oldIngress.host != newIngress.host || oldIngress.path != newIngress.path {
-		if err := iw.cache.Delete(oldIngress.host, oldIngress.path, oldIngress.targets); err != nil {
+	if oldIngress.Host != newIngress.Host || oldIngress.Path != newIngress.Path {
+		if err := iw.cache.Delete(oldIngress.Host, oldIngress.Path, oldIngress.Targets); err != nil {
 			iw.logger.WarnWith("Update ingress handler failure - failed to delete old ingress",
 				"error", err.Error(),
-				"ingressName", oldIngress.name,
+				"ingressName", oldIngress.Name,
 				"object", oldObj,
-				"host", oldIngress.host,
-				"path", oldIngress.path,
-				"targets", oldIngress.targets)
+				"host", oldIngress.Host,
+				"path", oldIngress.Path,
+				"targets", oldIngress.Targets)
 		}
 	}
 
-	if err := iw.cache.Set(newIngress.host, newIngress.path, newIngress.targets); err != nil {
+	if err := iw.cache.Set(newIngress.Host, newIngress.Path, newIngress.Targets); err != nil {
 		iw.logger.WarnWith("Update ingress handler failure - failed to add the new value",
 			"error", err.Error(),
 			"object", newObj,
-			"ingressName", newIngress.name,
-			"host", newIngress.host,
-			"path", newIngress.path,
-			"targets", newIngress.targets)
+			"ingressName", newIngress.Name,
+			"host", newIngress.Host,
+			"path", newIngress.Path,
+			"targets", newIngress.Targets)
 		return
 	}
 
 	iw.logger.DebugWith("Update ingress handler - successfully updated ingress in cache",
-		"ingressName", newIngress.name,
-		"host", newIngress.host,
-		"path", newIngress.path,
-		"targets", newIngress.targets)
+		"ingressName", newIngress.Name,
+		"host", newIngress.Host,
+		"path", newIngress.Path,
+		"targets", newIngress.Targets)
 }
 
 func (iw *IngressWatcher) DeleteHandler(obj interface{}) {
@@ -225,28 +225,28 @@ func (iw *IngressWatcher) DeleteHandler(obj interface{}) {
 		return
 	}
 
-	if err := iw.cache.Delete(ingress.host, ingress.path, ingress.targets); err != nil {
+	if err := iw.cache.Delete(ingress.Host, ingress.Path, ingress.Targets); err != nil {
 		iw.logger.WarnWith("Delete ingress handler failure - failed delete from cache",
 			"error", err.Error(),
 			"object", obj,
-			"ingressName", ingress.name,
-			"host", ingress.host,
-			"path", ingress.path,
-			"targets", ingress.targets)
+			"ingressName", ingress.Name,
+			"host", ingress.Host,
+			"path", ingress.Path,
+			"targets", ingress.Targets)
 		return
 	}
 
 	iw.logger.DebugWith("Delete ingress handler - successfully deleted ingress from cache",
-		"ingressName", ingress.name,
-		"host", ingress.host,
-		"path", ingress.path,
-		"targets", ingress.targets)
+		"ingressName", ingress.Name,
+		"host", ingress.Host,
+		"path", ingress.Path,
+		"targets", ingress.Targets)
 }
 
 // --- internal methods ---
 
 // extractValuesFromIngressResource extracts the relevant values from a Kubernetes Ingress resource
-func (iw *IngressWatcher) extractValuesFromIngressResource(obj interface{}) (*ingressValue, error) {
+func (iw *IngressWatcher) extractValuesFromIngressResource(obj interface{}) (*IngressValue, error) {
 	ingress, ok := obj.(*networkingv1.Ingress)
 	if !ok {
 		return nil, errors.New("Failed to cast object to Ingress")
@@ -271,11 +271,11 @@ func (iw *IngressWatcher) extractValuesFromIngressResource(obj interface{}) (*in
 		return nil, errors.Wrap(err, "Failed to extract path from ingress")
 	}
 
-	return &ingressValue{
-		host:    host,
-		path:    path,
-		targets: targets,
-		name:    ingress.Name,
+	return &IngressValue{
+		Host:    host,
+		Path:    path,
+		Targets: targets,
+		Name:    ingress.Name,
 	}, nil
 }
 

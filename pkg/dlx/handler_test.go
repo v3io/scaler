@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/v3io/scaler/pkg/ingresscache"
+	"github.com/v3io/scaler/pkg/kube"
 	resourcescalerMock "github.com/v3io/scaler/pkg/resourcescaler/mock"
 	"github.com/v3io/scaler/pkg/scalertypes"
 
@@ -27,12 +28,6 @@ type HandlerTestSuite struct {
 	httpServer  *httptest.Server
 	backendHost string
 	backendPort int
-}
-
-type ingressValue struct {
-	host    string
-	path    string
-	targets []string
 }
 
 func (suite *HandlerTestSuite) SetupSuite() {
@@ -83,7 +78,7 @@ func (suite *HandlerTestSuite) TestHandleRequest() {
 	for _, tc := range []struct {
 		name                  string
 		resolveServiceNameErr error
-		initialCachedData     *ingressValue
+		initialCachedData     *kube.IngressValue
 		reqHeaders            map[string]string
 		reqHost               string
 		reqPath               string
@@ -92,10 +87,10 @@ func (suite *HandlerTestSuite) TestHandleRequest() {
 		{
 			name:                  "No ingress headers, host and path found in ingress cache",
 			resolveServiceNameErr: nil,
-			initialCachedData: &ingressValue{
-				host:    "www.example.com",
-				path:    "/test/path",
-				targets: []string{"test-targets-name-1"},
+			initialCachedData: &kube.IngressValue{
+				Host:    "www.example.com",
+				Path:    "/test/path",
+				Targets: []string{"test-targets-name-1"},
 			},
 			reqHost:        "www.example.com",
 			reqPath:        "/test/path",
@@ -103,10 +98,10 @@ func (suite *HandlerTestSuite) TestHandleRequest() {
 		}, {
 			name:                  "No ingress headers,multiple targets found in ingress cache",
 			resolveServiceNameErr: nil,
-			initialCachedData: &ingressValue{
-				host:    "www.example.com",
-				path:    "/test/path/to/multiple",
-				targets: []string{"test-targets-name-1", "test-targets-name-2"},
+			initialCachedData: &kube.IngressValue{
+				Host:    "www.example.com",
+				Path:    "/test/path/to/multiple",
+				Targets: []string{"test-targets-name-1", "test-targets-name-2"},
 			},
 			reqHost:        "www.example.com",
 			reqPath:        "/test/path/to/multiple",
@@ -123,10 +118,10 @@ func (suite *HandlerTestSuite) TestHandleRequest() {
 		{
 			name:                  "No ingress headers, scaler fails",
 			resolveServiceNameErr: errors.New("fail"),
-			initialCachedData: &ingressValue{
-				host:    "www.example.com",
-				path:    "/test/path",
-				targets: []string{"test-targets-name-1"},
+			initialCachedData: &kube.IngressValue{
+				Host:    "www.example.com",
+				Path:    "/test/path",
+				Targets: []string{"test-targets-name-1"},
 			},
 			reqHost:        "www.example.com",
 			reqPath:        "/test/path",
@@ -140,7 +135,7 @@ func (suite *HandlerTestSuite) TestHandleRequest() {
 			suite.scaler.On("SetScaleCtx", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			testIngressCache := ingresscache.NewIngressCache(suite.logger)
 			if tc.initialCachedData != nil {
-				err := testIngressCache.Set(tc.initialCachedData.host, tc.initialCachedData.path, tc.initialCachedData.targets)
+				err := testIngressCache.Set(tc.initialCachedData.Host, tc.initialCachedData.Path, tc.initialCachedData.Targets)
 				suite.Require().NoError(err)
 			}
 
@@ -162,7 +157,7 @@ func (suite *HandlerTestSuite) TestGetResourceNameAndPath() {
 	for _, tc := range []struct {
 		name                  string
 		errMsg                string
-		initialCachedData     *ingressValue
+		initialCachedData     *kube.IngressValue
 		reqHeaders            map[string]string
 		reqHost               string
 		reqPath               string
@@ -172,10 +167,10 @@ func (suite *HandlerTestSuite) TestGetResourceNameAndPath() {
 	}{
 		{
 			name: "No ingress headers, host and path found in ingress cache",
-			initialCachedData: &ingressValue{
-				host:    "www.example.com",
-				path:    "/test/path",
-				targets: []string{"test-targets-name-1"},
+			initialCachedData: &kube.IngressValue{
+				Host:    "www.example.com",
+				Path:    "/test/path",
+				Targets: []string{"test-targets-name-1"},
 			},
 			reqHost:               "www.example.com",
 			reqPath:               "/test/path",
@@ -203,7 +198,7 @@ func (suite *HandlerTestSuite) TestGetResourceNameAndPath() {
 			// test case setup
 			testIngressCache := ingresscache.NewIngressCache(suite.logger)
 			if tc.initialCachedData != nil {
-				err := testIngressCache.Set(tc.initialCachedData.host, tc.initialCachedData.path, tc.initialCachedData.targets)
+				err := testIngressCache.Set(tc.initialCachedData.Host, tc.initialCachedData.Path, tc.initialCachedData.Targets)
 				suite.Require().NoError(err)
 			}
 
