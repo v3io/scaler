@@ -100,7 +100,7 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 		resourceNames = append(resourceNames, resourceName)
 		resourceTargetURLMap[resourceName] = targetURL
 	} else {
-		path, resourceNames, err = h.getResourceNameAndPath(req)
+		path, resourceNames, err = h.getPathAndResourceNames(req)
 		if err != nil {
 			h.logger.WarnWith("Failed to get resource names and path from request",
 				"error", err.Error(),
@@ -166,14 +166,14 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 	proxy.ServeHTTP(res, req)
 }
 
-func (h *Handler) getResourceNameAndPath(req *http.Request) (string, []string, error) {
-	// first try to get the target name and path from the ingress cache
-	path, resourceNames, err := h.extractValuesFromIngress(req)
+func (h *Handler) getPathAndResourceNames(req *http.Request) (string, []string, error) {
+	// first try to get the resource names and path from the ingress cache
+	path, resourceNames, err := h.getValuesFromCache(req)
 	if err == nil {
 		return path, resourceNames, nil
 	}
 
-	h.logger.DebugWith("Failed to get target name from ingress cache, try to extract from the request headers",
+	h.logger.DebugWith("Failed to get resource names from ingress cache, trying to extract from the request headers",
 		"host", req.Host,
 		"path", req.URL.Path,
 		"error", err.Error())
@@ -188,16 +188,16 @@ func (h *Handler) getResourceNameAndPath(req *http.Request) (string, []string, e
 	return path, resourceNames, nil
 }
 
-func (h *Handler) extractValuesFromIngress(req *http.Request) (string, []string, error) {
+func (h *Handler) getValuesFromCache(req *http.Request) (string, []string, error) {
 	host := req.Host
 	path := req.URL.Path
 	resourceNames, err := h.ingressCache.Get(host, path)
 	if err != nil {
-		return "", nil, errors.New("Failed to get target name from ingress cache")
+		return "", nil, errors.New("Failed to get resourceNames from ingress cache")
 	}
 
 	if len(resourceNames) == 0 {
-		return "", nil, errors.New("No resourceNames found in ingress cache")
+		return "", nil, errors.New("No resources found in ingress cache")
 	}
 
 	return path, resourceNames, nil

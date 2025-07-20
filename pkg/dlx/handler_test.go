@@ -153,7 +153,7 @@ func (suite *HandlerTestSuite) TestHandleRequest() {
 	}
 }
 
-func (suite *HandlerTestSuite) TestGetResourceNameAndPath() {
+func (suite *HandlerTestSuite) TestGetPathAndResourceNames() {
 	for _, tc := range []struct {
 		name                  string
 		errMsg                string
@@ -204,7 +204,7 @@ func (suite *HandlerTestSuite) TestGetResourceNameAndPath() {
 
 			testHandler := suite.createTestHandler(suite.backendPort, testIngressCache)
 			testRequest := suite.createTestHTTPRequest(tc.reqHeaders, tc.reqHost, tc.reqPath)
-			resultPath, resultResourceNames, err := testHandler.getResourceNameAndPath(testRequest)
+			resultPath, resultResourceNames, err := testHandler.getPathAndResourceNames(testRequest)
 
 			// validate the result
 			if tc.expectErr {
