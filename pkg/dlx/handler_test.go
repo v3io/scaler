@@ -44,7 +44,6 @@ func (suite *HandlerTestSuite) SetupTest() {
 		resourceReadinessTimeout: 3 * time.Second,
 	}
 	allowedPaths := map[string]struct{}{
-		// TODO - To fix this test for a valid path (i.e.- '/test/path'), the path suffix needs to be removed from h.parseTargetURL
 		"/test/path/test/path":                         {},
 		"/test/path/to/multiple/test/path/to/multiple": {},
 	}
