@@ -105,7 +105,7 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 			h.logger.WarnWith("Failed to get resource names and path from request",
 				"error", err.Error(),
 				"host", req.Host,
-				"path", req.URL.Path)
+				"path", h.getRequestURLPath(req))
 			res.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -175,7 +175,7 @@ func (h *Handler) getPathAndResourceNames(req *http.Request) (string, []string, 
 
 	h.logger.DebugWith("Failed to get resource names from ingress cache, trying to extract from the request headers",
 		"host", req.Host,
-		"path", req.URL.Path,
+		"path", h.getRequestURLPath(req),
 		"error", err.Error())
 
 	// old implementation for backward compatibility
@@ -190,7 +190,7 @@ func (h *Handler) getPathAndResourceNames(req *http.Request) (string, []string, 
 
 func (h *Handler) getValuesFromCache(req *http.Request) (string, []string, error) {
 	host := req.Host
-	path := req.URL.Path
+	path := h.getRequestURLPath(req)
 	resourceNames, err := h.ingressCache.Get(host, path)
 	if err != nil {
 		return "", nil, errors.New("Failed to get resource names from ingress cache")
@@ -269,4 +269,11 @@ func (h *Handler) URLBadParse(resourceName string, err error) int {
 		"resourceName", resourceName,
 		"err", errors.GetErrorStackString(err, 10))
 	return http.StatusBadRequest
+}
+
+func (h *Handler) getRequestURLPath(req *http.Request) string {
+	if req.URL != nil {
+		return req.URL.Path
+	}
+	return ""
 }

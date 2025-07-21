@@ -144,7 +144,7 @@ func (suite *HandlerTestSuite) TestHandleRequest() {
 
 			testHandler, err := suite.createTestHandlerAndInitTestCache(suite.backendPort, testCase.initialCachedData)
 			suite.Require().NoError(err)
-			testRequest := suite.createTestHTTPRequest(testCase.reqHeaders, testCase.reqHost, testCase.reqPath)
+			testRequest := suite.createTestHTTPRequest(testCase.name, testCase.reqHeaders, testCase.reqHost, testCase.reqPath)
 			testResponse := httptest.NewRecorder()
 
 			// call the testHandler
@@ -212,12 +212,24 @@ func (suite *HandlerTestSuite) TestGetPathAndResourceNames() {
 			expectedPath:          "test/path",
 			expectedResourceNames: []string{"test-targets-from-cache"},
 		},
+		{
+			name: "No request headers, missing request.URL",
+			initialCachedData: &kube.IngressValue{
+				Host:    "www.example.com",
+				Path:    "test/path",
+				Targets: []string{"test-targets-name-1"},
+			},
+			reqHost:   "www.example.com",
+			reqPath:   "test/path",
+			expectErr: true,
+			errMsg:    "No target name header found",
+		},
 	} {
 		suite.Run(testCase.name, func() {
 			// test case setup
 			testHandler, err := suite.createTestHandlerAndInitTestCache(suite.backendPort, testCase.initialCachedData)
 			suite.Require().NoError(err)
-			testRequest := suite.createTestHTTPRequest(testCase.reqHeaders, testCase.reqHost, testCase.reqPath)
+			testRequest := suite.createTestHTTPRequest(testCase.name, testCase.reqHeaders, testCase.reqHost, testCase.reqPath)
 			resultPath, resultResourceNames, err := testHandler.getPathAndResourceNames(testRequest)
 
 			// validate the result
@@ -256,6 +268,7 @@ func (suite *HandlerTestSuite) createTestHandlerAndInitTestCache(targetPort int,
 }
 
 func (suite *HandlerTestSuite) createTestHTTPRequest(
+	testName string,
 	reqHeaders map[string]string,
 	reqHost string,
 	reqPath string,
@@ -276,6 +289,13 @@ func (suite *HandlerTestSuite) createTestHTTPRequest(
 	for k, v := range reqHeaders {
 		req.Header.Set(k, v)
 	}
+
+	switch testName {
+	case "No request headers, missing request.URL":
+		req.URL = nil
+	default:
+	}
+
 	return req
 }
 
