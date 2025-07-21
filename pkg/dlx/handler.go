@@ -193,7 +193,7 @@ func (h *Handler) getValuesFromCache(req *http.Request) (string, []string, error
 	path := req.URL.Path
 	resourceNames, err := h.ingressCache.Get(host, path)
 	if err != nil {
-		return "", nil, errors.New("Failed to get resourceNames from ingress cache")
+		return "", nil, errors.New("Failed to get resource names from ingress cache")
 	}
 
 	if len(resourceNames) == 0 {

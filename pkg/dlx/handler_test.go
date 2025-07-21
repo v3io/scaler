@@ -84,7 +84,7 @@ func (suite *HandlerTestSuite) TestHandleRequest() {
 		expectedStatus        int
 	}{
 		{
-			name:                  "No ingress headers, host and path found in ingress cache",
+			name:                  "No request headers, host and path found in ingress cache",
 			resolveServiceNameErr: nil,
 			initialCachedData: &kube.IngressValue{
 				Host:    "www.example.com",
@@ -95,7 +95,7 @@ func (suite *HandlerTestSuite) TestHandleRequest() {
 			reqPath:        "test/path",
 			expectedStatus: http.StatusOK,
 		}, {
-			name:                  "No ingress headers, multiple targets found in ingress cache",
+			name:                  "No request headers, multiple targets found in ingress cache",
 			resolveServiceNameErr: nil,
 			initialCachedData: &kube.IngressValue{
 				Host:    "www.example.com",
@@ -107,7 +107,7 @@ func (suite *HandlerTestSuite) TestHandleRequest() {
 			expectedStatus: http.StatusOK,
 		},
 		{
-			name:                  "No ingress headers, not found in ingress cache",
+			name:                  "No request headers, not found in ingress cache",
 			resolveServiceNameErr: nil,
 			initialCachedData:     nil,
 			reqHost:               "unknown",
@@ -115,7 +115,7 @@ func (suite *HandlerTestSuite) TestHandleRequest() {
 			expectedStatus:        http.StatusBadRequest,
 		},
 		{
-			name:                  "No ingress headers, scaler fails",
+			name:                  "No request headers, scaler fails",
 			resolveServiceNameErr: errors.New("fail"),
 			initialCachedData: &kube.IngressValue{
 				Host:    "www.example.com",
@@ -126,12 +126,21 @@ func (suite *HandlerTestSuite) TestHandleRequest() {
 			reqPath:        "test/path",
 			expectedStatus: http.StatusInternalServerError,
 		},
+		{
+			name: "Request headers flow",
+			reqHeaders: map[string]string{
+				"X-Forwarded-Host": "127.0.0.1",
+				"X-Original-Uri":   "test/path",
+				"X-Resource-Name":  "test-targets-name-1",
+			},
+			reqHost:        "www.example.com",
+			reqPath:        "test/path",
+			expectedStatus: http.StatusOK,
+		},
 	} {
 		suite.Run(testCase.name, func() {
 			// test case setup
-			suite.scaler.ExpectedCalls = nil
-			suite.scaler.On("ResolveServiceName", mock.Anything).Return(suite.backendHost, testCase.resolveServiceNameErr)
-			suite.scaler.On("SetScaleCtx", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			suite.setScalerMocksBasedOnTestCase(testCase.name, testCase.resolveServiceNameErr)
 
 			testHandler, err := suite.createTestHandlerAndInitTestCache(suite.backendPort, testCase.initialCachedData)
 			suite.Require().NoError(err)
@@ -161,7 +170,7 @@ func (suite *HandlerTestSuite) TestGetPathAndResourceNames() {
 		expectedResourceNames []string
 	}{
 		{
-			name: "No ingress headers, host and path found in ingress cache",
+			name: "No request headers, host and path found in ingress cache",
 			initialCachedData: &kube.IngressValue{
 				Host:    "www.example.com",
 				Path:    "test/path",
@@ -172,7 +181,7 @@ func (suite *HandlerTestSuite) TestGetPathAndResourceNames() {
 			expectedPath:          "test/path",
 			expectedResourceNames: []string{"test-targets-name-1"},
 		}, {
-			name:                  "Ingress headers, host and path did not found in ingress cache",
+			name:                  "request headers, host and path did not found in ingress cache",
 			reqHost:               "www.example.com",
 			reqPath:               "test/path",
 			expectedPath:          "test/path",
@@ -182,13 +191,13 @@ func (suite *HandlerTestSuite) TestGetPathAndResourceNames() {
 				"X-Resource-Path": "test/path",
 			},
 		}, {
-			name:      "Missing both ingress headers and host and path did not found in ingress cache",
+			name:      "Missing both request headers and host and path did not found in ingress cache",
 			reqHost:   "www.example.com",
 			reqPath:   "test/path",
 			expectErr: true,
 			errMsg:    "No target name header found",
 		}, {
-			name:    "Both ingress headers and found in ingress cache, cache results should be taken",
+			name:    "Both request headers and found in ingress cache, cache results should be taken",
 			reqHost: "www.example.com",
 			reqPath: "test/path",
 			initialCachedData: &kube.IngressValue{
@@ -258,10 +267,33 @@ func (suite *HandlerTestSuite) createTestHTTPRequest(
 	if reqPath != "" {
 		req.URL.Path = reqPath
 	}
+
+	if len(reqHeaders) != 0 {
+		// pull X-Forwarded-Host from suite because it's not yet set during test case creation
+		reqHeaders["X-Forwarded-Port"] = strconv.Itoa(suite.backendPort)
+	}
+
 	for k, v := range reqHeaders {
 		req.Header.Set(k, v)
 	}
 	return req
+}
+
+func (suite *HandlerTestSuite) setScalerMocksBasedOnTestCase(
+	testName string,
+	resolveServiceNameErr error,
+) {
+	suite.scaler.ExpectedCalls = nil
+	switch testName {
+	case "No request headers, scaler fails":
+		suite.scaler.On("ResolveServiceName", mock.Anything).Return(suite.backendHost, resolveServiceNameErr)
+	case "No request headers, not found in ingress cache":
+	case "Request headers flow":
+		suite.scaler.On("SetScaleCtx", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	default:
+		suite.scaler.On("ResolveServiceName", mock.Anything).Return(suite.backendHost, resolveServiceNameErr)
+		suite.scaler.On("SetScaleCtx", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	}
 }
 
 func TestHandlerTestSuite(t *testing.T) {
