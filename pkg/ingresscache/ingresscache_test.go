@@ -53,6 +53,10 @@ func (suite *IngressCacheTestSuite) SetupTest() {
 
 func (suite *IngressCacheTestSuite) TestGet() {
 	suite.T().Parallel()
+	initialStatePrefixTests := []ingressCacheTestInitialState{
+		{"example.com", "/", []string{"test-target-name-1"}},
+		{"example.com", "/path/to", []string{"test-target-name-2"}},
+	}
 	for _, testCase := range []struct {
 		name           string
 		initialState   []ingressCacheTestInitialState
@@ -99,6 +103,31 @@ func (suite *IngressCacheTestSuite) TestGet() {
 			initialState: []ingressCacheTestInitialState{
 				{"example.com", "/test/path", []string{"test-target-name-1"}},
 			},
+		}, {
+			name:           "Get root path",
+			args:           testIngressCacheArgs{"example.com", "/", []string{"test-target-name-1"}},
+			expectedResult: []string{"test-target-name-1"},
+			initialState:   initialStatePrefixTests,
+		}, {
+			name:           "Get root path as closest prefix match",
+			args:           testIngressCacheArgs{"example.com", "/path", []string{"test-target-name-1"}},
+			expectedResult: []string{"test-target-name-1"},
+			initialState:   initialStatePrefixTests,
+		}, {
+			name:           "Get root path as closest prefix match with trailing slash",
+			args:           testIngressCacheArgs{"example.com", "/path/", []string{"test-target-name-1"}},
+			expectedResult: []string{"test-target-name-1"},
+			initialState:   initialStatePrefixTests,
+		}, {
+			name:           "Get path with exact match",
+			args:           testIngressCacheArgs{"example.com", "/path/to", []string{"test-target-name-2"}},
+			expectedResult: []string{"test-target-name-2"},
+			initialState:   initialStatePrefixTests,
+		}, {
+			name:           "Get closest prefix match with a longer path",
+			args:           testIngressCacheArgs{"example.com", "/path/to/another", []string{"test-target-name-2"}},
+			expectedResult: []string{"test-target-name-2"},
+			initialState:   initialStatePrefixTests,
 		},
 	} {
 		suite.Run(testCase.name, func() {
