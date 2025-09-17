@@ -100,7 +100,11 @@ func (ic *IngressCache) Get(host, path string) ([]string, error) {
 
 	result, err := ingressHostsTree.Get(path)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get the targets from the ingress host tree")
+		// Try to get the root path if the specific path is not found
+		result, err = ingressHostsTree.Get("/")
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get the targets from the ingress host tree")
+		}
 	}
 
 	return result.ToSliceString(), nil
