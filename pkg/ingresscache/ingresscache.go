@@ -100,7 +100,12 @@ func (ic *IngressCache) Get(host, path string) ([]string, error) {
 
 	result, err := ingressHostsTree.Get(path)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get the targets from the ingress host tree")
+		// If the specific path lookup fails, retry with root ("/").
+		// Needed because the trie can’t resolve prefixes when "/" is both delimiter and root path.
+		result, err = ingressHostsTree.Get("/")
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get the targets from the ingress host tree")
+		}
 	}
 
 	return result.ToSliceString(), nil
