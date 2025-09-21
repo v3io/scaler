@@ -44,8 +44,8 @@ func (suite *HandlerTestSuite) SetupTest() {
 		resourceReadinessTimeout: 3 * time.Second,
 	}
 	allowedPaths := map[string]struct{}{
-		"/test/path/test/path":                         {},
-		"/test/path/to/multiple/test/path/to/multiple": {},
+		"/test/path":             {},
+		"/test/path/to/multiple": {},
 	}
 	// Start a test server that always returns 200
 	suite.httpServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -130,12 +130,33 @@ func (suite *HandlerTestSuite) TestHandleRequest() {
 			name: "Request headers flow",
 			reqHeaders: map[string]string{
 				"X-Forwarded-Host": "127.0.0.1",
-				"X-Original-Uri":   "test/path",
+				"X-Original-Uri":   "",
 				"X-Resource-Name":  "test-targets-name-1",
 			},
 			reqHost:        "www.example.com",
 			reqPath:        "test/path",
 			expectedStatus: http.StatusOK,
+		},
+		{
+			name: "Request headers negative flow - duplicate request path should fail",
+			reqHeaders: map[string]string{
+				"X-Forwarded-Host": "127.0.0.1",
+				"X-Original-Uri":   "test/path",
+				"X-Resource-Name":  "test-targets-name-1",
+			},
+			reqHost:        "www.example.com",
+			reqPath:        "test/path",
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name: "Request headers flow with resource path header- should fail because path is duplicated",
+			reqHeaders: map[string]string{
+				"X-Resource-Name": "test-targets-name-1",
+				"X-Resource-Path": "test/path",
+			},
+			reqHost:        "www.example.com",
+			reqPath:        "test/path",
+			expectedStatus: http.StatusBadRequest,
 		},
 	} {
 		suite.Run(testCase.name, func() {
@@ -166,7 +187,6 @@ func (suite *HandlerTestSuite) TestGetPathAndResourceNames() {
 		reqHost               string
 		reqPath               string
 		expectErr             bool
-		expectedPath          string
 		expectedResourceNames []string
 	}{
 		{
@@ -178,13 +198,11 @@ func (suite *HandlerTestSuite) TestGetPathAndResourceNames() {
 			},
 			reqHost:               "www.example.com",
 			reqPath:               "test/path",
-			expectedPath:          "test/path",
 			expectedResourceNames: []string{"test-targets-name-1"},
 		}, {
 			name:                  "request headers, host and path did not found in ingress cache",
 			reqHost:               "www.example.com",
 			reqPath:               "test/path",
-			expectedPath:          "test/path",
 			expectedResourceNames: []string{"test-targets-name-1"},
 			reqHeaders: map[string]string{
 				"X-Resource-Name": "test-targets-name-1",
@@ -209,7 +227,6 @@ func (suite *HandlerTestSuite) TestGetPathAndResourceNames() {
 				"X-Resource-Name": "test-targets-from-headers",
 				"X-Resource-Path": "test/path",
 			},
-			expectedPath:          "test/path",
 			expectedResourceNames: []string{"test-targets-from-cache"},
 		},
 		{
@@ -230,7 +247,7 @@ func (suite *HandlerTestSuite) TestGetPathAndResourceNames() {
 			testHandler, err := suite.createTestHandlerAndInitTestCache(suite.backendPort, testCase.initialCachedData)
 			suite.Require().NoError(err)
 			testRequest := suite.createTestHTTPRequest(testCase.name, testCase.reqHeaders, testCase.reqHost, testCase.reqPath)
-			resultPath, resultResourceNames, err := testHandler.getPathAndResourceNames(testRequest)
+			resultResourceNames, err := testHandler.getResourceNames(testRequest)
 
 			// validate the result
 			if testCase.expectErr {
@@ -238,7 +255,6 @@ func (suite *HandlerTestSuite) TestGetPathAndResourceNames() {
 				suite.Require().ErrorContains(err, testCase.errMsg)
 			} else {
 				suite.Require().NoError(err)
-				suite.Require().Equal(testCase.expectedPath, resultPath)
 				suite.Require().Equal(testCase.expectedResourceNames, resultResourceNames)
 			}
 		})
@@ -308,7 +324,8 @@ func (suite *HandlerTestSuite) setScalerMocksBasedOnTestCase(
 	case "No request headers, scaler fails":
 		suite.scaler.On("ResolveServiceName", mock.Anything).Return(suite.backendHost, resolveServiceNameErr)
 	case "No request headers, not found in ingress cache":
-	case "Request headers flow":
+	case "Request headers flow",
+		"Request headers negative flow - duplicate request path should fail":
 		suite.scaler.On("SetScaleCtx", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	default:
 		suite.scaler.On("ResolveServiceName", mock.Anything).Return(suite.backendHost, resolveServiceNameErr)
