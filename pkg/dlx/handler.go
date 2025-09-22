@@ -79,7 +79,6 @@ func NewHandler(parentLogger logger.Logger,
 }
 
 func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
-	var path string
 	var err error
 	var resourceNames []string
 
@@ -100,7 +99,7 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 		resourceNames = append(resourceNames, resourceName)
 		resourceTargetURLMap[resourceName] = targetURL
 	} else {
-		path, resourceNames, err = h.getPathAndResourceNames(req)
+		resourceNames, err = h.getResourceNames(req)
 		if err != nil {
 			h.logger.WarnWith("Failed to get resource names and path from request",
 				"error", err.Error(),
@@ -109,8 +108,11 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 			res.WriteHeader(http.StatusBadRequest)
 			return
 		}
+		// add the path addition to the path if the header exists
+		// this is used when the ingress controller needs to add a suffix to the path request
+		pathAddition := req.Header.Get(h.targetPathHeader)
 		for _, resourceName := range resourceNames {
-			targetURL, status := h.parseTargetURL(resourceName, path)
+			targetURL, status := h.parseTargetURL(resourceName, pathAddition)
 			if targetURL == nil {
 				res.WriteHeader(status)
 				return
@@ -166,11 +168,11 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 	proxy.ServeHTTP(res, req)
 }
 
-func (h *Handler) getPathAndResourceNames(req *http.Request) (string, []string, error) {
-	// first try to get the resource names and path from the ingress cache
-	path, resourceNames, err := h.getValuesFromCache(req)
+func (h *Handler) getResourceNames(req *http.Request) ([]string, error) {
+	// first try to get the resource names from the ingress cache
+	resourceNames, err := h.getValuesFromCache(req)
 	if err == nil {
-		return path, resourceNames, nil
+		return resourceNames, nil
 	}
 
 	h.logger.DebugWith("Failed to get resource names from ingress cache, trying to extract from the request headers",
@@ -180,27 +182,26 @@ func (h *Handler) getPathAndResourceNames(req *http.Request) (string, []string, 
 
 	// old implementation for backward compatibility
 	targetNameHeaderValue := req.Header.Get(h.targetNameHeader)
-	path = req.Header.Get(h.targetPathHeader)
 	if targetNameHeaderValue == "" {
-		return "", nil, errors.New("No target name header found")
+		return nil, errors.New("No target name header found")
 	}
 	resourceNames = strings.Split(targetNameHeaderValue, ",")
-	return path, resourceNames, nil
+	return resourceNames, nil
 }
 
-func (h *Handler) getValuesFromCache(req *http.Request) (string, []string, error) {
+func (h *Handler) getValuesFromCache(req *http.Request) ([]string, error) {
 	host := req.Host
 	path := h.getRequestURLPath(req)
 	resourceNames, err := h.ingressCache.Get(host, path)
 	if err != nil {
-		return "", nil, errors.New("Failed to get resource names from ingress cache")
+		return nil, errors.New("Failed to get resource names from ingress cache")
 	}
 
 	if len(resourceNames) == 0 {
-		return "", nil, errors.New("No resources found in ingress cache")
+		return nil, errors.New("No resources found in ingress cache")
 	}
 
-	return path, resourceNames, nil
+	return resourceNames, nil
 }
 
 func (h *Handler) parseTargetURL(resourceName, path string) (*url.URL, int) {
