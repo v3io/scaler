@@ -28,10 +28,7 @@ import (
 
 	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/metrics/pkg/client/custom_metrics"
 )
 
 type Autoscaler struct {
@@ -41,13 +38,13 @@ type Autoscaler struct {
 	scaleInterval           scalertypes.Duration
 	inScaleToZeroProcessMap map[string]bool
 	groupKind               schema.GroupKind
-	customMetricsClientSet  custom_metrics.CustomMetricsClient
+	metricsClient           scalertypes.MetricsClient
 	ticker                  *time.Ticker
 }
 
 func NewAutoScaler(parentLogger logger.Logger,
 	resourceScaler scalertypes.ResourceScaler,
-	customMetricsClientSet custom_metrics.CustomMetricsClient,
+	metricsClient scalertypes.MetricsClient,
 	options scalertypes.AutoScalerOptions) (*Autoscaler, error) {
 	childLogger := parentLogger.GetChild("autoscaler")
 	childLogger.InfoWith("Creating Autoscaler",
@@ -59,7 +56,7 @@ func NewAutoScaler(parentLogger logger.Logger,
 		resourceScaler:          resourceScaler,
 		scaleInterval:           options.ScaleInterval,
 		groupKind:               options.GroupKind,
-		customMetricsClientSet:  customMetricsClientSet,
+		metricsClient:           metricsClient,
 		inScaleToZeroProcessMap: make(map[string]bool),
 	}, nil
 }
@@ -97,52 +94,6 @@ func (as *Autoscaler) getMetricNames(resources []scalertypes.Resource) []string 
 	}
 	metricNames = common.UniquifyStringSlice(metricNames)
 	return metricNames
-}
-
-func (as *Autoscaler) getResourceMetrics(metricNames []string) (map[string]map[string]int, error) {
-	resourcesMetricsMap := make(map[string]map[string]int)
-	resourceLabels := labels.Everything()
-	metricSelectorLabels := labels.Everything()
-	metricsClient := as.customMetricsClientSet.NamespacedMetrics(as.namespace)
-
-	for _, metricName := range metricNames {
-
-		// getting the metric values for all object of schema group kind (e.g. deployment)
-		metrics, err := metricsClient.GetForObjects(as.groupKind, resourceLabels, metricName, metricSelectorLabels)
-		if err != nil {
-
-			// if no data points submitted yet it's ok, continue to the next metric
-			if k8serrors.IsNotFound(err) {
-				continue
-			}
-			return nil, errors.Wrap(err, "Failed to get custom metrics")
-		}
-
-		// fill the resourcesMetricsMap with the metrics data we got
-		for _, item := range metrics.Items {
-
-			resourceName := item.DescribedObject.Name
-			value := int(item.Value.MilliValue())
-
-			as.logger.DebugWith("Got metric entry",
-				"resourceName", resourceName,
-				"metricName", metricName,
-				"value", value)
-
-			if _, found := resourcesMetricsMap[resourceName]; !found {
-				resourcesMetricsMap[resourceName] = make(map[string]int)
-			}
-
-			// sanity
-			if _, found := resourcesMetricsMap[resourceName][metricName]; found {
-				return nil, errors.New("Can not have more than one metric value per resource")
-			}
-
-			resourcesMetricsMap[resourceName][metricName] = value
-		}
-	}
-
-	return resourcesMetricsMap, nil
 }
 
 func (as *Autoscaler) checkResourceToScale(resource scalertypes.Resource, resourcesMetricsMap map[string]map[string]int) bool {
@@ -198,7 +149,7 @@ func (as *Autoscaler) checkResourcesToScale() error {
 	}
 	metricNames := as.getMetricNames(activeResources)
 	as.logger.DebugWith("Got metric names", "metricNames", metricNames)
-	resourceMetricsMap, err := as.getResourceMetrics(metricNames)
+	resourceMetricsMap, err := as.metricsClient.GetResourceMetrics(metricNames)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get resources metrics")
 	}
