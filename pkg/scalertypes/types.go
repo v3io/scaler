@@ -33,10 +33,23 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+type Kind string
+
+const (
+	KindCustomMetrics = "customMetrics"
+)
+
+type MetricClientOptions struct {
+	Kind                Kind
+	URL                 string
+	ServicesMetricNames []string
+}
+
 type AutoScalerOptions struct {
-	Namespace     string
-	ScaleInterval Duration
-	GroupKind     schema.GroupKind
+	Namespace           string
+	ScaleInterval       Duration
+	GroupKind           schema.GroupKind
+	MetricClientOptions MetricClientOptions
 }
 
 type ResourceScalerConfig struct {
@@ -198,4 +211,8 @@ func shortDurationString(d Duration) string {
 		s = s[:len(s)-2]
 	}
 	return s
+}
+
+type MetricsClient interface {
+	GetResourceMetrics(metricNames []string) (map[string]map[string]int, error)
 }
