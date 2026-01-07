@@ -18,12 +18,11 @@ under the Apache 2.0 license is conditioned upon your compliance with
 such restriction.
 */
 
-package factory
+package metricsclient
 
 import (
 	"fmt"
 
-	"github.com/v3io/scaler/pkg/autoscaler/metricsclients"
 	"github.com/v3io/scaler/pkg/scalertypes"
 
 	"github.com/nuclio/errors"
@@ -31,19 +30,21 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func NewMetricsClient(logger logger.Logger, restConfig *rest.Config, autoScalerConf scalertypes.AutoScalerOptions) (scalertypes.MetricsClient, error) {
-	switch autoScalerConf.MetricClientOptions.Kind {
+func NewMetricsClient(logger logger.Logger,
+	restConfig *rest.Config,
+	autoScalerConf scalertypes.AutoScalerOptions) (scalertypes.MetricsClient, error) {
+	switch autoScalerConf.MetricsClientOptions.Kind {
 	case scalertypes.KindCustomMetrics:
-		customMetricsClient, err := metricsclients.NewCustomMetricsClientFromConfig(restConfig)
+		customMetricsClient, err := NewCustomMetricsClientFromConfig(restConfig)
 		if err != nil {
 			return nil, errors.Wrap(err, "Failed to create custom metrics client")
 		}
-		return metricsclients.NewCustomMetricsWrapper(
+		return NewCustomMetricsClient(
 			logger.GetChild("customMetricsClient"),
 			customMetricsClient,
 			autoScalerConf.Namespace,
 			autoScalerConf.GroupKind), nil
 	default:
-		return nil, fmt.Errorf("unsupported metrics client kind: %s", autoScalerConf.MetricClientOptions.Kind)
+		return nil, fmt.Errorf("unsupported metrics client kind: %s", autoScalerConf.MetricsClientOptions.Kind)
 	}
 }

@@ -18,7 +18,7 @@ under the Apache 2.0 license is conditioned upon your compliance with
 such restriction.
 */
 
-package metricsclients
+package metricsclient
 
 import (
 	"github.com/nuclio/errors"
@@ -30,34 +30,34 @@ import (
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
-	"k8s.io/metrics/pkg/client/custom_metrics"
+	k8scustommetrics "k8s.io/metrics/pkg/client/custom_metrics"
 )
 
-type CustomMetricsWrapper struct {
-	custom_metrics.CustomMetricsClient
+type CustomMetricsClient struct {
+	k8scustommetrics.CustomMetricsClient
 	namespace string
 	groupKind schema.GroupKind
 	logger    logger.Logger
 }
 
 // NewCustomMetricsClientFromConfig creates a custom_metrics.CustomMetricsClient from rest.Config
-func NewCustomMetricsClientFromConfig(restConfig *rest.Config) (custom_metrics.CustomMetricsClient, error) {
+func NewCustomMetricsClientFromConfig(restConfig *rest.Config) (k8scustommetrics.CustomMetricsClient, error) {
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(restConfig)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create discovery client")
 	}
-	availableAPIsGetter := custom_metrics.NewAvailableAPIsGetter(discoveryClient)
+	availableAPIsGetter := k8scustommetrics.NewAvailableAPIsGetter(discoveryClient)
 	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(memory.NewMemCacheClient(discoveryClient))
-	customMetricsClient := custom_metrics.NewForConfig(restConfig, restMapper, availableAPIsGetter)
+	customMetricsClient := k8scustommetrics.NewForConfig(restConfig, restMapper, availableAPIsGetter)
 	return customMetricsClient, nil
 }
 
-func NewCustomMetricsWrapper(
+func NewCustomMetricsClient(
 	logger logger.Logger,
-	customMetricsClient custom_metrics.CustomMetricsClient,
+	customMetricsClient k8scustommetrics.CustomMetricsClient,
 	namespace string,
-	groupKind schema.GroupKind) *CustomMetricsWrapper {
-	return &CustomMetricsWrapper{
+	groupKind schema.GroupKind) *CustomMetricsClient {
+	return &CustomMetricsClient{
 		logger:              logger,
 		CustomMetricsClient: customMetricsClient,
 		namespace:           namespace,
@@ -65,7 +65,7 @@ func NewCustomMetricsWrapper(
 	}
 }
 
-func (cmw *CustomMetricsWrapper) GetResourceMetrics(metricNames []string) (map[string]map[string]int, error) {
+func (cmw *CustomMetricsClient) GetResourceMetrics(metricNames []string) (map[string]map[string]int, error) {
 	resourcesMetricsMap := make(map[string]map[string]int)
 	resourceLabels := labels.Everything()
 	metricSelectorLabels := labels.Everything()

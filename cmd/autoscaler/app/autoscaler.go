@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/v3io/scaler/pkg/autoscaler"
-	"github.com/v3io/scaler/pkg/autoscaler/factory"
+	"github.com/v3io/scaler/pkg/autoscaler/metricsclient"
 	"github.com/v3io/scaler/pkg/common"
 	"github.com/v3io/scaler/pkg/pluginloader"
 	"github.com/v3io/scaler/pkg/scalertypes"
@@ -48,7 +48,7 @@ func Run(kubeconfigPath string,
 			Kind:  metricsResourceKind,
 			Group: metricsResourceGroup,
 		},
-		MetricClientOptions: scalertypes.MetricClientOptions{
+		MetricsClientOptions: scalertypes.MetricsClientOptions{
 			Kind: scalertypes.KindCustomMetrics,
 		},
 	}
@@ -104,7 +104,7 @@ func createAutoScaler(restConfig *rest.Config,
 	}
 
 	// create metrics client using factory
-	metricsClient, err := factory.NewMetricsClient(rootLogger, restConfig, options)
+	metricsClient, err := metricsclient.NewMetricsClient(rootLogger, restConfig, options)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create metrics client")
 	}

@@ -39,17 +39,17 @@ const (
 	KindCustomMetrics = "customMetrics"
 )
 
-type MetricClientOptions struct {
+type MetricsClientOptions struct {
 	Kind     Kind
 	URL      string
 	Template string
 }
 
 type AutoScalerOptions struct {
-	Namespace           string
-	ScaleInterval       Duration
-	GroupKind           schema.GroupKind
-	MetricClientOptions MetricClientOptions
+	Namespace            string
+	ScaleInterval        Duration
+	GroupKind            schema.GroupKind
+	MetricsClientOptions MetricsClientOptions
 }
 
 type ResourceScalerConfig struct {
