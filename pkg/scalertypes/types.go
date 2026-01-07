@@ -40,9 +40,9 @@ const (
 )
 
 type MetricClientOptions struct {
-	Kind                Kind
-	URL                 string
-	ServicesMetricNames []string
+	Kind     Kind
+	URL      string
+	Template string
 }
 
 type AutoScalerOptions struct {

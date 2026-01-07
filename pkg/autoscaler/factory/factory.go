@@ -21,6 +21,8 @@ such restriction.
 package factory
 
 import (
+	"fmt"
+
 	"github.com/v3io/scaler/pkg/autoscaler/metricsclients"
 	"github.com/v3io/scaler/pkg/scalertypes"
 
@@ -42,6 +44,6 @@ func NewMetricsClient(logger logger.Logger, restConfig *rest.Config, autoScalerC
 			autoScalerConf.Namespace,
 			autoScalerConf.GroupKind), nil
 	default:
-		return nil, errors.New("unsupported metrics client kind")
+		return nil, fmt.Errorf("unsupported metrics client kind: %s", autoScalerConf.MetricClientOptions.Kind)
 	}
 }
