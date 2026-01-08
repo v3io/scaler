@@ -33,10 +33,23 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+type MetricsClientKind string
+
+const (
+	KindK8sMetricsClient = "k8sMetricsClient"
+)
+
+type MetricsClientOptions struct {
+	MetricsClientKind MetricsClientKind
+	URL               string
+	Template          string
+}
+
 type AutoScalerOptions struct {
-	Namespace     string
-	ScaleInterval Duration
-	GroupKind     schema.GroupKind
+	Namespace            string
+	ScaleInterval        Duration
+	GroupKind            schema.GroupKind
+	MetricsClientOptions MetricsClientOptions
 }
 
 type ResourceScalerConfig struct {
@@ -198,4 +211,25 @@ func shortDurationString(d Duration) string {
 		s = s[:len(s)-2]
 	}
 	return s
+}
+
+// MetricsClient defines an interface for retrieving resource metrics used by the autoscaler.
+type MetricsClient interface {
+	// GetResourceMetrics retrieves metrics for multiple resources and metric names.
+	//
+	// Parameters:
+	//   - metricNames: A slice of metric names to retrieve (e.g., "requests_per_minute", "cpu_usage_per_hour")
+	//
+	// Returns:
+	//   - map[string]map[string]int: A nested map structure where:
+	//     * The outer map key is the resource name (e.g., deployment name)
+	//     * The inner map key is the metric name
+	//     * The inner map value is the metric value as an integer
+	//     Example: map["my-deployment"]["requests_per_minute"] = 42
+	//   - error: An error if metric retrieval fails
+	//
+	// The dual map structure allows efficient lookup of metric values by resource name
+	// and then by metric name, enabling the autoscaler to check multiple metrics
+	// per resource when making scaling decisions.
+	GetResourceMetrics(metricNames []string) (map[string]map[string]int, error)
 }
