@@ -26,46 +26,30 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/discovery/cached/memory"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/restmapper"
 	k8scustommetrics "k8s.io/metrics/pkg/client/custom_metrics"
 )
 
-type CustomMetricsClient struct {
+type K8sCustomMetricsClient struct {
 	k8scustommetrics.CustomMetricsClient
 	namespace string
 	groupKind schema.GroupKind
 	logger    logger.Logger
 }
 
-// NewCustomMetricsClientFromConfig creates a custom_metrics.CustomMetricsClient from rest.Config
-func NewCustomMetricsClientFromConfig(restConfig *rest.Config) (k8scustommetrics.CustomMetricsClient, error) {
-	discoveryClient, err := discovery.NewDiscoveryClientForConfig(restConfig)
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to create discovery client")
-	}
-	availableAPIsGetter := k8scustommetrics.NewAvailableAPIsGetter(discoveryClient)
-	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(memory.NewMemCacheClient(discoveryClient))
-	customMetricsClient := k8scustommetrics.NewForConfig(restConfig, restMapper, availableAPIsGetter)
-	return customMetricsClient, nil
-}
-
 func NewCustomMetricsClient(
-	logger logger.Logger,
+	parentLogger logger.Logger,
 	customMetricsClient k8scustommetrics.CustomMetricsClient,
 	namespace string,
-	groupKind schema.GroupKind) *CustomMetricsClient {
-	return &CustomMetricsClient{
-		logger:              logger,
+	groupKind schema.GroupKind) *K8sCustomMetricsClient {
+	return &K8sCustomMetricsClient{
+		logger:              parentLogger.GetChild("custom-metrics"),
 		CustomMetricsClient: customMetricsClient,
 		namespace:           namespace,
 		groupKind:           groupKind,
 	}
 }
 
-func (cmw *CustomMetricsClient) GetResourceMetrics(metricNames []string) (map[string]map[string]int, error) {
+func (cmw *K8sCustomMetricsClient) GetResourceMetrics(metricNames []string) (map[string]map[string]int, error) {
 	resourcesMetricsMap := make(map[string]map[string]int)
 	resourceLabels := labels.Everything()
 	metricSelectorLabels := labels.Everything()

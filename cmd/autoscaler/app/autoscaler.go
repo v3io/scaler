@@ -41,6 +41,7 @@ func Run(kubeconfigPath string,
 	scaleInterval time.Duration,
 	metricsResourceKind string,
 	metricsResourceGroup string) error {
+	// define default auto scaler options
 	autoScalerOptions := scalertypes.AutoScalerOptions{
 		Namespace:     namespace,
 		ScaleInterval: scalertypes.Duration{Duration: scaleInterval},
@@ -49,7 +50,8 @@ func Run(kubeconfigPath string,
 			Group: metricsResourceGroup,
 		},
 		MetricsClientOptions: scalertypes.MetricsClientOptions{
-			Kind: scalertypes.KindCustomMetrics,
+			// default to k8s metrics client for the sake of backwards compatibility
+			MetricsClientKind: scalertypes.KindK8sMetricsClient,
 		},
 	}
 

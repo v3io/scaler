@@ -21,30 +21,35 @@ such restriction.
 package metricsclient
 
 import (
-	"fmt"
-
 	"github.com/v3io/scaler/pkg/scalertypes"
 
 	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
+	k8scustommetrics "k8s.io/metrics/pkg/client/custom_metrics"
 )
 
 func NewMetricsClient(logger logger.Logger,
 	restConfig *rest.Config,
 	autoScalerConf scalertypes.AutoScalerOptions) (scalertypes.MetricsClient, error) {
-	switch autoScalerConf.MetricsClientOptions.Kind {
-	case scalertypes.KindCustomMetrics:
-		customMetricsClient, err := NewCustomMetricsClientFromConfig(restConfig)
+	switch autoScalerConf.MetricsClientOptions.MetricsClientKind {
+	case scalertypes.KindK8sMetricsClient:
+		discoveryClient, err := discovery.NewDiscoveryClientForConfig(restConfig)
 		if err != nil {
-			return nil, errors.Wrap(err, "Failed to create custom metrics client")
+			return nil, errors.Wrap(err, "Failed to create k8s metrics client")
 		}
+		availableAPIsGetter := k8scustommetrics.NewAvailableAPIsGetter(discoveryClient)
+		restMapper := restmapper.NewDeferredDiscoveryRESTMapper(memory.NewMemCacheClient(discoveryClient))
+		customMetricsClient := k8scustommetrics.NewForConfig(restConfig, restMapper, availableAPIsGetter)
 		return NewCustomMetricsClient(
-			logger.GetChild("customMetricsClient"),
+			logger,
 			customMetricsClient,
 			autoScalerConf.Namespace,
 			autoScalerConf.GroupKind), nil
 	default:
-		return nil, fmt.Errorf("unsupported metrics client kind: %s", autoScalerConf.MetricsClientOptions.Kind)
+		return nil, errors.Errorf("unsupported metrics client kind: %s", autoScalerConf.MetricsClientOptions.MetricsClientKind)
 	}
 }
