@@ -26,6 +26,10 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/discovery/cached/memory"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	k8scustommetrics "k8s.io/metrics/pkg/client/custom_metrics"
 )
 
@@ -38,15 +42,22 @@ type K8sCustomMetricsClient struct {
 
 func NewCustomMetricsClient(
 	parentLogger logger.Logger,
-	customMetricsClient k8scustommetrics.CustomMetricsClient,
+	restConfig *rest.Config,
 	namespace string,
-	groupKind schema.GroupKind) *K8sCustomMetricsClient {
+	groupKind schema.GroupKind) (*K8sCustomMetricsClient, error) {
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(restConfig)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to create k8s metrics client")
+	}
+	availableAPIsGetter := k8scustommetrics.NewAvailableAPIsGetter(discoveryClient)
+	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(memory.NewMemCacheClient(discoveryClient))
+	customMetricsClient := k8scustommetrics.NewForConfig(restConfig, restMapper, availableAPIsGetter)
 	return &K8sCustomMetricsClient{
 		logger:              parentLogger.GetChild("custom-metrics"),
 		CustomMetricsClient: customMetricsClient,
 		namespace:           namespace,
 		groupKind:           groupKind,
-	}
+	}, nil
 }
 
 func (cmw *K8sCustomMetricsClient) GetResourceMetrics(metricNames []string) (map[string]map[string]int, error) {
