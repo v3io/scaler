@@ -39,10 +39,15 @@ const (
 	KindK8sMetricsClient = "k8sMetricsClient"
 )
 
+type QueryTemplate struct {
+	Name     string
+	Template string
+}
+
 type MetricsClientOptions struct {
 	MetricsClientKind MetricsClientKind
 	URL               string
-	Template          string
+	QueryTemplates    []QueryTemplate
 }
 
 type AutoScalerOptions struct {
@@ -136,7 +141,7 @@ type ScaleResource struct {
 }
 
 func (sr ScaleResource) GetKubernetesMetricName() string {
-	return fmt.Sprintf("%s_per_%s", sr.MetricName, shortDurationString(sr.WindowSize))
+	return fmt.Sprintf("%s_per_%s", sr.MetricName, ShortDurationString(sr.WindowSize))
 }
 
 func (sr ScaleResource) String() string {
@@ -202,7 +207,7 @@ func (d *Duration) UnmarshalJSON(b []byte) error {
 	}
 }
 
-func shortDurationString(d Duration) string {
+func ShortDurationString(d Duration) string {
 	s := d.String()
 	if strings.HasSuffix(s, "m0s") {
 		s = s[:len(s)-2]
@@ -215,10 +220,10 @@ func shortDurationString(d Duration) string {
 
 // MetricsClient defines an interface for retrieving resource metrics used by the autoscaler.
 type MetricsClient interface {
-	// GetResourceMetrics retrieves metrics for multiple resources and metric names.
+	// GetResourceMetrics retrieves metrics for multiple resources.
 	//
 	// Parameters:
-	//   - metricNames: A slice of metric names to retrieve (e.g., "requests_per_minute", "cpu_usage_per_hour")
+	//   - resources: A slice of resources to retrieve metrics for
 	//
 	// Returns:
 	//   - map[string]map[string]int: A nested map structure where:
@@ -231,5 +236,5 @@ type MetricsClient interface {
 	// The dual map structure allows efficient lookup of metric values by resource name
 	// and then by metric name, enabling the autoscaler to check multiple metrics
 	// per resource when making scaling decisions.
-	GetResourceMetrics(metricNames []string) (map[string]map[string]int, error)
+	GetResourceMetrics(resources []Resource) (map[string]map[string]int, error)
 }

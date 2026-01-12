@@ -23,7 +23,6 @@ package autoscaler
 import (
 	"time"
 
-	"github.com/v3io/scaler/pkg/common"
 	"github.com/v3io/scaler/pkg/scalertypes"
 
 	"github.com/nuclio/errors"
@@ -85,17 +84,6 @@ func (as *Autoscaler) Stop() error {
 	return nil
 }
 
-func (as *Autoscaler) getMetricNames(resources []scalertypes.Resource) []string {
-	var metricNames []string
-	for _, resource := range resources {
-		for _, scaleResource := range resource.ScaleResources {
-			metricNames = append(metricNames, scaleResource.GetKubernetesMetricName())
-		}
-	}
-	metricNames = common.UniquifyStringSlice(metricNames)
-	return metricNames
-}
-
 func (as *Autoscaler) checkResourceToScale(resource scalertypes.Resource, resourcesMetricsMap map[string]map[string]int) bool {
 	if _, found := resourcesMetricsMap[resource.Name]; !found {
 		as.logger.DebugWith("Resource does not have metrics data yet, keeping up", "resourceName", resource.Name)
@@ -147,9 +135,7 @@ func (as *Autoscaler) checkResourcesToScale() error {
 	if len(activeResources) == 0 {
 		return nil
 	}
-	metricNames := as.getMetricNames(activeResources)
-	as.logger.DebugWith("Got metric names", "metricNames", metricNames)
-	resourceMetricsMap, err := as.metricsClient.GetResourceMetrics(metricNames)
+	resourceMetricsMap, err := as.metricsClient.GetResourceMetrics(activeResources)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get resources metrics")
 	}
