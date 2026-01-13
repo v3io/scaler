@@ -38,6 +38,12 @@ func NewMetricsClient(logger logger.Logger,
 			restConfig,
 			autoScalerConf.Namespace,
 			autoScalerConf.GroupKind)
+	case scalertypes.KindPrometheusClient:
+		return NewPrometheusClient(
+			logger,
+			autoScalerConf.MetricsClientOptions.URL,
+			autoScalerConf.Namespace,
+			autoScalerConf.MetricsClientOptions.QueryTemplates)
 	default:
 		return nil, errors.Errorf("unsupported metrics client kind: %s", autoScalerConf.MetricsClientOptions.MetricsClientKind)
 	}

@@ -37,6 +37,7 @@ type MetricsClientKind string
 
 const (
 	KindK8sMetricsClient = "k8sMetricsClient"
+	KindPrometheusClient = "prometheusClient"
 )
 
 type QueryTemplate struct {
