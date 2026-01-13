@@ -81,6 +81,7 @@ func (cmw *K8sCustomMetricsClient) getMetricNames(resources []scalertypes.Resour
 
 func (cmw *K8sCustomMetricsClient) GetResourceMetrics(resources []scalertypes.Resource) (map[string]map[string]int, error) {
 	metricNames := cmw.getMetricNames(resources)
+	cmw.logger.DebugWith("KAWABANGA 0 - metric names", "metricNames", metricNames)
 	resourcesMetricsMap := make(map[string]map[string]int)
 	resourceLabels := labels.Everything()
 	metricSelectorLabels := labels.Everything()
@@ -120,5 +121,13 @@ func (cmw *K8sCustomMetricsClient) GetResourceMetrics(resources []scalertypes.Re
 		}
 	}
 
+	cmw.logger.Debug("KAWABANGA 1 - start")
+	for resourceName, metricsMap := range resourcesMetricsMap {
+		cmw.logger.DebugWith("KAWABANGA 1 - inside loop", "resourceName", resourceName)
+		for metricName, value := range metricsMap {
+			cmw.logger.DebugWith("KAWABANGA 1 - inside inner loop", "metricName", metricName, "value", value)
+		}
+	}
+	cmw.logger.Debug("KAWABANGA 1 - end")
 	return resourcesMetricsMap, nil
 }
