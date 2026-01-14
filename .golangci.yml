@@ -12,44 +12,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+version: "2"
+
+# timeout for analysis
+timeout: 5m
 linters:
-  disable-all: true
+  default: none
   enable:
+    - errcheck
     - goconst
-    - gofmt
-    - revive
-    - gosimple
+    - gocritic
+    - govet
     - ineffassign
     - misspell
     - staticcheck
     - unconvert
     - govet
     - unused
-    - errcheck
-    - typecheck
-    - gocritic
+
+formatters:
+  enable:
     - gci
-
-run:
-
-  # timeout for analysis
-  timeout: 5m
-
-linters-settings:
-  gci:
-    sections:
-      - standard
-      - prefix(github.com/v3io/scaler)
-      - default
-      - blank
-      - dot
-
-    custom-order: true
-
-issues:
-
-  # List of regexps of issue texts to exclude
-  exclude:
-    - "comment on"
-    - "error should be the last"
-    - "should have comment"
+    - gofmt
+  settings:
+    gci:
+      sections:
+        - standard
+        - prefix(github.com/v3io/scaler)
+        - default
+        - blank
+        - dot
+      custom-order: true
