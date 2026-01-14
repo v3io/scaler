@@ -24,6 +24,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 	"text/template"
 	"time"
 
@@ -89,11 +90,12 @@ func NewPrometheusClient(parentLogger logger.Logger, prometheusURL, namespace st
 	}, nil
 }
 
-// renderQuery renders the Prometheus query template with the current namespace, window size, and additional parameters
-func (pc *PrometheusClient) renderQuery(queryTemplate *template.Template, windowSize string) (string, error) {
+// renderQuery renders the Prometheus query template
+func (pc *PrometheusClient) renderQuery(queryTemplate *template.Template, windowSize, resourceNameRegex string) (string, error) {
 	templateData := make(map[string]string)
 	templateData["Namespace"] = pc.namespace
 	templateData["WindowSize"] = windowSize
+	templateData["Resources"] = resourceNameRegex
 
 	var queryBuffer bytes.Buffer
 	if err := queryTemplate.Execute(&queryBuffer, templateData); err != nil {
@@ -115,6 +117,15 @@ func (pc *PrometheusClient) extractWindowSizesForMetric(resources []scalertypes.
 		}
 	}
 	return windowSizes
+}
+
+// buildResourceNameRegex creates a pipe-separated regex pattern from resource names for Prometheus query filtering (e.g., "func1|func2|func3")
+func (pc *PrometheusClient) buildResourceNameRegex(resources []scalertypes.Resource) string {
+	resourceNames := make([]string, len(resources))
+	for i, resource := range resources {
+		resourceNames[i] = resource.Name
+	}
+	return strings.Join(resourceNames, "|")
 }
 
 // resolveFullMetricName finds the matching ScaleResource for a given metric name and window size,
@@ -145,6 +156,8 @@ func (pc *PrometheusClient) GetResourceMetrics(resources []scalertypes.Resource)
 			continue
 		}
 
+		resourceNameRegex := pc.buildResourceNameRegex(resources)
+
 		for windowSize := range windowSizes {
 			fullMetricName, err := pc.resolveFullMetricName(resources, metricName, windowSize)
 			if err != nil {
@@ -155,7 +168,7 @@ func (pc *PrometheusClient) GetResourceMetrics(resources []scalertypes.Resource)
 				continue
 			}
 
-			query, err := pc.renderQuery(queryTemplate, windowSize)
+			query, err := pc.renderQuery(queryTemplate, windowSize, resourceNameRegex)
 			if err != nil {
 				return nil, errors.Wrapf(err, "Failed to render query for metricName=%s, windowSize=%s", metricName, windowSize)
 			}
