@@ -1,6 +1,6 @@
 module github.com/v3io/scaler
 
-go 1.23.8
+go 1.25.5
 
 require (
 	github.com/dghubble/trie v0.1.0
