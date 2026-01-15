@@ -24,6 +24,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math"
 	"strings"
 	"text/template"
 	"time"
@@ -210,7 +211,9 @@ func (pc *PrometheusClient) GetResourceMetrics(resources []scalertypes.Resource)
 					continue
 				}
 
-				metricValue := int(metricSample.Value)
+				// Use Ceil to ensure any fractional value > 0 becomes at least 1
+				// This prevents incorrect scale-to-zero decisions for resources with low activity
+				metricValue := int(math.Ceil(float64(metricSample.Value)))
 
 				if _, found := metricsByResource[resourceName]; !found {
 					metricsByResource[resourceName] = make(map[string]int)
