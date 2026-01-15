@@ -129,7 +129,6 @@ func (as *Autoscaler) getMaxScaleResourceWindowSize(resource scalertypes.Resourc
 func (as *Autoscaler) checkResourcesToScale() error {
 	now := time.Now()
 	activeResources, err := as.resourceScaler.GetResources()
-	as.logger.DebugWith("KAWABANGA 3 - inside checkResourcesToScale", "activeResources", activeResources)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get resources")
 	}
@@ -140,15 +139,6 @@ func (as *Autoscaler) checkResourcesToScale() error {
 	if err != nil {
 		return errors.Wrap(err, "Failed to get resources metrics")
 	}
-
-	as.logger.Debug("KAWABANGA 4 - start")
-	for resourceName, metricsMap := range resourceMetricsMap {
-		as.logger.DebugWith("KAWABANGA 4 - inside loop", "resourceName", resourceName)
-		for metricName, value := range metricsMap {
-			as.logger.DebugWith("KAWABANGA 4 - inside inner loop", "metricName", metricName, "value", value)
-		}
-	}
-	as.logger.Debug("KAWABANGA 4 - end")
 
 	resourcesToScale := make([]scalertypes.Resource, 0)
 	for idx, resource := range activeResources {
