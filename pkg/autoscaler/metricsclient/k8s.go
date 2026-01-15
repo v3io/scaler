@@ -67,18 +67,6 @@ func NewCustomMetricsClient(
 	}, nil
 }
 
-// getMetricNames extracts unique metric names from resources
-func (cmw *K8sCustomMetricsClient) getMetricNames(resources []scalertypes.Resource) []string {
-	var metricNames []string
-	for _, resource := range resources {
-		for _, scaleResource := range resource.ScaleResources {
-			metricNames = append(metricNames, scaleResource.GetKubernetesMetricName())
-		}
-	}
-	metricNames = common.UniquifyStringSlice(metricNames)
-	return metricNames
-}
-
 func (cmw *K8sCustomMetricsClient) GetResourceMetrics(resources []scalertypes.Resource) (map[string]map[string]int, error) {
 	metricNames := cmw.getMetricNames(resources)
 	resourcesMetricsMap := make(map[string]map[string]int)
@@ -120,4 +108,16 @@ func (cmw *K8sCustomMetricsClient) GetResourceMetrics(resources []scalertypes.Re
 		}
 	}
 	return resourcesMetricsMap, nil
+}
+
+// getMetricNames extracts unique metric names from resources
+func (cmw *K8sCustomMetricsClient) getMetricNames(resources []scalertypes.Resource) []string {
+	var metricNames []string
+	for _, resource := range resources {
+		for _, scaleResource := range resource.ScaleResources {
+			metricNames = append(metricNames, scaleResource.GetKubernetesMetricName())
+		}
+	}
+	metricNames = common.UniquifyStringSlice(metricNames)
+	return metricNames
 }

@@ -91,60 +91,6 @@ func NewPrometheusClient(parentLogger logger.Logger, prometheusURL, namespace st
 	}, nil
 }
 
-// renderQuery renders the Prometheus query template
-func (pc *PrometheusClient) renderQuery(queryTemplate *template.Template, windowSize, resourceNameRegex string) (string, error) {
-	templateData := make(map[string]string)
-	templateData["Namespace"] = pc.namespace
-	templateData["WindowSize"] = windowSize
-	templateData["Resources"] = resourceNameRegex
-
-	var queryBuffer bytes.Buffer
-	if err := queryTemplate.Execute(&queryBuffer, templateData); err != nil {
-		return "", fmt.Errorf("error executing template: %w", err)
-	}
-
-	return queryBuffer.String(), nil
-}
-
-// extractWindowSizesForMetric extracts unique window sizes from resources' ScaleResources for a specific metric name.
-func (pc *PrometheusClient) extractWindowSizesForMetric(resources []scalertypes.Resource, metricName string) map[string]bool {
-	windowSizes := make(map[string]bool)
-	for _, resource := range resources {
-		for _, scaleResource := range resource.ScaleResources {
-			if scaleResource.MetricName == metricName {
-				windowSizeStr := scalertypes.ShortDurationString(scaleResource.WindowSize)
-				windowSizes[windowSizeStr] = true
-			}
-		}
-	}
-	return windowSizes
-}
-
-// buildResourceNameRegex creates a pipe-separated regex pattern from resource names for Prometheus query filtering (e.g., "func1|func2|func3")
-func (pc *PrometheusClient) buildResourceNameRegex(resources []scalertypes.Resource) string {
-	resourceNames := make([]string, len(resources))
-	for i, resource := range resources {
-		resourceNames[i] = resource.Name
-	}
-	return strings.Join(resourceNames, "|")
-}
-
-// resolveFullMetricName finds the matching ScaleResource for a given metric name and window size,
-// and returns the full metric name (e.g., "metric_name_per_1m").
-func (pc *PrometheusClient) resolveFullMetricName(resources []scalertypes.Resource, metricName, windowSize string) (string, error) {
-	for _, resource := range resources {
-		for _, scaleResource := range resource.ScaleResources {
-			if scaleResource.MetricName == metricName {
-				scaleResourceWindowSize := scalertypes.ShortDurationString(scaleResource.WindowSize)
-				if scaleResourceWindowSize == windowSize {
-					return scaleResource.GetKubernetesMetricName(), nil
-				}
-			}
-		}
-	}
-	return "", errors.Errorf("Failed to find ScaleResource matching metric name and window size: metricName=%s, windowSize=%s", metricName, windowSize)
-}
-
 // GetResourceMetrics retrieves metrics for multiple resources
 func (pc *PrometheusClient) GetResourceMetrics(resources []scalertypes.Resource) (map[string]map[string]int, error) {
 	metricsByResource := make(map[string]map[string]int)
@@ -203,7 +149,7 @@ func (pc *PrometheusClient) GetResourceMetrics(resources []scalertypes.Resource)
 			for _, metricSample := range metricSamples {
 				resourceName, err := pc.extractResourceName(metricSample.Metric)
 				if err != nil {
-					pc.logger.WarnWith("Failed to extract resource name from Prometheus metricSample labels",
+					pc.logger.WarnWith("Failed to extract resource name from the Prometheus metric's labels",
 						"metricName", metricName,
 						"windowSize", windowSize,
 						"labels", metricSample.Metric.String(),
@@ -211,7 +157,7 @@ func (pc *PrometheusClient) GetResourceMetrics(resources []scalertypes.Resource)
 					continue
 				}
 
-				// Use Ceil to ensure any fractional value > 0 becomes at least 1
+				// Round up values to ensure any fractional value > 0 becomes at least 1
 				// This prevents incorrect scale-to-zero decisions for resources with low activity
 				metricValue := int(math.Ceil(float64(metricSample.Value)))
 
@@ -219,7 +165,7 @@ func (pc *PrometheusClient) GetResourceMetrics(resources []scalertypes.Resource)
 					metricsByResource[resourceName] = make(map[string]int)
 				}
 
-				pc.logger.DebugWith("Retrieved metricSample sample",
+				pc.logger.DebugWith("Retrieved metric",
 					"resourceName", resourceName,
 					"metricName", fullMetricName,
 					"windowSize", windowSize,
@@ -228,13 +174,67 @@ func (pc *PrometheusClient) GetResourceMetrics(resources []scalertypes.Resource)
 				if _, found := metricsByResource[resourceName][fullMetricName]; found {
 					return nil, errors.Errorf("Cannot have more than one metricSample value per resource: resource=%s, metricSample=%s", resourceName, fullMetricName)
 				}
-
 				metricsByResource[resourceName][fullMetricName] = metricValue
 			}
 		}
 	}
-
 	return metricsByResource, nil
+}
+
+// renderQuery renders the Prometheus query template
+func (pc *PrometheusClient) renderQuery(queryTemplate *template.Template, windowSize, resourceNameRegex string) (string, error) {
+	templateData := make(map[string]string)
+	templateData["Namespace"] = pc.namespace
+	templateData["WindowSize"] = windowSize
+	templateData["Resources"] = resourceNameRegex
+
+	var queryBuffer bytes.Buffer
+	if err := queryTemplate.Execute(&queryBuffer, templateData); err != nil {
+		return "", fmt.Errorf("error executing template: %w", err)
+	}
+
+	return queryBuffer.String(), nil
+}
+
+// extractWindowSizesForMetric extracts unique window sizes from resources' ScaleResources for a specific metric name.
+func (pc *PrometheusClient) extractWindowSizesForMetric(resources []scalertypes.Resource, metricName string) map[string]bool {
+	windowSizes := make(map[string]bool)
+	for _, resource := range resources {
+		for _, scaleResource := range resource.ScaleResources {
+			if scaleResource.MetricName == metricName {
+				windowSizeStr := scalertypes.ShortDurationString(scaleResource.WindowSize)
+				windowSizes[windowSizeStr] = true
+			}
+		}
+	}
+	return windowSizes
+}
+
+// buildResourceNameRegex creates a Prometheus regex pattern for query filtering
+func (pc *PrometheusClient) buildResourceNameRegex(resources []scalertypes.Resource) string {
+	resourceNames := make([]string, len(resources))
+	for i, resource := range resources {
+		resourceNames[i] = resource.Name
+	}
+	// creates a pipe-separated regex pattern from resource names for Prometheus query filtering (e.g., "resource1|resource2")
+	return strings.Join(resourceNames, "|")
+}
+
+// resolveFullMetricName resolves the full metric name because the same resource can have multiple
+// metrics with the same base name but different window sizes (e.g., "metric_name_per_1m" vs "metric_name_per_5m"),
+// and we need unique keys in our internal metrics map to store them separately.
+func (pc *PrometheusClient) resolveFullMetricName(resources []scalertypes.Resource, metricName, windowSize string) (string, error) {
+	for _, resource := range resources {
+		for _, scaleResource := range resource.ScaleResources {
+			if scaleResource.MetricName == metricName {
+				scaleResourceWindowSize := scalertypes.ShortDurationString(scaleResource.WindowSize)
+				if scaleResourceWindowSize == windowSize {
+					return scaleResource.GetKubernetesMetricName(), nil
+				}
+			}
+		}
+	}
+	return "", errors.Errorf("Failed to find ScaleResource matching metric name and window size: metricName=%s, windowSize=%s", metricName, windowSize)
 }
 
 // extractResourceName extracts the resource name from Prometheus metric labels.
@@ -244,13 +244,10 @@ func (pc *PrometheusClient) extractResourceName(labels model.Metric) (string, er
 		"service_name", // For deployments (num_of_requests, jupyter_kernel_busyness) - maps to deployment resource
 		"pod",          // For pod-based metrics (DCGM_FI_DEV_GPU_UTIL) - maps to pod resource
 	}
-
 	for _, labelName := range labelNames {
 		if value, ok := labels[labelName]; ok {
 			return string(value), nil
 		}
 	}
-
-	// If no common label found, return error
 	return "", errors.Errorf("Could not extract resource name from labels: %v", labels)
 }
