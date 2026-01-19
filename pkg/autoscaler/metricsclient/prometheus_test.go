@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"text/template"
 	"time"
@@ -50,12 +51,18 @@ func (suite *PrometheusClientTestSuite) SetupTest() {
 	suite.Require().NoError(err)
 }
 
-// createMockPrometheusServer creates an HTTP test server with a custom response result
-func createMockPrometheusServer(serverResult []map[string]interface{}) *httptest.Server {
+// createMockPrometheusServer creates an HTTP test server with a custom response result per window size
+func createMockPrometheusServer(serverResultPerWindowSize map[string][]map[string]interface{}) *httptest.Server {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/api/v1/query":
 			timestamp := float64(time.Now().Unix())
+
+			// Extract window size from query (e.g., "...[1m]..." -> "1m") and lookup results
+			query := r.FormValue("query")
+			start, end := strings.Index(query, "["), strings.Index(query, "]")
+			windowSize := query[start+1 : end]
+			serverResult := serverResultPerWindowSize[windowSize]
 
 			// Update timestamps in serverResult
 			for _, result := range serverResult {
@@ -86,10 +93,10 @@ func createMockPrometheusServer(serverResult []map[string]interface{}) *httptest
 func (suite *PrometheusClientTestSuite) TestGetResourceMetrics() {
 	timestamp := float64(time.Now().Unix())
 	tests := []struct {
-		name           string
-		resources      []scalertypes.Resource
-		serverResult   []map[string]interface{}
-		expectedResult map[string]map[string]int
+		name                      string
+		resources                 []scalertypes.Resource
+		serverResultPerWindowSize map[string][]map[string]interface{}
+		expectedResult            map[string]map[string]int
 	}{
 		{
 			name: "single resource with metrics",
@@ -104,12 +111,14 @@ func (suite *PrometheusClientTestSuite) TestGetResourceMetrics() {
 					},
 				},
 			},
-			serverResult: []map[string]interface{}{
-				{
-					"metric": map[string]string{
-						"function": "test-resource1",
+			serverResultPerWindowSize: map[string][]map[string]interface{}{
+				"1m": {
+					{
+						"metric": map[string]string{
+							"function": "test-resource1",
+						},
+						"value": []interface{}{timestamp, "0"},
 					},
-					"value": []interface{}{timestamp, "0"},
 				},
 			},
 			expectedResult: map[string]map[string]int{
@@ -140,18 +149,20 @@ func (suite *PrometheusClientTestSuite) TestGetResourceMetrics() {
 					},
 				},
 			},
-			serverResult: []map[string]interface{}{
-				{
-					"metric": map[string]string{
-						"function": "test-resource1",
+			serverResultPerWindowSize: map[string][]map[string]interface{}{
+				"1m": {
+					{
+						"metric": map[string]string{
+							"function": "test-resource1",
+						},
+						"value": []interface{}{timestamp, "0"},
 					},
-					"value": []interface{}{timestamp, "0"},
-				},
-				{
-					"metric": map[string]string{
-						"function": "test-resource3",
+					{
+						"metric": map[string]string{
+							"function": "test-resource3",
+						},
+						"value": []interface{}{timestamp, "0.5"},
 					},
-					"value": []interface{}{timestamp, "0.5"},
 				},
 			},
 			expectedResult: map[string]map[string]int{
@@ -162,7 +173,8 @@ func (suite *PrometheusClientTestSuite) TestGetResourceMetrics() {
 					"handled_events_total_per_1m": 1,
 				},
 			},
-		}, {
+		},
+		{
 			name: "multiple resources with different window size",
 			resources: []scalertypes.Resource{
 				{
@@ -184,27 +196,29 @@ func (suite *PrometheusClientTestSuite) TestGetResourceMetrics() {
 					},
 				},
 			},
-			serverResult: []map[string]interface{}{
-				{
-					"metric": map[string]string{
-						"function": "test-resource1",
+			serverResultPerWindowSize: map[string][]map[string]interface{}{
+				"1m": {
+					{
+						"metric": map[string]string{
+							"function": "test-resource1",
+						},
+						"value": []interface{}{timestamp, "0.1"},
 					},
-					"value": []interface{}{timestamp, "0.1"},
 				},
-				{
-					"metric": map[string]string{
-						"function": "test-resource3",
+				"3m": {
+					{
+						"metric": map[string]string{
+							"function": "test-resource3",
+						},
+						"value": []interface{}{timestamp, "0.1"},
 					},
-					"value": []interface{}{timestamp, "0.1"},
 				},
 			},
 			expectedResult: map[string]map[string]int{
 				"test-resource1": {
 					"handled_events_total_per_1m": 1,
-					"handled_events_total_per_3m": 1,
 				},
 				"test-resource3": {
-					"handled_events_total_per_1m": 1,
 					"handled_events_total_per_3m": 1,
 				},
 			},
@@ -213,7 +227,7 @@ func (suite *PrometheusClientTestSuite) TestGetResourceMetrics() {
 
 	for _, testCase := range tests {
 		suite.Run(testCase.name, func() {
-			mockServer := createMockPrometheusServer(testCase.serverResult)
+			mockServer := createMockPrometheusServer(testCase.serverResultPerWindowSize)
 			defer mockServer.Close()
 
 			// Create Prometheus client pointing to mock server
@@ -325,12 +339,11 @@ func (suite *PrometheusClientTestSuite) TestRenderQuery() {
 	}
 }
 
-func (suite *PrometheusClientTestSuite) TestExtractWindowSizesForMetric() {
+func (suite *PrometheusClientTestSuite) TestBuildMetricLookup() {
 	tests := []struct {
-		name       string
-		resources  []scalertypes.Resource
-		metricName string
-		expected   map[string]bool
+		name      string
+		resources []scalertypes.Resource
+		expected  metricLookup
 	}{
 		{
 			name: "single resource with single window size",
@@ -346,8 +359,11 @@ func (suite *PrometheusClientTestSuite) TestExtractWindowSizesForMetric() {
 					},
 				},
 			},
-			metricName: "handled_events_total",
-			expected:   map[string]bool{"1m": true},
+			expected: metricLookup{
+				"handled_events_total": windowSizeLookup{
+					"1m": map[string]struct{}{"test-resource1": {}},
+				},
+			},
 		},
 		{
 			name: "multiple resources with same window size",
@@ -373,8 +389,11 @@ func (suite *PrometheusClientTestSuite) TestExtractWindowSizesForMetric() {
 					},
 				},
 			},
-			metricName: "handled_events_total",
-			expected:   map[string]bool{"1m": true},
+			expected: metricLookup{
+				"handled_events_total": windowSizeLookup{
+					"1m": map[string]struct{}{"test-resource1": {}, "test-resource2": {}},
+				},
+			},
 		},
 		{
 			name: "multiple resources with different window sizes",
@@ -400,8 +419,12 @@ func (suite *PrometheusClientTestSuite) TestExtractWindowSizesForMetric() {
 					},
 				},
 			},
-			metricName: "handled_events_total",
-			expected:   map[string]bool{"1m": true, "2m": true},
+			expected: metricLookup{
+				"handled_events_total": windowSizeLookup{
+					"1m": map[string]struct{}{"test-resource1": {}},
+					"2m": map[string]struct{}{"test-resource2": {}},
+				},
+			},
 		},
 		{
 			name: "resource with multiple scale resources for same metric",
@@ -421,8 +444,12 @@ func (suite *PrometheusClientTestSuite) TestExtractWindowSizesForMetric() {
 					},
 				},
 			},
-			metricName: "handled_events_total",
-			expected:   map[string]bool{"1m": true, "5m": true},
+			expected: metricLookup{
+				"handled_events_total": windowSizeLookup{
+					"1m": map[string]struct{}{"test-resource1": {}},
+					"5m": map[string]struct{}{"test-resource1": {}},
+				},
+			},
 		},
 		{
 			name: "resources with different metric names",
@@ -437,36 +464,24 @@ func (suite *PrometheusClientTestSuite) TestExtractWindowSizesForMetric() {
 						},
 						{
 							MetricName: "other_metric",
-							WindowSize: scalertypes.Duration{Duration: 2 * time.Minute},
-						},
-					},
-				},
-			},
-			metricName: "handled_events_total",
-			expected:   map[string]bool{"1m": true},
-		},
-		{
-			name: "no resources with specified metric name",
-			resources: []scalertypes.Resource{
-				{
-					Name:      "test-resource1",
-					Namespace: "test-namespace",
-					ScaleResources: []scalertypes.ScaleResource{
-						{
-							MetricName: "other_metric",
 							WindowSize: scalertypes.Duration{Duration: 1 * time.Minute},
 						},
 					},
 				},
 			},
-			metricName: "handled_events_total",
-			expected:   map[string]bool{},
+			expected: metricLookup{
+				"handled_events_total": windowSizeLookup{
+					"1m": map[string]struct{}{"test-resource1": {}},
+				},
+				"other_metric": windowSizeLookup{
+					"1m": map[string]struct{}{"test-resource1": {}},
+				},
+			},
 		},
 		{
-			name:       "empty resources",
-			resources:  []scalertypes.Resource{},
-			metricName: "handled_events_total",
-			expected:   map[string]bool{},
+			name:      "empty resources",
+			resources: []scalertypes.Resource{},
+			expected:  metricLookup{},
 		},
 		{
 			name: "window sizes with different formats",
@@ -492,8 +507,12 @@ func (suite *PrometheusClientTestSuite) TestExtractWindowSizesForMetric() {
 					},
 				},
 			},
-			metricName: "handled_events_total",
-			expected:   map[string]bool{"30m": true, "1h": true},
+			expected: metricLookup{
+				"handled_events_total": windowSizeLookup{
+					"30m": map[string]struct{}{"test-resource1": {}},
+					"1h":  map[string]struct{}{"test-resource2": {}},
+				},
+			},
 		},
 	}
 
@@ -503,14 +522,17 @@ func (suite *PrometheusClientTestSuite) TestExtractWindowSizesForMetric() {
 				namespace: "test-namespace",
 			}
 
-			result := client.extractWindowSizesForMetric(testCase.resources, testCase.metricName)
+			result := client.buildMetricLookup(testCase.resources)
 
-			suite.Require().Equal(len(testCase.expected), len(result), "Window sizes count mismatch")
-			for expectedKey := range testCase.expected {
-				suite.Require().True(result[expectedKey], "Expected window size %s not found", expectedKey)
-			}
-			for resultKey := range result {
-				suite.Require().True(testCase.expected[resultKey], "Unexpected window size %s found", resultKey)
+			suite.Require().Equal(len(testCase.expected), len(result), "Metric count mismatch")
+			for metricName, expectedWindowSizes := range testCase.expected {
+				suite.Require().Contains(result, metricName, "Expected metric %s not found", metricName)
+				resultWindowSizes := result[metricName]
+				suite.Require().Equal(len(expectedWindowSizes), len(resultWindowSizes), "Window sizes count mismatch for metric %s", metricName)
+				for windowSize, expectedResources := range expectedWindowSizes {
+					suite.Require().Contains(resultWindowSizes, windowSize, "Expected window size %s not found for metric %s", windowSize, metricName)
+					suite.Require().Equal(expectedResources, resultWindowSizes[windowSize], "Resources mismatch for metric %s, window size %s", metricName, windowSize)
+				}
 			}
 		})
 	}

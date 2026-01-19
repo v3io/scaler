@@ -157,7 +157,11 @@ type ScaleResource struct {
 }
 
 func (sr ScaleResource) GetKubernetesMetricName() string {
-	return fmt.Sprintf("%s_per_%s", sr.MetricName, ShortDurationString(sr.WindowSize))
+	return GetKubernetesMetricName(sr.MetricName, ShortDurationString(sr.WindowSize))
+}
+
+func GetKubernetesMetricName(metricName, windowSize string) string {
+	return fmt.Sprintf("%s_per_%s", metricName, windowSize)
 }
 
 func (sr ScaleResource) String() string {
