@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/nuclio/errors"
@@ -43,6 +44,20 @@ const (
 type QueryTemplate struct {
 	Name     string
 	Template string
+}
+
+func (q *QueryTemplate) CreateQueryTemplate() (*template.Template, error) {
+	if q.Name == "" {
+		return nil, errors.New("template name cannot be empty")
+	}
+	if q.Template == "" {
+		return nil, errors.New("query template cannot be empty")
+	}
+	tmpl, err := template.New(q.Name).Parse(q.Template)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse query template")
+	}
+	return tmpl, nil
 }
 
 type MetricsClientOptions struct {

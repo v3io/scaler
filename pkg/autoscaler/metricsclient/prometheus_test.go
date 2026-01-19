@@ -305,7 +305,7 @@ func (suite *PrometheusClientTestSuite) TestRenderQuery() {
 
 	for _, testCase := range tests {
 		suite.Run(testCase.name, func() {
-			client := &PrometheusClient{
+			client := &PrometheusMetricsClient{
 				namespace: testCase.namespace,
 			}
 
@@ -499,7 +499,7 @@ func (suite *PrometheusClientTestSuite) TestExtractWindowSizesForMetric() {
 
 	for _, testCase := range tests {
 		suite.Run(testCase.name, func() {
-			client := &PrometheusClient{
+			client := &PrometheusMetricsClient{
 				namespace: "test-namespace",
 			}
 

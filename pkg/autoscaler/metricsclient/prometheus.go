@@ -33,67 +33,68 @@ import (
 
 	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"
-	"github.com/prometheus/client_golang/api"
-	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
+	prometheusapi "github.com/prometheus/client_golang/api"
+	prometheusv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
 )
 
-type PrometheusClient struct {
+const (
+	functionLabelName = "function"     // For nuclio functions (nuclio_processor_handled_events_total) - maps to nuclio function resource
+	serviceLabelName  = "service_name" // For deployments (num_of_requests, jupyter_kernel_busyness) - maps to deployment resource
+	podLabelName      = "pod"          // For pod-based metrics (DCGM_FI_DEV_GPU_UTIL) - maps to pod resource
+)
+
+type PrometheusMetricsClient struct {
 	logger         logger.Logger
-	apiClient      v1.API
+	apiClient      prometheusv1.API
 	namespace      string
 	queryTemplates map[string]*template.Template
 }
 
-func NewPrometheusClient(parentLogger logger.Logger, prometheusURL, namespace string, templates []scalertypes.QueryTemplate) (*PrometheusClient, error) {
+func NewPrometheusClient(parentLogger logger.Logger, prometheusURL, namespace string, templates []scalertypes.QueryTemplate) (*PrometheusMetricsClient, error) {
 	if len(templates) == 0 {
-		return nil, errors.New("Failed to created Prometheus client: query template cannot be empty")
+		return nil, errors.New("query template cannot be empty")
 	}
 
 	if prometheusURL == "" {
-		return nil, errors.New("Failed to created Prometheus client: prometheus URL cannot be empty")
+		return nil, errors.New("prometheus URL cannot be empty")
 	}
 
 	if namespace == "" {
-		return nil, errors.New("Failed to created Prometheus client: namespace cannot be empty")
+		return nil, errors.New("namespace cannot be empty")
 	}
 
-	client, err := api.NewClient(api.Config{
+	client, err := prometheusapi.NewClient(prometheusapi.Config{
 		Address: prometheusURL,
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to created Prometheus client: failed to create prometheus API client")
+		return nil, errors.Wrap(err, "failed to create prometheus API client")
 	}
 
 	queryTemplates := make(map[string]*template.Template)
 	for _, queryTemplate := range templates {
-		if queryTemplate.Name == "" {
-			return nil, errors.New("Failed to created Prometheus client: template name cannot be empty")
-		}
-		if queryTemplate.Template == "" {
-			return nil, errors.New("Failed to created Prometheus client: query template cannot be empty")
-		}
-		tmpl, err := template.New(queryTemplate.Name).Parse(queryTemplate.Template)
+		tmpl, err := queryTemplate.CreateQueryTemplate()
 		if err != nil {
-			return nil, errors.Wrap(err, "Failed to created Prometheus client: failed to parse template in prometheus client")
+			return nil, errors.Wrap(err, "failed to create query template")
 		}
 		queryTemplates[queryTemplate.Name] = tmpl
 	}
 
 	childLogger := parentLogger.GetChild("prometheus-client")
-	childLogger.Info("Creating prometheus client")
+	childLogger.Info("Creating prometheus metrics client")
 
-	return &PrometheusClient{
+	return &PrometheusMetricsClient{
 		logger:         childLogger,
-		apiClient:      v1.NewAPI(client),
+		apiClient:      prometheusv1.NewAPI(client),
 		namespace:      namespace,
 		queryTemplates: queryTemplates,
 	}, nil
 }
 
 // GetResourceMetrics retrieves metrics for multiple resources
-func (pc *PrometheusClient) GetResourceMetrics(resources []scalertypes.Resource) (map[string]map[string]int, error) {
+func (pc *PrometheusMetricsClient) GetResourceMetrics(resources []scalertypes.Resource) (map[string]map[string]int, error) {
 	metricsByResource := make(map[string]map[string]int)
+	resourceNameRegex := pc.buildResourceNameRegex(resources)
 
 	for metricName, queryTemplate := range pc.queryTemplates {
 		windowSizes := pc.extractWindowSizesForMetric(resources, metricName)
@@ -102,8 +103,6 @@ func (pc *PrometheusClient) GetResourceMetrics(resources []scalertypes.Resource)
 				"metricName", metricName)
 			continue
 		}
-
-		resourceNameRegex := pc.buildResourceNameRegex(resources)
 
 		for windowSize := range windowSizes {
 			fullMetricName, err := pc.resolveFullMetricName(resources, metricName, windowSize)
@@ -122,15 +121,11 @@ func (pc *PrometheusClient) GetResourceMetrics(resources []scalertypes.Resource)
 
 			rawResult, warnings, err := pc.apiClient.Query(context.Background(), query, time.Now())
 			if err != nil {
-				pc.logger.WarnWith("Failed to execute Prometheus query",
-					"metricName", metricName,
-					"windowSize", windowSize,
-					"error", err)
-				continue
+				return nil, errors.Wrapf(err, "failed to execute Prometheus query for metricName=%s, windowSize=%s", metricName, windowSize)
 			}
 
 			if len(warnings) > 0 {
-				pc.logger.DebugWith("Prometheus query warnings",
+				pc.logger.WarnWith("Prometheus query returned warnings",
 					"metricName", metricName,
 					"windowSize", windowSize,
 					"warnings", warnings)
@@ -138,23 +133,13 @@ func (pc *PrometheusClient) GetResourceMetrics(resources []scalertypes.Resource)
 
 			metricSamples, ok := rawResult.(model.Vector)
 			if !ok {
-				pc.logger.WarnWith("Unexpected Prometheus result type",
-					"metricName", metricName,
-					"windowSize", windowSize,
-					"expectedType", "model.Vector",
-					"actualType", fmt.Sprintf("%T", rawResult))
-				continue
+				return nil, errors.Wrapf(err, "unexpected Prometheus result type for metricName=%s, windowSize=%s", metricName, windowSize)
 			}
 
 			for _, metricSample := range metricSamples {
 				resourceName, err := pc.extractResourceName(metricSample.Metric)
 				if err != nil {
-					pc.logger.WarnWith("Failed to extract resource name from the Prometheus metric's labels",
-						"metricName", metricName,
-						"windowSize", windowSize,
-						"labels", metricSample.Metric.String(),
-						"error", err)
-					continue
+					return nil, errors.Wrapf(err, "failed to extract resource name from the prometheus metric's labels. metricName=%s, windowSize=%s", metricName, windowSize)
 				}
 
 				// Round up values to ensure any fractional value > 0 becomes at least 1
@@ -182,7 +167,7 @@ func (pc *PrometheusClient) GetResourceMetrics(resources []scalertypes.Resource)
 }
 
 // renderQuery renders the Prometheus query template
-func (pc *PrometheusClient) renderQuery(queryTemplate *template.Template, windowSize, resourceNameRegex string) (string, error) {
+func (pc *PrometheusMetricsClient) renderQuery(queryTemplate *template.Template, windowSize, resourceNameRegex string) (string, error) {
 	templateData := make(map[string]string)
 	templateData["Namespace"] = pc.namespace
 	templateData["WindowSize"] = windowSize
@@ -197,7 +182,7 @@ func (pc *PrometheusClient) renderQuery(queryTemplate *template.Template, window
 }
 
 // extractWindowSizesForMetric extracts unique window sizes from resources' ScaleResources for a specific metric name.
-func (pc *PrometheusClient) extractWindowSizesForMetric(resources []scalertypes.Resource, metricName string) map[string]bool {
+func (pc *PrometheusMetricsClient) extractWindowSizesForMetric(resources []scalertypes.Resource, metricName string) map[string]bool {
 	windowSizes := make(map[string]bool)
 	for _, resource := range resources {
 		for _, scaleResource := range resource.ScaleResources {
@@ -211,7 +196,7 @@ func (pc *PrometheusClient) extractWindowSizesForMetric(resources []scalertypes.
 }
 
 // buildResourceNameRegex creates a Prometheus regex pattern for query filtering
-func (pc *PrometheusClient) buildResourceNameRegex(resources []scalertypes.Resource) string {
+func (pc *PrometheusMetricsClient) buildResourceNameRegex(resources []scalertypes.Resource) string {
 	resourceNames := make([]string, len(resources))
 	for i, resource := range resources {
 		resourceNames[i] = resource.Name
@@ -223,7 +208,7 @@ func (pc *PrometheusClient) buildResourceNameRegex(resources []scalertypes.Resou
 // resolveFullMetricName resolves the full metric name because the same resource can have multiple
 // metrics with the same base name but different window sizes (e.g., "metric_name_per_1m" vs "metric_name_per_5m"),
 // and we need unique keys in our internal metrics map to store them separately.
-func (pc *PrometheusClient) resolveFullMetricName(resources []scalertypes.Resource, metricName, windowSize string) (string, error) {
+func (pc *PrometheusMetricsClient) resolveFullMetricName(resources []scalertypes.Resource, metricName, windowSize string) (string, error) {
 	for _, resource := range resources {
 		for _, scaleResource := range resource.ScaleResources {
 			if scaleResource.MetricName == metricName {
@@ -238,11 +223,11 @@ func (pc *PrometheusClient) resolveFullMetricName(resources []scalertypes.Resour
 }
 
 // extractResourceName extracts the resource name from Prometheus metric labels.
-func (pc *PrometheusClient) extractResourceName(labels model.Metric) (string, error) {
+func (pc *PrometheusMetricsClient) extractResourceName(labels model.Metric) (string, error) {
 	labelNames := []model.LabelName{
-		"function",     // For nuclio functions (nuclio_processor_handled_events_total) - maps to nucliofunction resource
-		"service_name", // For deployments (num_of_requests, jupyter_kernel_busyness) - maps to deployment resource
-		"pod",          // For pod-based metrics (DCGM_FI_DEV_GPU_UTIL) - maps to pod resource
+		functionLabelName,
+		serviceLabelName,
+		podLabelName,
 	}
 	for _, labelName := range labelNames {
 		if value, ok := labels[labelName]; ok {
