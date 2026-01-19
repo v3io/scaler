@@ -241,6 +241,7 @@ func (suite *PrometheusClientTestSuite) TestGetResourceMetrics() {
 						Template: testQueryTemplateWithResources,
 					},
 				},
+				10*time.Second,
 			)
 			suite.Require().NoError(err)
 

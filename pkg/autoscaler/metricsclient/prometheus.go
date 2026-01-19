@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -50,14 +51,22 @@ type windowSizeLookup map[string]map[string]struct{}
 // metricLookup maps metricName → windowSizeLookup
 type metricLookup map[string]windowSizeLookup
 
+// metricResult holds the result of a single metric query for a resource
+type metricResult struct {
+	resourceName   string
+	fullMetricName string
+	metricValue    int
+}
+
 type PrometheusMetricsClient struct {
 	logger         logger.Logger
 	apiClient      prometheusv1.API
 	namespace      string
 	queryTemplates map[string]*template.Template
+	interval       time.Duration
 }
 
-func NewPrometheusClient(parentLogger logger.Logger, prometheusURL, namespace string, templates []scalertypes.QueryTemplate) (*PrometheusMetricsClient, error) {
+func NewPrometheusClient(parentLogger logger.Logger, prometheusURL, namespace string, templates []scalertypes.QueryTemplate, interval time.Duration) (*PrometheusMetricsClient, error) {
 	if len(templates) == 0 {
 		return nil, errors.New("query template cannot be empty")
 	}
@@ -94,78 +103,160 @@ func NewPrometheusClient(parentLogger logger.Logger, prometheusURL, namespace st
 		apiClient:      prometheusv1.NewAPI(client),
 		namespace:      namespace,
 		queryTemplates: queryTemplates,
+		interval:       interval,
 	}, nil
 }
 
 // GetResourceMetrics retrieves metrics for multiple resources
 func (pc *PrometheusMetricsClient) GetResourceMetrics(resources []scalertypes.Resource) (map[string]map[string]int, error) {
-	metricsByResource := make(map[string]map[string]int)
+	ctx, cancel := context.WithTimeout(context.Background(), pc.interval)
+	defer cancel()
 	metricToWindowSizes := pc.buildMetricLookup(resources)
+
+	// fetch metrics in a goroutine to enable timeout handling via context.
+	type result struct {
+		metrics map[string]map[string]int
+		err     error
+	}
+	resultCh := make(chan result, 1)
+	defer close(resultCh)
+
+	go func() {
+		metrics, err := pc.getResourceMetrics(ctx, metricToWindowSizes)
+		resultCh <- result{metrics: metrics, err: err}
+	}()
+
+	select {
+	case <-ctx.Done():
+		return nil, errors.Wrap(ctx.Err(), "timeout waiting for resource metrics")
+	case res := <-resultCh:
+		return res.metrics, res.err
+	}
+}
+
+func (pc *PrometheusMetricsClient) getResourceMetrics(ctx context.Context, metricToWindowSizes metricLookup) (map[string]map[string]int, error) {
+	metricsByResource := make(map[string]map[string]int)
+
+	resultChan := make(chan *metricResult)
+	errChan := make(chan error)
+	wg := sync.WaitGroup{}
 
 	for metricName, queryTemplate := range pc.queryTemplates {
 		windowSizeToResources := metricToWindowSizes[metricName]
 
 		for windowSize, resourcesInWindowSize := range windowSizeToResources {
-			// create resource name regex for Prometheus query based on the resources in this window size
-			resourceNameRegex := pc.createResourceNameRegex(resourcesInWindowSize)
-			fullMetricName := scalertypes.GetKubernetesMetricName(metricName, windowSize)
-			query, err := pc.renderQuery(queryTemplate, windowSize, resourceNameRegex)
-			if err != nil {
-				return nil, errors.Wrapf(err, "failed to render query for metricName=%s, windowSize=%s", metricName, windowSize)
-			}
-
-			rawResult, warnings, err := pc.apiClient.Query(context.Background(), query, time.Now())
-			if err != nil {
-				return nil, errors.Wrapf(err, "failed to execute Prometheus query for metricName=%s, windowSize=%s", metricName, windowSize)
-			}
-
-			if len(warnings) > 0 {
-				pc.logger.WarnWith("Prometheus query returned warnings",
-					"metricName", metricName,
-					"windowSize", windowSize,
-					"warnings", warnings)
-			}
-
-			metricSamples, ok := rawResult.(model.Vector)
-			if !ok {
-				return nil, errors.Wrapf(err, "unexpected Prometheus result type for metricName=%s, windowSize=%s", metricName, windowSize)
-			}
-
-			for _, metricSample := range metricSamples {
-				resourceName, err := pc.extractResourceName(metricSample.Metric)
+			wg.Add(1)
+			go func(resourcesInWindowSize map[string]struct{}, metricName, windowSize string, resultChan chan<- *metricResult, errChan chan<- error) {
+				defer wg.Done()
+				// create resource name regex for Prometheus query based on the resources in this window size
+				resourceNameRegex := pc.createResourceNameRegex(resourcesInWindowSize)
+				fullMetricName := scalertypes.GetKubernetesMetricName(metricName, windowSize)
+				query, err := pc.renderQuery(queryTemplate, windowSize, resourceNameRegex)
 				if err != nil {
-					return nil, errors.Wrapf(err, "failed to extract resource name from the prometheus metric's labels. metricName=%s, windowSize=%s", metricName, windowSize)
+					errChan <- errors.Wrapf(err, "failed to render query: metricName=%s, windowSize=%s", metricName, windowSize)
+					return
 				}
 
-				if _, exists := resourcesInWindowSize[resourceName]; !exists {
-					pc.logger.DebugWith("Received metric for unconfigured resource, skipping",
-						"resourceName", resourceName,
+				rawResult, warnings, err := pc.apiClient.Query(ctx, query, time.Now())
+				if err != nil {
+					errChan <- errors.Wrapf(err, "failed to execute Prometheus query: metricName=%s, windowSize=%s", metricName, windowSize)
+					return
+				}
+
+				if len(warnings) > 0 {
+					pc.logger.WarnWith("Prometheus query returned warnings",
 						"metricName", metricName,
-						"windowSize", windowSize)
-					continue
+						"windowSize", windowSize,
+						"warnings", warnings)
 				}
 
-				// Round up values to ensure any fractional value > 0 becomes at least 1
-				// This prevents incorrect scale-to-zero decisions for resources with low activity
-				metricValue := int(math.Ceil(float64(metricSample.Value)))
-
-				if _, exists := metricsByResource[resourceName]; !exists {
-					metricsByResource[resourceName] = make(map[string]int)
+				metricSamples, ok := rawResult.(model.Vector)
+				if !ok {
+					errChan <- errors.Errorf("unexpected Prometheus result type for metricName=%s, windowSize=%s", metricName, windowSize)
+					return
 				}
 
-				pc.logger.DebugWith("Retrieved metric",
-					"resourceName", resourceName,
-					"metricName", fullMetricName,
-					"windowSize", windowSize,
-					"value", metricValue)
+				for _, metricSample := range metricSamples {
+					resourceName, err := pc.extractResourceName(metricSample.Metric)
+					if err != nil {
+						errChan <- errors.Wrapf(err, "failed to extract resource name from the prometheus metric's labels. metricName=%s, windowSize=%s", metricName, windowSize)
+						return
+					}
 
-				if _, exists := metricsByResource[resourceName][fullMetricName]; exists {
-					return nil, errors.Errorf("Cannot have more than one metricSample value per resource: resource=%s, metricSample=%s", resourceName, fullMetricName)
+					if _, exists := resourcesInWindowSize[resourceName]; !exists {
+						pc.logger.DebugWith("Received metric for unconfigured resource, skipping",
+							"resourceName", resourceName,
+							"metricName", metricName,
+							"windowSize", windowSize)
+						continue
+					}
+
+					// Round up values to ensure any fractional value > 0 becomes at least 1
+					// This prevents incorrect scale-to-zero decisions for resources with low activity
+					metricValue := int(math.Ceil(float64(metricSample.Value)))
+
+					pc.logger.DebugWith("Retrieved metric",
+						"resourceName", resourceName,
+						"metricName", fullMetricName,
+						"windowSize", windowSize,
+						"value", metricValue)
+
+					// finished processing this metric sample, send the result
+					resultChan <- &metricResult{
+						resourceName:   resourceName,
+						fullMetricName: fullMetricName,
+						metricValue:    metricValue,
+					}
 				}
-				metricsByResource[resourceName][fullMetricName] = metricValue
-			}
+			}(resourcesInWindowSize, metricName, windowSize, resultChan, errChan)
 		}
 	}
+
+	var collectedErrors []error
+	collectorDone := make(chan struct{})
+	// Collect results and errors
+	go func(resultChan <-chan *metricResult, errChan <-chan error) {
+		defer close(collectorDone)
+		for resultChan != nil || errChan != nil {
+			select {
+			case result, ok := <-resultChan:
+				if !ok {
+					resultChan = nil
+					continue
+				}
+				if _, exists := metricsByResource[result.resourceName]; !exists {
+					metricsByResource[result.resourceName] = make(map[string]int)
+				}
+				if _, exists := metricsByResource[result.resourceName][result.fullMetricName]; exists {
+					collectedErrors = append(collectedErrors, errors.Errorf("duplicate metric value for resource: resourceName=%s, metricName=%s", result.resourceName, result.fullMetricName))
+					continue
+				}
+				metricsByResource[result.resourceName][result.fullMetricName] = result.metricValue
+
+			case err, ok := <-errChan:
+				if !ok {
+					errChan = nil
+					continue
+				}
+				if err == nil {
+					continue
+				}
+				collectedErrors = append(collectedErrors, err)
+			}
+		}
+	}(resultChan, errChan)
+
+	// wait for all queries to complete
+	wg.Wait()
+	close(resultChan)
+	close(errChan)
+	// wait for collector to finish processing results
+	<-collectorDone
+
+	if len(collectedErrors) > 0 {
+		return nil, errors.Errorf("failed to get resource metrics: %v", collectedErrors)
+	}
+
 	return metricsByResource, nil
 }
 

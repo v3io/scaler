@@ -43,7 +43,8 @@ func NewMetricsClient(logger logger.Logger,
 			logger,
 			autoScalerConf.MetricsClientOptions.URL,
 			autoScalerConf.Namespace,
-			autoScalerConf.MetricsClientOptions.QueryTemplates)
+			autoScalerConf.MetricsClientOptions.QueryTemplates,
+			autoScalerConf.ScaleInterval.Duration)
 		if err != nil {
 			return nil, errors.Wrap(err, "Failed to create Prometheus metric client")
 		}
