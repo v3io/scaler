@@ -41,11 +41,13 @@ const (
 	KindPrometheusClient = "prometheusClient"
 )
 
+// QueryTemplate defines a named Prometheus query template.
 type QueryTemplate struct {
 	Name     string
 	Template string
 }
 
+// CreateQueryTemplate parses and validates the query template
 func (q *QueryTemplate) CreateQueryTemplate() (*template.Template, error) {
 	if q.Name == "" {
 		return nil, errors.New("template name cannot be empty")
@@ -156,10 +158,12 @@ type ScaleResource struct {
 	Threshold  int      `json:"threshold,omitempty"`
 }
 
+// GetKubernetesMetricName constructs a Kubernetes metric name from a base metric name and window size
 func (sr ScaleResource) GetKubernetesMetricName() string {
 	return GetKubernetesMetricName(sr.MetricName, ShortDurationString(sr.WindowSize))
 }
 
+// GetKubernetesMetricName constructs a Kubernetes metric name from a base metric name and window size
 func GetKubernetesMetricName(metricName, windowSize string) string {
 	return fmt.Sprintf("%s_per_%s", metricName, windowSize)
 }
@@ -227,6 +231,7 @@ func (d *Duration) UnmarshalJSON(b []byte) error {
 	}
 }
 
+// ShortDurationString formats a Duration into a short string representation by removing trailing zeros
 func ShortDurationString(d Duration) string {
 	s := d.String()
 	if strings.HasSuffix(s, "m0s") {

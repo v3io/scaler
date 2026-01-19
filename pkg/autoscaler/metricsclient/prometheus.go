@@ -58,6 +58,7 @@ type metricResult struct {
 	metricValue    int
 }
 
+// PrometheusMetricsClient implements MetricsClient interface using Prometheus as the backend
 type PrometheusMetricsClient struct {
 	logger         logger.Logger
 	apiClient      prometheusv1.API
@@ -66,9 +67,10 @@ type PrometheusMetricsClient struct {
 	interval       time.Duration
 }
 
+// NewPrometheusClient creates a new PrometheusMetricsClient instance
 func NewPrometheusClient(parentLogger logger.Logger, prometheusURL, namespace string, templates []scalertypes.QueryTemplate, interval time.Duration) (*PrometheusMetricsClient, error) {
 	if len(templates) == 0 {
-		return nil, errors.New("query template cannot be empty")
+		return nil, errors.New("query templates cannot be empty")
 	}
 
 	if prometheusURL == "" {
@@ -310,7 +312,7 @@ func (pc *PrometheusMetricsClient) extractResourceName(labels model.Metric) (str
 			return string(value), nil
 		}
 	}
-	return "", errors.Errorf("Could not extract resource name from labels: %v", labels)
+	return "", errors.Errorf("could not extract resource name from labels: %v", labels)
 }
 
 // createResourceNameRegex creates a regex string for Prometheus query from resource names
