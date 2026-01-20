@@ -24,6 +24,9 @@ on:
     branches:
     - development
 
+permissions:
+  contents: read
+
 env:
   AUTOSCALER_DOCKER_REPO: quay.io/v3io/autoscaler
   DLX_DOCKER_REPO: quay.io/v3io/dlx
@@ -50,14 +53,14 @@ jobs:
         run: |
           echo "SCALER_LABEL=${{ steps.release_info.outputs.REF_TAG }}" >> $GITHUB_ENV
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           cache: true
           go-version-file: "go.mod"
 
-      - uses: azure/docker-login@v1
+      - uses: azure/docker-login@15c4aadf093404726ab2ff205b2cdd33fa6d054c # v2
         with:
           login-server: quay.io
           username: ${{ secrets.QUAYIO_DOCKER_USERNAME }}
