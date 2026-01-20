@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/nuclio/errors"
@@ -37,12 +38,34 @@ type MetricsClientKind string
 
 const (
 	KindK8sMetricsClient = "k8sMetricsClient"
+	KindPrometheusClient = "prometheusClient"
 )
+
+// QueryTemplate defines a named Prometheus query template.
+type QueryTemplate struct {
+	Name     string
+	Template string
+}
+
+// CreateQueryTemplate parses and validates the query template
+func (q *QueryTemplate) CreateQueryTemplate() (*template.Template, error) {
+	if q.Name == "" {
+		return nil, errors.New("template name cannot be empty")
+	}
+	if q.Template == "" {
+		return nil, errors.New("query template cannot be empty")
+	}
+	tmpl, err := template.New(q.Name).Parse(q.Template)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse query template")
+	}
+	return tmpl, nil
+}
 
 type MetricsClientOptions struct {
 	MetricsClientKind MetricsClientKind
 	URL               string
-	Template          string
+	QueryTemplates    []QueryTemplate
 }
 
 type AutoScalerOptions struct {
@@ -135,8 +158,14 @@ type ScaleResource struct {
 	Threshold  int      `json:"threshold,omitempty"`
 }
 
+// GetKubernetesMetricName constructs a Kubernetes metric name from a base metric name and window size
 func (sr ScaleResource) GetKubernetesMetricName() string {
-	return fmt.Sprintf("%s_per_%s", sr.MetricName, shortDurationString(sr.WindowSize))
+	return GetKubernetesMetricName(sr.MetricName, ShortDurationString(sr.WindowSize))
+}
+
+// GetKubernetesMetricName constructs a Kubernetes metric name from a base metric name and window size
+func GetKubernetesMetricName(metricName, windowSize string) string {
+	return fmt.Sprintf("%s_per_%s", metricName, windowSize)
 }
 
 func (sr ScaleResource) String() string {
@@ -202,7 +231,8 @@ func (d *Duration) UnmarshalJSON(b []byte) error {
 	}
 }
 
-func shortDurationString(d Duration) string {
+// ShortDurationString formats a Duration into a short string representation by removing trailing zeros
+func ShortDurationString(d Duration) string {
 	s := d.String()
 	if strings.HasSuffix(s, "m0s") {
 		s = s[:len(s)-2]
@@ -215,10 +245,10 @@ func shortDurationString(d Duration) string {
 
 // MetricsClient defines an interface for retrieving resource metrics used by the autoscaler.
 type MetricsClient interface {
-	// GetResourceMetrics retrieves metrics for multiple resources and metric names.
+	// GetResourceMetrics retrieves metrics for multiple resources.
 	//
 	// Parameters:
-	//   - metricNames: A slice of metric names to retrieve (e.g., "requests_per_minute", "cpu_usage_per_hour")
+	//   - resources: A slice of resources to retrieve metrics for
 	//
 	// Returns:
 	//   - map[string]map[string]int: A nested map structure where:
@@ -231,5 +261,5 @@ type MetricsClient interface {
 	// The dual map structure allows efficient lookup of metric values by resource name
 	// and then by metric name, enabling the autoscaler to check multiple metrics
 	// per resource when making scaling decisions.
-	GetResourceMetrics(metricNames []string) (map[string]map[string]int, error)
+	GetResourceMetrics(resources []Resource) (map[string]map[string]int, error)
 }

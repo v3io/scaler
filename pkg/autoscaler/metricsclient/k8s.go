@@ -21,6 +21,9 @@ such restriction.
 package metricsclient
 
 import (
+	"github.com/v3io/scaler/pkg/common"
+	"github.com/v3io/scaler/pkg/scalertypes"
+
 	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -52,15 +55,20 @@ func NewCustomMetricsClient(
 	availableAPIsGetter := k8scustommetrics.NewAvailableAPIsGetter(discoveryClient)
 	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(memory.NewMemCacheClient(discoveryClient))
 	customMetricsClient := k8scustommetrics.NewForConfig(restConfig, restMapper, availableAPIsGetter)
+
+	childLogger := parentLogger.GetChild("custom-metrics")
+	childLogger.Info("Creating custom-metrics client")
+
 	return &K8sCustomMetricsClient{
-		logger:              parentLogger.GetChild("custom-metrics"),
+		logger:              childLogger,
 		CustomMetricsClient: customMetricsClient,
 		namespace:           namespace,
 		groupKind:           groupKind,
 	}, nil
 }
 
-func (cmw *K8sCustomMetricsClient) GetResourceMetrics(metricNames []string) (map[string]map[string]int, error) {
+func (cmw *K8sCustomMetricsClient) GetResourceMetrics(resources []scalertypes.Resource) (map[string]map[string]int, error) {
+	metricNames := cmw.getMetricNames(resources)
 	resourcesMetricsMap := make(map[string]map[string]int)
 	resourceLabels := labels.Everything()
 	metricSelectorLabels := labels.Everything()
@@ -99,6 +107,17 @@ func (cmw *K8sCustomMetricsClient) GetResourceMetrics(metricNames []string) (map
 			resourcesMetricsMap[resourceName][metricName] = value
 		}
 	}
-
 	return resourcesMetricsMap, nil
+}
+
+// getMetricNames extracts unique metric names from resources
+func (cmw *K8sCustomMetricsClient) getMetricNames(resources []scalertypes.Resource) []string {
+	var metricNames []string
+	for _, resource := range resources {
+		for _, scaleResource := range resource.ScaleResources {
+			metricNames = append(metricNames, scaleResource.GetKubernetesMetricName())
+		}
+	}
+	metricNames = common.UniquifyStringSlice(metricNames)
+	return metricNames
 }
