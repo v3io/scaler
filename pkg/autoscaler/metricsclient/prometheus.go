@@ -115,7 +115,8 @@ func (pc *PrometheusMetricsClient) GetResourceMetrics(resources []scalertypes.Re
 	defer cancel()
 	metricToWindowSizes := pc.buildMetricLookup(resources)
 
-	// fetch metrics in a goroutine to enable timeout handling via context.
+	// run getResourceMetrics in a goroutine so we can race it against the context timeout.
+	// the select below returns whichever completes first: the metrics result or the timeout.
 	type result struct {
 		metrics map[string]map[string]int
 		err     error
@@ -140,7 +141,6 @@ func (pc *PrometheusMetricsClient) getResourceMetrics(ctx context.Context, metri
 	metricsByResource := make(map[string]map[string]int)
 
 	resultChan := make(chan *metricResult)
-	errChan := make(chan error)
 	wg := sync.WaitGroup{}
 
 	for metricName, queryTemplate := range pc.queryTemplates {
@@ -148,20 +148,26 @@ func (pc *PrometheusMetricsClient) getResourceMetrics(ctx context.Context, metri
 
 		for windowSize, resourcesInWindowSize := range windowSizeToResources {
 			wg.Add(1)
-			go func(resourcesInWindowSize map[string]struct{}, metricName, windowSize string, resultChan chan<- *metricResult, errChan chan<- error) {
+			go func(resourcesInWindowSize map[string]struct{}, metricName, windowSize string, resultChan chan<- *metricResult) {
 				defer wg.Done()
 				// create resource name regex for Prometheus query based on the resources in this window size
 				resourceNameRegex := pc.createResourceNameRegex(resourcesInWindowSize)
 				fullMetricName := scalertypes.GetKubernetesMetricName(metricName, windowSize)
 				query, err := pc.renderQuery(queryTemplate, windowSize, resourceNameRegex)
 				if err != nil {
-					errChan <- errors.Wrapf(err, "failed to render query: metricName=%s, windowSize=%s", metricName, windowSize)
+					pc.logger.WarnWith("Failed to render query, skipping",
+						"metricName", metricName,
+						"windowSize", windowSize,
+						"error", err.Error())
 					return
 				}
 
 				rawResult, warnings, err := pc.apiClient.Query(ctx, query, time.Now())
 				if err != nil {
-					errChan <- errors.Wrapf(err, "failed to execute Prometheus query: metricName=%s, windowSize=%s", metricName, windowSize)
+					pc.logger.WarnWith("Failed to execute Prometheus query, skipping",
+						"metricName", metricName,
+						"windowSize", windowSize,
+						"error", err.Error())
 					return
 				}
 
@@ -174,15 +180,20 @@ func (pc *PrometheusMetricsClient) getResourceMetrics(ctx context.Context, metri
 
 				metricSamples, ok := rawResult.(model.Vector)
 				if !ok {
-					errChan <- errors.Errorf("unexpected Prometheus result type for metricName=%s, windowSize=%s", metricName, windowSize)
+					pc.logger.WarnWith("Unexpected Prometheus result type, skipping",
+						"metricName", metricName,
+						"windowSize", windowSize)
 					return
 				}
 
 				for _, metricSample := range metricSamples {
 					resourceName, err := pc.extractResourceName(metricSample.Metric)
 					if err != nil {
-						errChan <- errors.Wrapf(err, "failed to extract resource name from the prometheus metric's labels. metricName=%s, windowSize=%s", metricName, windowSize)
-						return
+						pc.logger.WarnWith("Failed to extract resource name from prometheus metric labels, skipping",
+							"metricName", metricName,
+							"windowSize", windowSize,
+							"error", err.Error())
+						continue
 					}
 
 					if _, exists := resourcesInWindowSize[resourceName]; !exists {
@@ -210,53 +221,52 @@ func (pc *PrometheusMetricsClient) getResourceMetrics(ctx context.Context, metri
 						metricValue:    metricValue,
 					}
 				}
-			}(resourcesInWindowSize, metricName, windowSize, resultChan, errChan)
+			}(resourcesInWindowSize, metricName, windowSize, resultChan)
 		}
 	}
 
-	var collectedErrors []error
+	var collectorErr error
 	collectorDone := make(chan struct{})
-	// Collect results and errors
-	go func(resultChan <-chan *metricResult, errChan <-chan error) {
+	// Collect results
+	go func(resultChan chan *metricResult) {
 		defer close(collectorDone)
-		for resultChan != nil || errChan != nil {
+		for {
 			select {
 			case result, ok := <-resultChan:
 				if !ok {
-					resultChan = nil
-					continue
+					return
 				}
 				if _, exists := metricsByResource[result.resourceName]; !exists {
 					metricsByResource[result.resourceName] = make(map[string]int)
 				}
-				if _, exists := metricsByResource[result.resourceName][result.fullMetricName]; exists {
-					collectedErrors = append(collectedErrors, errors.Errorf("duplicate metric value for resource: resourceName=%s, metricName=%s", result.resourceName, result.fullMetricName))
-					continue
+				if existingValue, exists := metricsByResource[result.resourceName][result.fullMetricName]; exists {
+					if existingValue == result.metricValue {
+						continue
+					}
+					collectorErr = errors.Errorf("conflicting metric values for resource: resourceName=%s, metricName=%s, existingValue=%d, newValue=%d",
+						result.resourceName, result.fullMetricName, existingValue, result.metricValue)
+					return
 				}
 				metricsByResource[result.resourceName][result.fullMetricName] = result.metricValue
 
-			case err, ok := <-errChan:
-				if !ok {
-					errChan = nil
-					continue
-				}
-				if err == nil {
-					continue
-				}
-				collectedErrors = append(collectedErrors, err)
+			case <-ctx.Done():
+				return
 			}
 		}
-	}(resultChan, errChan)
+	}(resultChan)
 
 	// wait for all queries to complete
 	wg.Wait()
 	close(resultChan)
-	close(errChan)
 	// wait for collector to finish processing results
 	<-collectorDone
 
-	if len(collectedErrors) > 0 {
-		return nil, errors.Errorf("failed to get resource metrics: %v", collectedErrors)
+	if collectorErr != nil {
+		return nil, collectorErr
+	}
+
+	if len(metricsByResource) == 0 {
+		return nil, errors.New("no metrics retrieved for any resource")
 	}
 
 	return metricsByResource, nil
