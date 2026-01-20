@@ -115,26 +115,7 @@ func (pc *PrometheusMetricsClient) GetResourceMetrics(resources []scalertypes.Re
 	defer cancel()
 	metricToWindowSizes := pc.buildMetricLookup(resources)
 
-	// run getResourceMetrics in a goroutine so we can race it against the context timeout.
-	// the select below returns whichever completes first: the metrics result or the timeout.
-	type result struct {
-		metrics map[string]map[string]int
-		err     error
-	}
-	resultCh := make(chan result, 1)
-	defer close(resultCh)
-
-	go func() {
-		metrics, err := pc.getResourceMetrics(ctx, metricToWindowSizes)
-		resultCh <- result{metrics: metrics, err: err}
-	}()
-
-	select {
-	case <-ctx.Done():
-		return nil, errors.Wrap(ctx.Err(), "timeout waiting for resource metrics")
-	case res := <-resultCh:
-		return res.metrics, res.err
-	}
+	return pc.getResourceMetrics(ctx, metricToWindowSizes)
 }
 
 func (pc *PrometheusMetricsClient) getResourceMetrics(ctx context.Context, metricToWindowSizes metricLookup) (map[string]map[string]int, error) {
@@ -146,6 +127,7 @@ func (pc *PrometheusMetricsClient) getResourceMetrics(ctx context.Context, metri
 	for metricName, queryTemplate := range pc.queryTemplates {
 		windowSizeToResources := metricToWindowSizes[metricName]
 
+		// maximum goroutines is limited to the number of unique windowSize values across all metrics (5 by default).
 		for windowSize, resourcesInWindowSize := range windowSizeToResources {
 			wg.Add(1)
 			go func(resourcesInWindowSize map[string]struct{}, metricName, windowSize string, resultChan chan<- *metricResult) {
@@ -230,28 +212,19 @@ func (pc *PrometheusMetricsClient) getResourceMetrics(ctx context.Context, metri
 	// Collect results
 	go func(resultChan chan *metricResult) {
 		defer close(collectorDone)
-		for {
-			select {
-			case result, ok := <-resultChan:
-				if !ok {
-					return
+		for result := range resultChan {
+			if _, exists := metricsByResource[result.resourceName]; !exists {
+				metricsByResource[result.resourceName] = make(map[string]int)
+			}
+			if existingValue, exists := metricsByResource[result.resourceName][result.fullMetricName]; exists {
+				if existingValue == result.metricValue {
+					continue
 				}
-				if _, exists := metricsByResource[result.resourceName]; !exists {
-					metricsByResource[result.resourceName] = make(map[string]int)
-				}
-				if existingValue, exists := metricsByResource[result.resourceName][result.fullMetricName]; exists {
-					if existingValue == result.metricValue {
-						continue
-					}
-					collectorErr = errors.Errorf("conflicting metric values for resource: resourceName=%s, metricName=%s, existingValue=%d, newValue=%d",
-						result.resourceName, result.fullMetricName, existingValue, result.metricValue)
-					return
-				}
-				metricsByResource[result.resourceName][result.fullMetricName] = result.metricValue
-
-			case <-ctx.Done():
+				collectorErr = errors.Errorf("conflicting metric values for resource: resourceName=%s, metricName=%s, existingValue=%d, newValue=%d",
+					result.resourceName, result.fullMetricName, existingValue, result.metricValue)
 				return
 			}
+			metricsByResource[result.resourceName][result.fullMetricName] = result.metricValue
 		}
 	}(resultChan)
 
