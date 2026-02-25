@@ -223,6 +223,24 @@ func (suite *PrometheusClientTestSuite) TestGetResourceMetrics() {
 				},
 			},
 		},
+		{
+			name: "empty metrics from prometheus",
+			resources: []scalertypes.Resource{
+				{
+					Name: "test-resource1",
+					ScaleResources: []scalertypes.ScaleResource{
+						{
+							MetricName: "handled_events_total",
+							WindowSize: scalertypes.Duration{Duration: 1 * time.Minute},
+						},
+					},
+				},
+			},
+			serverResultPerWindowSize: map[string][]map[string]interface{}{
+				"1m": {},
+			},
+			expectedResult: map[string]map[string]int{},
+		},
 	}
 
 	for _, testCase := range tests {
