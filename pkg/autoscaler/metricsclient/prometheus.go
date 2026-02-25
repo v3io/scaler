@@ -238,10 +238,6 @@ func (pc *PrometheusMetricsClient) getResourceMetrics(ctx context.Context, metri
 		return nil, collectorErr
 	}
 
-	if len(metricsByResource) == 0 {
-		return nil, errors.New("no metrics retrieved for any resource")
-	}
-
 	return metricsByResource, nil
 }
 
