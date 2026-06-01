@@ -29,6 +29,13 @@ linters:
     - unconvert
     - govet
     - unused
+  exclusions:
+    rules:
+      # Test files commonly repeat literal fixtures (hosts, paths, resource names);
+      # extracting them into constants hurts readability more than it helps.
+      - path: _test\.go
+        linters:
+          - goconst
 
 formatters:
   enable:

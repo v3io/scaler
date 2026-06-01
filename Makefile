@@ -70,21 +70,33 @@ push-docker-images:
 
 # tools get built with the specified OS/arch and inject version
 GO_BUILD_TOOL_WORKDIR = /scaler
-GOLANGCI_LINT_VERSION := v2.7.2
+GOLANGCI_LINT_VERSION := 2.12.1
+GOLANGCI_LINT_BIN := .bin/golangci-lint
+GOLANGCI_LINT_INSTALL_COMMAND := curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b .bin v$(GOLANGCI_LINT_VERSION)
+
+.PHONY: ensure-golangci-linter
+ensure-golangci-linter:
+	@if ! command -v $(GOLANGCI_LINT_BIN) >/dev/null 2>&1; then \
+		echo "golangci-lint not found. Installing..."; \
+		$(GOLANGCI_LINT_INSTALL_COMMAND); \
+	else \
+		installed_version=$$($(GOLANGCI_LINT_BIN) version | awk '/version/ {gsub(/^v/, "", $$4); print $$4}'); \
+		if [ "$$installed_version" != "$(GOLANGCI_LINT_VERSION)" ]; then \
+			echo "golangci-lint version mismatch ($$installed_version != $(GOLANGCI_LINT_VERSION)). Reinstalling..."; \
+			$(GOLANGCI_LINT_INSTALL_COMMAND); \
+		fi \
+	fi
 
 .PHONY: lint
-lint: modules
-	@test -e .bin/golangci-lint || \
-    	  	(curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b .bin $(GOLANGCI_LINT_VERSION))
-
+lint: modules ensure-golangci-linter
 	@echo Linting...
-	.bin/golangci-lint run -v
+	$(GOLANGCI_LINT_BIN) run -v
 	@echo Done.
 
 .PHONY: fmt
-fmt:
+fmt: ensure-golangci-linter
 	gofmt -s -w .
-	.bin/golangci-lint run --fix ./...
+	$(GOLANGCI_LINT_BIN) run --fix ./...
 
 .PHONY: test-undockerized
 test-undockerized: modules
