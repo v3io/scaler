@@ -70,7 +70,7 @@ push-docker-images:
 
 # tools get built with the specified OS/arch and inject version
 GO_BUILD_TOOL_WORKDIR = /scaler
-GOLANGCI_LINT_VERSION := v2.7.2
+GOLANGCI_LINT_VERSION := v2.12.1
 
 .PHONY: lint
 lint: modules
