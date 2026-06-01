@@ -30,6 +30,6 @@ COPY . .
 
 RUN GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-s -w" -o dlx cmd/dlx/main.go
 
-FROM gcr.io/iguazio/alpine:3.18
+FROM gcr.io/iguazio/alpine:3.23
 
 COPY --from=builder /dlx/dlx /home/v3io/bin/dlx
