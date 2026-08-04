@@ -72,7 +72,8 @@ func NewDLX(parentLogger logger.Logger,
 		options.TargetPathHeader,
 		options.TargetPort,
 		options.MultiTargetStrategy,
-		watcher.GetIngressHostCacheReader())
+		watcher.GetIngressHostCacheReader(),
+		options.TargetAuthenticator)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create handler")
 	}
