@@ -132,8 +132,13 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 		"resourceNames", resourceNames)
 
 	if h.targetAuthenticator != nil {
+
+		// every resolved target must authenticate: a canary ingress resolves to both the primary and the
+		// canary function, and starting either of them on a single verdict would be a way past the check
 		for _, name := range resourceNames {
-			if !h.targetAuthenticator.AuthenticateTarget(name) {
+			if !h.targetAuthenticator.AuthenticateTarget(res, req, name) {
+
+				// the authenticator has already written the 401/302; writing to res here would clobber it
 				h.logger.DebugWith("Authentication failed, not scaling from zero",
 					"resourceName", name,
 					"host", req.Host,

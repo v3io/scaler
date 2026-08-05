@@ -24,6 +24,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 	"text/template"
 	"time"
@@ -120,13 +121,15 @@ type ResolveTargetsFromIngressCallback func(ingress *networkingv1.Ingress) ([]st
 //
 // Implementation guidelines:
 //   - On a false return the implementation has already written the mode-appropriate
-//     rejection (401 for api, 302 for browser) to the response; the caller must stop
-//     processing immediately.
+//     rejection (401 for api, 302 for browser) to res; the caller must stop
+//     processing immediately without writing to res itself.
 //   - Fail closed: any error path must return false with a written rejection.
 type TargetAuthenticator interface {
-	// AuthenticateTarget returns true if the request is authorized for functionName.
-	// On false, the mode-appropriate rejection has already been written to the response.
-	AuthenticateTarget(functionName string) bool
+	// AuthenticateTarget returns true if req is authorized for functionName. The request is
+	// passed in because the credential lives on it (Authorization, Cookie, and the
+	// authenticator-kind header), and res because on false the implementation, not the DLX,
+	// writes the mode-appropriate rejection.
+	AuthenticateTarget(res http.ResponseWriter, req *http.Request, functionName string) bool
 }
 
 type DLXOptions struct {

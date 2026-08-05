@@ -294,6 +294,10 @@ func (suite *HandlerTestSuite) TestAuthenticateTargetCallback() {
 
 	// SetScaleCtx must NOT have been called — function stays at zero
 	suite.scaler.AssertNotCalled(suite.T(), "SetScaleCtx")
+
+	// the authenticator's rejection must reach the caller untouched. Asserting only on SetScaleCtx
+	// would still pass if the DLX swallowed the response and returned a bare 200.
+	suite.Require().Equal(http.StatusUnauthorized, testResponse.Code)
 }
 
 // --- HandlerTestSuite suite methods ---
@@ -373,9 +377,11 @@ func TestHandlerTestSuite(t *testing.T) {
 	suite.Run(t, new(HandlerTestSuite))
 }
 
-// rejectingTargetAuthenticator always denies, proving the DLX stops before scaling.
+// rejectingTargetAuthenticator always denies, proving the DLX stops before scaling. It writes the
+// rejection itself, as a real implementation does.
 type rejectingTargetAuthenticator struct{}
 
-func (r *rejectingTargetAuthenticator) AuthenticateTarget(_ string) bool {
+func (r *rejectingTargetAuthenticator) AuthenticateTarget(res http.ResponseWriter, _ *http.Request, _ string) bool {
+	res.WriteHeader(http.StatusUnauthorized)
 	return false
 }
