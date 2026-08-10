@@ -125,7 +125,7 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	h.logger.InfoWith("Resolved targets for request",
+	h.logger.DebugWith("Resolved targets for request",
 		"host", req.Host,
 		"path", h.getRequestURLPath(req),
 		"url", req.URL.String(),
