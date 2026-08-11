@@ -51,6 +51,7 @@ type Handler struct {
 	proxyLock           sync.Locker
 	lastProxyErrorTime  time.Time
 	ingressCache        ingresscache.IngressHostCacheReader
+	targetAuthenticator scalertypes.TargetAuthenticator
 }
 
 func NewHandler(parentLogger logger.Logger,
@@ -60,7 +61,8 @@ func NewHandler(parentLogger logger.Logger,
 	targetPathHeader string,
 	targetPort int,
 	multiTargetStrategy scalertypes.MultiTargetStrategy,
-	ingressCache ingresscache.IngressHostCacheReader) (Handler, error) {
+	ingressCache ingresscache.IngressHostCacheReader,
+	targetAuthenticator scalertypes.TargetAuthenticator) (Handler, error) {
 	h := Handler{
 		logger:              parentLogger.GetChild("handler"),
 		resourceStarter:     resourceStarter,
@@ -73,6 +75,7 @@ func NewHandler(parentLogger logger.Logger,
 		proxyLock:           &sync.Mutex{},
 		lastProxyErrorTime:  time.Now(),
 		ingressCache:        ingressCache,
+		targetAuthenticator: targetAuthenticator,
 	}
 	h.HandleFunc = h.handleRequest
 	return h, nil
@@ -120,6 +123,31 @@ func (h *Handler) handleRequest(res http.ResponseWriter, req *http.Request) {
 
 			resourceTargetURLMap[resourceName] = targetURL
 		}
+	}
+
+	h.logger.DebugWith("Resolved targets for request",
+		"host", req.Host,
+		"path", h.getRequestURLPath(req),
+		"url", req.URL.String(),
+		"resourceNames", resourceNames)
+
+	if h.targetAuthenticator != nil {
+
+		// every resolved target must authenticate: a canary ingress resolves to both the primary and the
+		// canary function, and starting either of them on a single verdict would be a way past the check
+		for _, name := range resourceNames {
+			if !h.targetAuthenticator.AuthenticateTarget(res, req, name) {
+
+				// the authenticator has already written the 401/302; writing to res here would clobber it
+				h.logger.DebugWith("Authentication failed, not scaling from zero",
+					"resourceName", name,
+					"host", req.Host,
+					"path", h.getRequestURLPath(req))
+				return
+			}
+		}
+		h.logger.DebugWith("Authentication succeeded, scaling from zero",
+			"resourceNames", resourceNames)
 	}
 
 	statusResult := h.startResources(resourceNames)

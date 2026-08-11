@@ -261,6 +261,45 @@ func (suite *HandlerTestSuite) TestGetPathAndResourceNames() {
 	}
 }
 
+func (suite *HandlerTestSuite) TestAuthenticateTargetCallback() {
+	initialCachedData := &kube.IngressValue{
+		Host:    "www.example.com",
+		Path:    "test/path",
+		Targets: []string{"test-targets-name-1"},
+	}
+	testIngressCache := ingresscache.NewIngressCache(suite.logger)
+	suite.Require().NoError(testIngressCache.Set(initialCachedData.Host, initialCachedData.Path, initialCachedData.Targets))
+
+	// parseTargetURL runs before the auth check to build the URL map; it needs ResolveServiceName.
+	suite.scaler.ExpectedCalls = nil
+	suite.scaler.On("ResolveServiceName", mock.Anything).Return(suite.backendHost, nil)
+
+	testHandler, err := NewHandler(
+		suite.logger,
+		suite.starter,
+		suite.scaler,
+		"X-Resource-Name",
+		"X-Resource-Path",
+		suite.backendPort,
+		scalertypes.MultiTargetStrategyPrimary,
+		testIngressCache,
+		&rejectingTargetAuthenticator{},
+	)
+	suite.Require().NoError(err)
+
+	testRequest := suite.createTestHTTPRequest("Auth rejected — function stays at zero", nil, "www.example.com", "test/path")
+	testResponse := httptest.NewRecorder()
+
+	testHandler.handleRequest(testResponse, testRequest)
+
+	// SetScaleCtx must NOT have been called — function stays at zero
+	suite.scaler.AssertNotCalled(suite.T(), "SetScaleCtx")
+
+	// the authenticator's rejection must reach the caller untouched. Asserting only on SetScaleCtx
+	// would still pass if the DLX swallowed the response and returned a bare 200.
+	suite.Require().Equal(http.StatusUnauthorized, testResponse.Code)
+}
+
 // --- HandlerTestSuite suite methods ---
 
 func (suite *HandlerTestSuite) createTestHandlerAndInitTestCache(targetPort int, initialCachedData *kube.IngressValue) (Handler, error) {
@@ -280,6 +319,7 @@ func (suite *HandlerTestSuite) createTestHandlerAndInitTestCache(targetPort int,
 		targetPort,
 		scalertypes.MultiTargetStrategyPrimary,
 		testIngressCache,
+		nil,
 	)
 }
 
@@ -335,4 +375,13 @@ func (suite *HandlerTestSuite) setScalerMocksBasedOnTestCase(
 
 func TestHandlerTestSuite(t *testing.T) {
 	suite.Run(t, new(HandlerTestSuite))
+}
+
+// rejectingTargetAuthenticator always denies, proving the DLX stops before scaling. It writes the
+// rejection itself, as a real implementation does.
+type rejectingTargetAuthenticator struct{}
+
+func (r *rejectingTargetAuthenticator) AuthenticateTarget(res http.ResponseWriter, _ *http.Request, _ string) bool {
+	res.WriteHeader(http.StatusUnauthorized)
+	return false
 }

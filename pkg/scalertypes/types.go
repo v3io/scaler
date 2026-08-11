@@ -24,6 +24,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 	"text/template"
 	"time"
@@ -112,6 +113,25 @@ const (
 // - Should handle nil or malformed Ingress objects gracefully and return an error in such cases
 type ResolveTargetsFromIngressCallback func(ingress *networkingv1.Ingress) ([]string, error)
 
+// TargetAuthenticator authenticates incoming requests against specific target functions
+// before the DLX scales them from zero.
+//
+// This interface is expected to be implemented externally and passed into the DLX via
+// DLXOptions, allowing the ResourceScaler plugin to delegate to the co-located auth-proxy.
+//
+// Implementation guidelines:
+//   - On a false return the implementation has already written the mode-appropriate
+//     rejection (401 for api, 302 for browser) to res; the caller must stop
+//     processing immediately without writing to res itself.
+//   - Fail closed: any error path must return false with a written rejection.
+type TargetAuthenticator interface {
+	// AuthenticateTarget returns true if req is authorized for functionName. The request is
+	// passed in because the credential lives on it (Authorization, Cookie, and the
+	// authenticator-kind header), and res because on false the implementation, not the DLX,
+	// writes the mode-appropriate rejection.
+	AuthenticateTarget(res http.ResponseWriter, req *http.Request, functionName string) bool
+}
+
 type DLXOptions struct {
 	Namespace string
 
@@ -124,6 +144,7 @@ type DLXOptions struct {
 	MultiTargetStrategy               MultiTargetStrategy
 	LabelSelector                     string
 	ResolveTargetsFromIngressCallback ResolveTargetsFromIngressCallback `json:"-"`
+	TargetAuthenticator               TargetAuthenticator               `json:"-"`
 	ResyncInterval                    Duration
 	KubeClientSet                     kubernetes.Interface `json:"-"`
 }
